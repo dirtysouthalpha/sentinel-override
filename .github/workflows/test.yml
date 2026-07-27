@@ -81,6 +81,16 @@ jobs:
             echo "PASS: All JS files have valid syntax"
           fi
 
+      # ━━━ Step 2b: Web Dashboard Load Gate ━━━
+      # web/ is plain browser pages with no build step, so nothing above ever
+      # parsed them: the Syntax Check only walks background/ content/
+      # popup-modules/, and dashboard-prime.html keeps its ~1000-line script
+      # inline where `node --check` cannot reach it. This parses each page with
+      # linkedom, compiles every inline script, and verifies the element ids the
+      # scripts drive actually exist.
+      - name: Web Dashboard Load Gate
+        run: npm run test:web
+
       # ━━━ Step 3: Test Suite ━━━
       - name: Test Suite
         run: npm test
