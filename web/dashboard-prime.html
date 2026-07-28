@@ -1762,11 +1762,52 @@ function apiError(kind, status, message) {
   return err;
 }
 
+// ─── API token ───
+// Sentinel Desktop v31 requires a bearer token: it refuses to bind a non-loopback
+// interface with auth disabled, because /powershell and /command are arbitrary
+// code execution. Every route including /status now answers 401 without one.
+//
+// The token is kept in localStorage and asked for once, deliberately NOT baked
+// into this file: this page is version-controlled, and a committed credential is
+// a credential leak. Read it from the machine-scope SENTINEL_API_TOKEN
+// environment variable on the host when prompted.
+const TOKEN_KEY = 'sentinel-api-token';
+
+function getApiToken({ prompt: doPrompt = false } = {}) {
+  let tok = '';
+  try { tok = localStorage.getItem(TOKEN_KEY) || ''; } catch { /* storage blocked */ }
+  if (!tok && doPrompt && typeof window.prompt === 'function') {
+    const entered = window.prompt(
+      'Sentinel API token required.\n\n' +
+      'On the host: echo %SENTINEL_API_TOKEN%  (or read it from the machine environment).'
+    );
+    if (entered) {
+      tok = entered.trim();
+      try { localStorage.setItem(TOKEN_KEY, tok); } catch { /* storage blocked */ }
+    }
+  }
+  return tok;
+}
+
+function clearApiToken() {
+  try { localStorage.removeItem(TOKEN_KEY); } catch { /* storage blocked */ }
+}
+
 async function apiFetch(url, opts) {
   const o = opts || {};
   const timeoutMs = o.timeoutMs || DEFAULT_TIMEOUT_MS;
   const init = Object.assign({}, o);
   delete init.timeoutMs;
+
+  // Attach the bearer token to API requests. Only same-origin-as-API URLs get
+  // it, so the credential is never sent to some other host.
+  if (typeof url === 'string' && url.startsWith(API)) {
+    const tok = getApiToken({ prompt: !apiFetch._promptedOnce });
+    apiFetch._promptedOnce = true;
+    if (tok) {
+      init.headers = Object.assign({}, init.headers, { Authorization: 'Bearer ' + tok });
+    }
+  }
 
   // Always arm a timeout. If the caller also passed its own signal (the Stop
   // button), honour both.
@@ -1792,6 +1833,15 @@ async function apiFetch(url, opts) {
     throw apiError('degraded', 503, String(detail));
   }
 
+  if (res.status === 401 || res.status === 403) {
+    // A stored token that the server rejects is worse than none: it would fail
+    // silently forever. Drop it so the next call re-prompts.
+    clearApiToken();
+    apiFetch._promptedOnce = false;
+    throw apiError('unauthorized', res.status,
+      'API token missing or rejected - reload and re-enter it');
+  }
+
   if (!res.ok) {
     throw apiError('error', res.status, 'HTTP ' + res.status);
   }
@@ -1812,6 +1862,7 @@ function errLabel(exc) {
   if (!exc) return 'unknown error';
   if (exc.kind === 'offline') return 'unreachable';
   if (exc.kind === 'degraded') return 'degraded';
+  if (exc.kind === 'unauthorized') return 'auth required';
   if (exc.kind === 'error') return exc.message || 'error';
   return exc.message || 'error';
 }
