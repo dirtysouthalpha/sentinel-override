@@ -92,8 +92,11 @@ describe('dashboard-prime.html runs', () => {
 
     // Chat scaffold intact.
     expect(document.getElementById('msgs')).not.toBeNull();
-    // Status dot shows the offline state, not a blank or "connected" lie.
-    expect(document.getElementById('sdot').className).toBe('err');
+    // The desktop health pill (Part 3 replaced the 8px #sdot) shows the
+    // offline state, not a blank or "connected" lie — and says so in text.
+    const pill = document.getElementById('pill-desktop');
+    expect(pill.className).toBe('pill err');
+    expect(pill.title).toMatch(/offline/);
     // File explorer says what went wrong instead of spinning on "Loading…".
     expect(document.getElementById('fe-tree').textContent).toMatch(/Cannot list directory/);
     // Brain panel degrades to offline.
@@ -113,7 +116,9 @@ describe('dashboard-prime.html runs', () => {
     expect(document.getElementById('fe-tree').textContent).toMatch(/degraded/i);
     expect(document.getElementById('fe-tree').textContent).toMatch(/embedding server down/);
     // A degraded service is NOT reported as offline.
-    expect(document.getElementById('sdot').className).toBe('warn');
+    const pill = document.getElementById('pill-desktop');
+    expect(pill.className).toBe('pill warn');
+    expect(pill.title).toMatch(/degraded/);
   });
 
   it('renders live brain numbers from the real :8001 response shape', async () => {

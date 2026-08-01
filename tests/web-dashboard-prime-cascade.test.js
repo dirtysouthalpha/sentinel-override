@@ -107,6 +107,42 @@ describe('dashboard-prime cascade structure (Part 4)', () => {
     expect(el.getAttribute('style')).toBeNull();
   });
 
+  test('Part 3: every top-bar control is a real element with a mouse affordance', () => {
+    // The v11 bar shipped four controls whose only trigger was display:none at
+    // every width. The replacement must keep each control as an actual button
+    // in the header — labels may shed responsively, controls may not.
+    const top = document.querySelector('#top');
+    expect(top.querySelector('#omni-wrap #omni')).not.toBeNull();
+    for (const name of ['brain', 'desktop', 'fleet']) {
+      const pill = top.querySelector('button#pill-' + name);
+      expect(pill).not.toBeNull();
+    }
+    expect(top.querySelector('button#settings-btn')).not.toBeNull();
+    // The overflow that hid four controls is gone, not restyled.
+    expect(document.querySelector('#top-overflow')).toBeNull();
+    expect(document.querySelector('#cmd-palette')).toBeNull();
+  });
+
+  test('Part 3: the ⚙ popover carries the sub-1200px surface for model + auto-route', () => {
+    const pop = document.querySelector('#settings-pop');
+    expect(pop).not.toBeNull();
+    expect(pop.querySelector('#model-sel-top')).not.toBeNull();
+    expect(pop.querySelector('#ar-tog-top')).not.toBeNull();
+    expect(pop.querySelector('#theme-grid')).not.toBeNull();
+  });
+
+  test('Part 3: container queries shed labels, never whole controls', () => {
+    // Inside the topbar container queries, display:none may only target
+    // label-tier elements. Hiding a .pill, #omni or #settings-btn would
+    // recreate the unreachable-control bug this file exists to prevent.
+    for (const m of css.matchAll(/@container topbar[^{]*\{([\s\S]*?)\n\}/g)) {
+      const body = m[1];
+      for (const rule of body.matchAll(/([^{}]+)\{[^}]*display:\s*none/g)) {
+        expect(rule[1]).toMatch(/\.pill-name|\.btn-label|#omni-key|#omni-glyph/);
+      }
+    }
+  });
+
   test('the drawer has content, not just a class: model picker lives inside #sidebar', () => {
     // At 375px the drawer IS #sidebar. Assert the controls the drawer must
     // surface actually exist inside it — the v11 mistake was asserting
