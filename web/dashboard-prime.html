@@ -1921,7 +1921,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">
             <div style="font-size:1.5rem;margin-bottom:4px">🗺️</div>
             <div style="font-size:1.4rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent" id="sv-r">—</div>
-            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Regions</div>
+            <!-- "Anatomical", because the SELF MODEL panel counts the same DB
+                 column a different way (76 labels in use vs these 12 anchor
+                 rows) and the two figures sat 6x apart on one page with the
+                 same name (§2.11). -->
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px" title="The 12 anchor rows of the region table. The Self Model's 'region labels in use' counts distinct labels on neurons in the same column — different taxonomy, same data.">Anatomical regions</div>
           </div>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">
             <div style="font-size:1.5rem;margin-bottom:4px">🔖</div>
@@ -2015,12 +2019,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
             <div><div class="bl-k">Identity</div><div class="bl-v" id="sm-identity">—</div></div>
             <div><div class="bl-k">Avg quality</div><div class="bl-v" id="sm-quality">—</div></div>
-            <div><div class="bl-k">Domains / sources</div><div class="bl-v" id="sm-domains">—</div></div>
+            <!-- Same DB column as the "Anatomical regions" stat up top, two
+                 taxonomies: 12 anchor rows vs 76 labels in use (§2.11). -->
+            <div><div class="bl-k" title="Distinct region labels stored on neurons — the same column the 12 anatomical anchors index, not a second taxonomy">Region labels in use / sources</div><div class="bl-v" id="sm-domains">—</div></div>
             <div><div class="bl-k">Current focus</div><div class="bl-v" id="sm-focus">—</div></div>
           </div>
-          <div class="bl-k" style="margin-top:12px">Strongest regions</div>
+          <!-- Ranked by COUNT, displayed with quality. Calling them
+               "strongest" while `events` (q=0.46) outranked four of the five
+               was the §2.9 lie — the label now says what the sort key is. -->
+          <div class="bl-k" style="margin-top:12px" title="Ranked by neuron count; the q= figure is average quality, not the sort key">Largest regions (by count)</div>
           <div id="sm-strong" style="font-size:.7rem;color:var(--muted)">—</div>
-          <div class="bl-k" style="margin-top:10px">Weakest regions</div>
+          <div class="bl-k" style="margin-top:10px" title="Ranked by neuron count; the q= figure is average quality, not the sort key">Smallest regions (by count)</div>
           <div id="sm-weak" style="font-size:.7rem;color:var(--muted)">—</div>
           <div class="bl-k" style="margin-top:10px">Known limitations</div>
           <div id="sm-limits" style="font-size:.7rem;color:var(--muted)">—</div>
@@ -2036,7 +2045,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
             <div><div class="bl-k">Recalls graded</div><div class="bl-v" id="ll-graded">—</div></div>
             <div><div class="bl-k">Outcomes recorded</div><div class="bl-v" id="ll-outcomes">—</div></div>
-            <div><div class="bl-k">Golden eval</div><div class="bl-v" id="ll-eval">—</div></div>
+            <div><div class="bl-k" title="Live-corpus reading — it drifted 92→83→92% in one evening with no code change. The reproducible, comparable number is frozen_eval.py (byte-identical across runs, corpus-fingerprinted); run it before believing any ranking change.">Golden eval (live corpus — drifts)</div><div class="bl-v" id="ll-eval">—</div></div>
             <!-- The brain's only self-scored accuracy number: 4,185 predictions
                  graded against what actually happened. It was on no dashboard,
                  in no trend and in no audit, while `outcomes` (22 rows) was
@@ -2046,6 +2055,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
             <div><div class="bl-k">Edges / neuron</div><div class="bl-v" id="ll-density">—</div></div>
             <div><div class="bl-k">Quality &ge; 0.6</div><div class="bl-v" id="ll-good">—</div></div>
             <div><div class="bl-k">Trend points</div><div class="bl-v" id="ll-points">—</div></div>
+            <!-- These eight figures are one daily 05:30 snapshot, ~12h stale
+                 by evening, and already disagreed with the live header
+                 (7,636 vs 7,803) with nothing saying so (§2.2). -->
+            <div><div class="bl-k">As of</div><div class="bl-v" id="ll-asof">—</div></div>
           </div>
           <div class="bl-k" style="margin-top:12px">Writes accepted / refused today</div>
           <div id="ll-writes" style="font-size:.7rem;color:var(--muted)">—</div>
@@ -3431,17 +3444,41 @@ async function askBrain() {
 
     const body = document.createElement('div');
     body.style.cssText = 'font-size:.72rem;opacity:.9;word-break:break-word';
-    body.textContent = String(n.content || '').slice(0, 260);
+    // 8 of 8 live hits exceed 260 chars (up to 1,993). Clipping silently and
+    // still offering ✓/✗ let a verdict that moves live ranking (±0.18) be
+    // cast on 13% of the memory (§2.4). Clip visibly, expand on click, and
+    // gate grading on having expanded.
+    const full = String(n.content || '');
+    const clipped = full.length > 260;
+    body.textContent = clipped ? full.slice(0, 260) + '…' : full;
     left.appendChild(body);
 
+    const state = { expanded: !clipped };
+    if (clipped) {
+      const more = document.createElement('button');
+      more.textContent = 'show all ' + full.length.toLocaleString() + ' chars';
+      more.style.cssText = 'cursor:pointer;background:none;border:none;padding:2px 0;'
+        + 'color:#8fb4e8;font-size:.66rem;text-decoration:underline';
+      more.addEventListener('click', () => {
+        state.expanded = true;
+        body.textContent = full;
+        more.remove();
+      });
+      left.appendChild(more);
+    }
+
     row.appendChild(left);
-    row.appendChild(verdictControl(n.id));
+    row.appendChild(verdictControl(n.id, state));
     box.appendChild(row);
   });
 }
 
-/** Useful / not-useful buttons for one recalled neuron. */
-function verdictControl(neuronId) {
+/**
+ * Useful / not-useful buttons for one recalled neuron.
+ * `state.expanded` gates the verdict: grading moves live ranking, so it must
+ * not be castable on a 13% excerpt.
+ */
+function verdictControl(neuronId, state) {
   const wrap = document.createElement('span');
   wrap.style.cssText = 'display:flex;gap:5px';
 
@@ -3452,6 +3489,10 @@ function verdictControl(neuronId) {
     b.style.cssText = 'cursor:pointer;background:transparent;color:#8fb4e8;'
       + 'border:1px solid var(--border);border-radius:5px;font-size:.68rem;padding:1px 7px';
     b.addEventListener('click', async () => {
+      if (state && !state.expanded) {
+        toast('Expand the memory first — a verdict moves live ranking and should cover all of it, not 13%', '');
+        return;
+      }
       wrap.textContent = '…';
       try {
         // Two distinct signals. useful_ids is query-conditional and is what
@@ -3544,6 +3585,13 @@ async function loadLearningLoop() {
         ? '—'
         : up.toLocaleString() + ' ↑ / ' + (down || 0).toLocaleString() + ' ↓'
           + (down === 0 || up / Math.max(down || 1, 1) > 20 ? '  ⚠ one-way' : ''));
+    }
+    // Stamp WHICH snapshot these eight figures are — they are a daily 05:30
+    // reading, not live, and by evening they visibly disagree with the live
+    // header. An unstamped stale number reads as a current one (§2.2).
+    if (last) {
+      const when = String(last.day || last.date || last.ts || '').slice(0, 16);
+      setText('ll-asof', (when || 'unknown time') + ' (daily snapshot, not live)');
     }
     // One point is a reading, not a trend. Say which one this is.
     setText('loop-badge', series.length < 2 ? 'no trend yet (needs 2+ days)' : 'trending');
@@ -3676,7 +3724,9 @@ function mapDraw() {
   ctx.setTransform(MAP.dpr, 0, 0, MAP.dpr, 0, 0);
   ctx.clearRect(0, 0, MAP.w, MAP.h);
 
-  const visible = n => !MAP.hidden.has(n.region);
+  // Chips normalise a missing region to '(unlabeled)'; match that here or
+  // those nodes become unfilterable again the moment their chip is toggled.
+  const visible = n => !MAP.hidden.has(n.region || '(unlabeled)');
 
   // Edges first, underneath.
   ctx.lineWidth = 0.5;
@@ -3739,25 +3789,29 @@ function mapRenderRegionChips() {
   const box = document.getElementById('map-regions');
   if (!box) return;
   box.textContent = '';
+  // Chips are built from the NODES' regions, not the 12-row anchor table.
+  // Built from the table they summed to 589 while the header said 1,200, and
+  // turning all 12 off left 611 neurons visible and unfilterable (§2.1).
   const counts = new Map();
-  MAP.nodes.forEach(n => counts.set(n.region, (counts.get(n.region) || 0) + 1));
-  MAP.regions.slice().sort((a, b) => (counts.get(b.name) || 0) - (counts.get(a.name) || 0))
-    .forEach(r => {
-      const n = counts.get(r.name) || 0;
-      if (!n) return;
+  MAP.nodes.forEach(n => counts.set(n.region || '(unlabeled)', (counts.get(n.region || '(unlabeled)') || 0) + 1));
+  const colorOf = new Map();
+  MAP.regions.forEach(r => colorOf.set(r.name, r.color));
+  [...counts.entries()].sort((a, b) => b[1] - a[1])
+    .forEach(([name, n]) => {
+      const color = colorOf.get(name) || '#8fb4e8';
       const b = document.createElement('button');
       b.type = 'button';
-      b.textContent = r.name + ' ' + n;
+      b.textContent = name + ' ' + n;
       const paint = () => {
-        const off = MAP.hidden.has(r.name);
+        const off = MAP.hidden.has(name);
         b.style.cssText = 'cursor:pointer;border-radius:99px;padding:2px 8px;font-size:.6rem;'
-          + 'border:1px solid ' + (off ? 'var(--border)' : r.color) + ';'
-          + 'background:' + (off ? 'transparent' : r.color + '22') + ';'
-          + 'color:' + (off ? 'var(--muted)' : r.color);
+          + 'border:1px solid ' + (off ? 'var(--border)' : color) + ';'
+          + 'background:' + (off ? 'transparent' : color + '22') + ';'
+          + 'color:' + (off ? 'var(--muted)' : color);
       };
       paint();
       b.addEventListener('click', () => {
-        if (MAP.hidden.has(r.name)) MAP.hidden.delete(r.name); else MAP.hidden.add(r.name);
+        if (MAP.hidden.has(name)) MAP.hidden.delete(name); else MAP.hidden.add(name);
         paint();
         mapDraw();
       });
@@ -3769,7 +3823,7 @@ function mapRenderRegionChips() {
 function mapPick(px, py) {
   let best = null, bestD = 14 * 14;
   MAP.nodes.forEach(n => {
-    if (MAP.hidden.has(n.region)) return;
+    if (MAP.hidden.has(n.region || '(unlabeled)')) return;
     const [x, y] = mapProject(n._x, n._y);
     const d = (x - px) * (x - px) + (y - py) * (y - py);
     if (d < bestD) { bestD = d; best = n; }
@@ -3943,6 +3997,14 @@ function renderFleetNode(node) {
         up ? 'rgba(0,255,136,.10)' : 'rgba(255,68,102,.12)'));
     });
   }
+  // A node also DECLARES services; only some are probed. nuke declares
+  // hermes/docker/webui but only composio/sentinel are probed — the declared
+  // three simply never appeared, which read as "healthy" (§2.10). A grey
+  // "not probed" chip is the honest rendering of "we do not know".
+  const declared = Array.isArray(node.services) ? node.services : [];
+  declared.filter(s => !(s in svcMap)).forEach(s => {
+    svcRow.appendChild(chip('? ' + s + ' — not probed', 'var(--muted)', 'transparent'));
+  });
   card.appendChild(svcRow);
   return card;
 }
@@ -3962,8 +4024,12 @@ async function loadFleet() {
 
   const nodes = Array.isArray(state.nodes) ? state.nodes : [];
   const down = nodes.filter(n => String(n.status).toLowerCase() !== 'online').length;
+  // "sensed" comes from the newest node heartbeat, NOT state.topology_time —
+  // that field is datetime.now() stamped at request time, so it would read
+  // "0s ago" three days after the sensing loop died (§2.3).
+  const newest = Math.max(0, ...nodes.map(n => Date.parse(n.last_seen) || 0));
   setText('fleet-meta', nodes.length + ' nodes · ' + (down ? down + ' not online' : 'all online')
-    + ' · sensed ' + sinceLabel(state.topology_time));
+    + ' · sensed ' + (newest ? sinceLabel(new Date(newest).toISOString()) : 'never'));
   nodes.forEach(n => box.appendChild(renderFleetNode(n)));
   if (!nodes.length) box.textContent = 'no nodes reported';
 }
@@ -4110,8 +4176,20 @@ async function loadMindVitals() {
   await Promise.allSettled([
     grab('/self/confidence', d => setText('mind-conf',
       d.overall_confidence == null ? '—' : (d.overall_confidence * 100).toFixed(0) + '%')),
-    grab('/v6/emotion/status', d => setText('mind-mood',
-      (d.mode || '—') + ' · arousal ' + Number(d.avg_arousal || 0).toFixed(2))),
+    grab('/v6/emotion/status', d => {
+      // valence and arousal are column DEFAULTS (0.0 / 0.5) for every neuron
+      // in the store — nothing has ever written them, so "exploratory" was a
+      // constant and the "stressed" branch unreachable (§2.5). Defaults are
+      // rendered as the absence of data, not as a mood.
+      const v = Number(d.avg_valence != null ? d.avg_valence : (d.valence != null ? d.valence : 0));
+      const a = Number(d.avg_arousal != null ? d.avg_arousal : (d.arousal != null ? d.arousal : 0));
+      const scored = Number(d.scored != null ? d.scored : (d.scored_count != null ? d.scored_count : 0));
+      if (scored === 0 || (v === 0 && a === 0.5)) {
+        setText('mind-mood', 'n/a (' + scored.toLocaleString() + ' neurons scored — values are column defaults)');
+      } else {
+        setText('mind-mood', (d.mode || '—') + ' · arousal ' + a.toFixed(2));
+      }
+    }),
     grab('/brain/predict/stats', d => {
       setText('mind-hit', d.hit_rate == null ? '—'
         : (d.hit_rate * 100).toFixed(1) + '% of ' + (d.predictions_scored || 0).toLocaleString());
@@ -4270,12 +4348,32 @@ async function loadMindEpisodes() {
     if (ep.chain_id) head.appendChild(chip(String(ep.chain_id), 'var(--muted)', 'transparent'));
     if (ep.when || ep.created) {
       head.appendChild(chip(String(ep.when || ep.created).slice(0, 10), 'var(--muted)', 'transparent'));
+    } else {
+      // /brain/timeline has never returned a date field — so this chip had
+      // never rendered (§2.6). Until the server ships `created`, say the
+      // date is missing rather than silently omitting the chip.
+      head.appendChild(chip('no date', 'var(--muted)', 'transparent'));
     }
     row.appendChild(head);
     const body = document.createElement('div');
     body.style.cssText = 'color:var(--text);opacity:.9;word-break:break-word';
-    body.textContent = String(ep.summary || ep.text || '').slice(0, 400);
-    row.appendChild(body);
+    // Clamp at a word boundary with a visible expander — 10 of 10 live
+    // episodes were cut mid-word at 400 chars with no way to read the rest.
+    const full = String(ep.summary || ep.text || '');
+    if (full.length > 400) {
+      const cut = full.lastIndexOf(' ', 400);
+      body.textContent = full.slice(0, cut > 200 ? cut : 400) + '…';
+      const more = document.createElement('button');
+      more.textContent = 'show all';
+      more.style.cssText = 'cursor:pointer;background:none;border:none;padding:2px 0;'
+        + 'color:#8fb4e8;font-size:.66rem;text-decoration:underline;display:block';
+      more.addEventListener('click', () => { body.textContent = full; more.remove(); });
+      row.appendChild(body);
+      row.appendChild(more);
+    } else {
+      body.textContent = full;
+      row.appendChild(body);
+    }
     list.appendChild(row);
   });
 }
