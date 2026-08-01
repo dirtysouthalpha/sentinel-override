@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Sentinel Command Center v9</title>
+<title>Sentinel Command Center v11</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -218,6 +218,89 @@ body::before {
 }
 #app.both-collapsed {
   grid-template-columns: 0 1fr 0;
+}
+
+/* ── Collapse affordances ──
+   Collapsing already worked, but the only triggers were the top-bar hamburger,
+   the top-bar Files button and two keyboard shortcuts. Nothing on either panel
+   said it could be collapsed, and once a rail was 0 wide there was no way back
+   without the keyboard. Two additions fix both halves: a chevron in each
+   panel's own header, and a thin always-present handle at each screen edge. */
+
+.panel-collapse {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .8rem;
+  line-height: 1;
+  padding: 4px 6px;
+  transition: color var(--t), background var(--t), border-color var(--t);
+}
+.panel-collapse:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--border-active);
+}
+.panel-collapse:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The reopen handles. Rendered only while their rail is collapsed, so they
+   never sit on top of panel content. */
+.edge-handle {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 40;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 76px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  font-size: .7rem;
+  line-height: 1;
+  transition: color var(--t), background var(--t), width var(--t);
+}
+.edge-handle:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+  width: 22px;
+}
+.edge-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+#edge-left {
+  left: 0;
+  border-left: none;
+  border-radius: 0 var(--r) var(--r) 0;
+}
+#edge-right {
+  right: 0;
+  border-right: none;
+  border-radius: var(--r) 0 0 var(--r);
+}
+#app.sidebar-collapsed ~ #edge-left,
+#app.both-collapsed ~ #edge-left { display: flex; }
+#app.right-collapsed ~ #edge-right,
+#app.both-collapsed ~ #edge-right { display: flex; }
+
+/* On mobile the rails are overlays driven by .mob-open, not grid columns, so
+   the edge handles would be lying about the state. Hide them there. */
+@media (max-width: 767px) {
+  .edge-handle { display: none !important; }
 }
 
 /* ── Sidebar ── */
@@ -1433,9 +1516,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
   <!-- ═══════════ SIDEBAR ═══════════ -->
   <aside id="sidebar" role="navigation" aria-label="Conversation history">
-    <div id="sb-logo">
-      <div class="logo-name">SENTINEL</div>
-      <div class="logo-sub">Command Center v9</div>
+    <div id="sb-logo" style="display:flex;align-items:flex-start;gap:8px">
+      <div style="min-width:0">
+        <div class="logo-name">SENTINEL</div>
+        <div class="logo-sub">Command Center v11</div>
+      </div>
+      <button class="panel-collapse" id="sb-collapse" title="Collapse conversations (Ctrl+B)"
+              aria-label="Collapse conversation sidebar" aria-controls="sidebar" aria-expanded="true">‹‹</button>
     </div>
 
     <nav id="sb-nav">
@@ -1538,7 +1625,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       <div class="pg on" id="pg-chat">
         <div id="chat-area">
           <div id="msgs" role="log" aria-live="polite">
-            <div class="msg s"><div class="mb">Sentinel Command Center v9 — Ready. Describe a goal and press Enter.</div></div>
+            <div class="msg s"><div class="mb">Sentinel Command Center v11 — Ready. Describe a goal and press Enter.</div></div>
           </div>
           <div id="inp-area">
             <div class="inp-row">
@@ -1705,11 +1792,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   <!-- ═══════════ FILE EXPLORER ═══════════ -->
   <aside id="file-explorer" role="complementary" aria-label="File explorer">
     <div id="fe-header">
-      <div id="fe-title">📁 File Explorer</div>
+      <div id="fe-title">
+        <span>📁 File Explorer</span>
+        <button class="panel-collapse" id="fe-collapse" title="Collapse files (Ctrl+.)"
+                aria-label="Collapse file explorer" aria-controls="file-explorer" aria-expanded="true">››</button>
+      </div>
       <div id="fe-breadcrumb">
-        <!-- Handler attached in setupStaticHandlers(); an inline onclick here
-             would double-fire alongside it. -->
-        <span class="bc-item">C:</span>
+        <!-- Populated by updateBreadcrumb() once the API reports which root it
+             opened at. It is no longer hardcoded to C: — the server-side jail
+             refuses the drive root, so the client must not assume it. -->
       </div>
     </div>
     <div id="fe-tree" role="tree" aria-label="Directory tree">
@@ -1722,6 +1813,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   </aside>
 
 </div>
+
+<!-- ── Edge handles ──
+     Siblings of #app rather than children, because a collapsed grid column is
+     0 wide and would clip anything inside it. -->
+<button class="edge-handle" id="edge-left" aria-label="Reopen conversation sidebar"
+        title="Reopen conversations (Ctrl+B)">››</button>
+<button class="edge-handle" id="edge-right" aria-label="Reopen file explorer"
+        title="Reopen files (Ctrl+.)">‹‹</button>
 
 <!-- ── File Viewer Modal ── -->
 <div id="file-viewer" role="dialog" aria-modal="true" aria-label="File viewer">
@@ -1749,7 +1848,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 'use strict';
 
 // ═══════════ STATE ═══════════
-const API = 'http://localhost:8091';
+// Sentinel Desktop API.
+//
+// Same-origin whenever this page is actually served, which it now is: the
+// Desktop API mounts the sentinel-override web/ directory at /prime. That
+// matters for more than tidiness — a hardcoded localhost:8091 breaks the moment
+// the dashboard is opened from another node over Tailscale, and it makes every
+// call cross-origin so the bearer token rides on a CORS preflight for no reason.
+//
+// The file:// fallback is kept because this page must stay openable straight
+// from the repo, but note that the WebSocket cannot work there (location.host is
+// empty on a file:// page, so the socket URL has no host) — which is exactly why
+// the chat had never once displayed a reply.
+const API = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? location.origin
+  : 'http://localhost:8091';
 // Neuralis brain API. Must be 8001: port 8000 only ever answered via an
 // undocumented `netsh interface portproxy` rule, so it is not a dependable
 // endpoint and must never be hardcoded here.
@@ -1758,7 +1871,11 @@ let abort = null;
 let streaming = false;
 let convId = null;
 let allModels = [];
-let currentPath = 'C:\\';
+// Empty, not 'C:\'. The server-side jail refuses the drive root, and which
+// roots are browsable is the server's call — the client asks for "wherever you
+// open" and renders the path it gets back.
+let currentPath = '';
+let convCache = [];
 let sidebarCollapsed = false;
 let rightCollapsed = false;
 
@@ -1766,6 +1883,16 @@ let rightCollapsed = false;
 // funnel through appendMsg, and neither used to bound #msgs, so a long-running
 // or chatty agent session grew the DOM until the tab crawled.
 const MAX_MESSAGES = 300;
+
+// localStorage keys. Declared up here with the rest of the state, NOT beside the
+// functions that use them: init() runs before the panel-toggle section is
+// reached, and a `const` read from above its own declaration throws a
+// ReferenceError from the temporal dead zone. That is exactly what happened —
+// loadPanelState() threw on every boot and its catch block swallowed it, so the
+// collapse state silently never restored.
+const PANEL_KEY = 'dash11-panels';
+const GROUP_KEY = 'dash8-groups';
+const THEME_KEY = 'dash8-theme';
 
 // ═══════════ ESCAPING (mirrored from web/lib/dash-escape.js) ═══════════
 // This dashboard has to stay a single self-contained file that works from
@@ -1875,15 +2002,34 @@ function clearApiToken() {
   try { localStorage.removeItem(TOKEN_KEY); } catch { /* storage blocked */ }
 }
 
+/** True only if `url` resolves to exactly the Desktop API's origin. */
+function isApiOrigin(url) {
+  try {
+    const base = (typeof location !== 'undefined' && location.href) ? location.href : undefined;
+    return new URL(url, base).origin === new URL(API, base).origin;
+  } catch {
+    // Fail closed. An unparseable URL never gets the credential.
+    return false;
+  }
+}
+
 async function apiFetch(url, opts) {
   const o = opts || {};
   const timeoutMs = o.timeoutMs || DEFAULT_TIMEOUT_MS;
   const init = Object.assign({}, o);
   delete init.timeoutMs;
 
-  // Attach the bearer token to API requests. Only same-origin-as-API URLs get
-  // it, so the credential is never sent to some other host.
-  if (typeof url === 'string' && url.startsWith(API)) {
+  // Attach the bearer token only to requests genuinely bound for the Desktop
+  // API's ORIGIN.
+  //
+  // This was `url.startsWith(API)`, which was safe only while API was the
+  // literal 'http://localhost:8091'. In v11 API became same-origin, so it can
+  // be a bare 'http://localhost' — and that is a string prefix of
+  // 'http://localhost:8001', the BRAIN. Prefix-matching would have shipped the
+  // Desktop API's credential to a different service on the same host (and to
+  // 'http://localhost.evil.test' besides). Compare parsed origins instead —
+  // the same lesson as path containment: components, never prefixes.
+  if (typeof url === 'string' && isApiOrigin(url)) {
     const tok = getApiToken({ prompt: !apiFetch._promptedOnce });
     apiFetch._promptedOnce = true;
     if (tok) {
@@ -2005,6 +2151,7 @@ function connectWS() {
   setupKeyboard();
   setupStaticHandlers();
   loadGroupState();
+  loadPanelState();
   // allSettled, not all: one dead subsystem must not abort the others.
   await Promise.allSettled([loadModels(), loadConvs(), loadBrainStats(), loadFiles(currentPath),
                             loadCockpit()]);
@@ -2025,9 +2172,40 @@ function setupStaticHandlers() {
   if (askInput) {
     askInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); askBrain(); } });
   }
-  document.querySelectorAll('#fe-breadcrumb .bc-item').forEach(el => {
-    el.addEventListener('click', () => navigateTo('C:\\'));
-  });
+  // Collapse chevrons and edge handles (v11). Kept out of inline onclick= so
+  // the page stays CSP-strict, same as every other control here.
+  const bind = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', fn);
+  };
+  bind('sb-collapse', toggleSidebar);
+  bind('fe-collapse', toggleRight);
+  bind('edge-left', toggleSidebar);
+  bind('edge-right', toggleRight);
+  bind('mob-overlay', closeMobilePanels);
+
+  // Crossing the mobile breakpoint has to re-assert state, or the desktop grid
+  // classes and the mobile overlay classes both linger and fight each other.
+  //
+  // Feature-detected: this function must never throw. It runs inside init()
+  // before any data loads, so anything that raises here takes the whole page
+  // down — and it is also executed by the CI load test against a minimal DOM
+  // that has no window.addEventListener.
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    let wasMobile = isMobile();
+    window.addEventListener('resize', () => {
+      const now = isMobile();
+      if (now === wasMobile) return;
+      wasMobile = now;
+      closeMobilePanels();
+      if (now) {
+        document.getElementById('app').classList.remove(
+          'sidebar-collapsed', 'right-collapsed', 'both-collapsed');
+      } else {
+        applyPanelState();
+      }
+    });
+  }
 }
 
 // ═══════════ CONNECTIVITY ═══════════
@@ -2056,28 +2234,97 @@ function setDot(s, detail) {
 }
 
 // ═══════════ PANEL TOGGLES ═══════════
-function toggleSidebar() {
-  sidebarCollapsed = !sidebarCollapsed;
+// Rewritten in v11. The v10 pair had three defects:
+//
+//   1. Both flipped `sidebarCollapsed` / `rightCollapsed` on the MOBILE branch
+//      too, where those booleans drive nothing — so after a resize the desktop
+//      state was inverted from what was on screen.
+//   2. Both toggled #mob-overlay. Opening one panel and then the other toggled
+//      the overlay twice, leaving it off with a panel still open.
+//   3. Neither state was persisted, while the theme and the conversation-group
+//      state both were.
+// PANEL_KEY is declared with the other storage keys at the top of this script —
+// see the note there about the temporal dead zone.
+
+function isMobile() { return window.innerWidth <= 767; }
+
+/** Single writer for every panel-related class and ARIA attribute. */
+function applyPanelState() {
   const app = document.getElementById('app');
-  if (window.innerWidth <= 767) {
-    document.getElementById('sidebar').classList.toggle('mob-open');
-    document.getElementById('mob-overlay').classList.toggle('open');
-  } else {
-    app.classList.toggle('sidebar-collapsed', sidebarCollapsed);
-    app.classList.toggle('both-collapsed', sidebarCollapsed && rightCollapsed);
+  app.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+  app.classList.toggle('right-collapsed', rightCollapsed);
+  app.classList.toggle('both-collapsed', sidebarCollapsed && rightCollapsed);
+
+  const sb = document.getElementById('sb-collapse');
+  if (sb) sb.setAttribute('aria-expanded', String(!sidebarCollapsed));
+  const fe = document.getElementById('fe-collapse');
+  if (fe) fe.setAttribute('aria-expanded', String(!rightCollapsed));
+}
+
+function savePanelState() {
+  try {
+    localStorage.setItem(PANEL_KEY, JSON.stringify({ sidebar: sidebarCollapsed, right: rightCollapsed }));
+  } catch { /* storage blocked */ }
+}
+
+function loadPanelState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(PANEL_KEY) || '{}');
+    sidebarCollapsed = s.sidebar === true;
+    rightCollapsed = s.right === true;
+  } catch (exc) {
+    // Narrow on purpose. A blanket `catch {}` here hid a ReferenceError for the
+    // whole of this feature's first implementation: the state saved correctly
+    // and silently never restored. A corrupt entry is expected and survivable;
+    // anything else is a bug and should be visible in the console.
+    if (!(exc instanceof SyntaxError)) console.error('loadPanelState:', exc);
   }
+  // Mobile uses overlays, not grid columns; a restored collapse there would
+  // hide a panel the user cannot see a handle for.
+  if (isMobile()) { sidebarCollapsed = false; rightCollapsed = false; }
+  applyPanelState();
+}
+
+/** Close any open mobile overlay and sync the backdrop to reality. */
+function syncMobileOverlay() {
+  const open = document.getElementById('sidebar').classList.contains('mob-open')
+    || document.getElementById('file-explorer').classList.contains('mob-open');
+  document.getElementById('mob-overlay').classList.toggle('open', open);
+}
+
+function toggleSidebar() {
+  if (isMobile()) {
+    const sb = document.getElementById('sidebar');
+    const willOpen = !sb.classList.contains('mob-open');
+    sb.classList.toggle('mob-open', willOpen);
+    // Only one overlay panel at a time, or the backdrop bookkeeping desyncs.
+    if (willOpen) document.getElementById('file-explorer').classList.remove('mob-open');
+    syncMobileOverlay();
+    return;
+  }
+  sidebarCollapsed = !sidebarCollapsed;
+  applyPanelState();
+  savePanelState();
 }
 
 function toggleRight() {
-  rightCollapsed = !rightCollapsed;
-  const app = document.getElementById('app');
-  if (window.innerWidth <= 767) {
-    document.getElementById('file-explorer').classList.toggle('mob-open');
-    document.getElementById('mob-overlay').classList.toggle('open');
-  } else {
-    app.classList.toggle('right-collapsed', rightCollapsed);
-    app.classList.toggle('both-collapsed', sidebarCollapsed && rightCollapsed);
+  if (isMobile()) {
+    const fe = document.getElementById('file-explorer');
+    const willOpen = !fe.classList.contains('mob-open');
+    fe.classList.toggle('mob-open', willOpen);
+    if (willOpen) document.getElementById('sidebar').classList.remove('mob-open');
+    syncMobileOverlay();
+    return;
   }
+  rightCollapsed = !rightCollapsed;
+  applyPanelState();
+  savePanelState();
+}
+
+function closeMobilePanels() {
+  document.getElementById('sidebar').classList.remove('mob-open');
+  document.getElementById('file-explorer').classList.remove('mob-open');
+  syncMobileOverlay();
 }
 
 // ═══════════ TOP BAR OVERFLOW ═══════════
@@ -2128,12 +2375,12 @@ function saveGroupState() {
   document.querySelectorAll('.conv-group').forEach(g => {
     state[g.dataset.group] = g.classList.contains('collapsed');
   });
-  localStorage.setItem('dash8-groups', JSON.stringify(state));
+  localStorage.setItem(GROUP_KEY, JSON.stringify(state));
 }
 
 function loadGroupState() {
   try {
-    const state = JSON.parse(localStorage.getItem('dash8-groups') || '{}');
+    const state = JSON.parse(localStorage.getItem(GROUP_KEY) || '{}');
     document.querySelectorAll('.conv-group').forEach(g => {
       const collapsed = state[g.dataset.group];
       if (collapsed === true) {
@@ -2144,12 +2391,14 @@ function loadGroupState() {
   } catch {}
 }
 
+// Search now runs server-side over message BODIES. v10 matched titles only with
+// a client-side includes(), so a phrase from three days ago was unfindable —
+// and it hid rows without updating the group counts, which then disagreed with
+// what was on screen.
+let convSearchTimer = null;
 function filterConvs(query) {
-  const q = query.toLowerCase();
-  document.querySelectorAll('.conv-item').forEach(item => {
-    const title = item.querySelector('.conv-item-title')?.textContent?.toLowerCase() || '';
-    item.style.display = (!q || title.includes(q)) ? '' : 'none';
-  });
+  clearTimeout(convSearchTimer);
+  convSearchTimer = setTimeout(() => { loadConvs((query || '').trim()); }, 200);
 }
 
 // ═══════════ MODELS ═══════════
@@ -2176,11 +2425,31 @@ async function loadModels() {
   }
 }
 
-// ═══════════ CONVERSATIONS (Phase 3 placeholder) ═══════════
-async function loadConvs() {
-  // Phase 3: Will fetch from /api/conversations and group by date
-  // For now, show placeholder
-  renderConvs([]);
+// ═══════════ CONVERSATIONS ═══════════
+// v10 shipped four date groups, a search box and a delete button over a store
+// that did not exist: loadConvs() was `renderConvs([])` with a `// Phase 3:`
+// comment, and POST /api/conversations answered 404. The endpoints are real as
+// of v11 (core/conversations.py), so these are now wired for real.
+async function loadConvs(query) {
+  const url = API + '/api/conversations' + (query ? '?q=' + encodeURIComponent(query) : '');
+  try {
+    const data = await apiJson(url, { timeoutMs: 10000 });
+    convCache = Array.isArray(data.conversations) ? data.conversations : [];
+    renderConvs(convCache);
+  } catch (exc) {
+    convCache = [];
+    renderConvs([]);
+    // Say so in the sidebar rather than showing an empty list that looks like
+    // "you have no conversations".
+    const first = document.querySelector('.conv-group-body');
+    if (first) {
+      first.textContent = '';
+      const msg = document.createElement('div');
+      msg.style.cssText = 'padding:4px 8px;font-size:.72rem;color:var(--err)';
+      msg.textContent = 'History unavailable (' + errLabel(exc) + ')';
+      first.appendChild(msg);
+    }
+  }
 }
 
 function renderConvs(convs) {
@@ -2257,13 +2526,46 @@ async function openConv(id, el) {
   convId = id;
   document.querySelectorAll('.conv-item').forEach(i => i.classList.remove('on'));
   if (el) el.classList.add('on');
-  // Phase 5: Load messages from API
+
+  const msgs = document.getElementById('msgs');
+  msgs.textContent = '';
   appendMsg('s', 'Loading conversation…');
+
+  try {
+    const data = await apiJson(API + '/api/conversations/' + encodeURIComponent(id) + '/messages',
+                               { timeoutMs: 15000 });
+    msgs.textContent = '';
+    const list = Array.isArray(data.messages) ? data.messages : [];
+    if (!list.length) {
+      appendMsg('s', 'No messages in this conversation yet.');
+      return;
+    }
+    // Roles are stored as the API's words; MSG_CLASS keys are single letters.
+    const ROLE = { user: 'u', assistant: 'a', system: 's', error: 'e' };
+    list.forEach(m => appendMsg(ROLE[m.role] || 'a', m.content));
+  } catch (exc) {
+    msgs.textContent = '';
+    appendMsg('e', 'Could not load conversation (' + errLabel(exc) + ')');
+  }
+  if (isMobile()) closeMobilePanels();
 }
 
 async function delConv(id) {
   if (!confirm('Delete this conversation?')) return;
-  // Phase 5: API delete
+  try {
+    await apiJson(API + '/api/conversations/' + encodeURIComponent(id),
+                  { method: 'DELETE', timeoutMs: 10000 });
+  } catch (exc) {
+    // v10 toasted success unconditionally and deleted nothing. A failed delete
+    // must not look like a successful one.
+    toast('Delete failed (' + errLabel(exc) + ')', 'err');
+    return;
+  }
+  if (convId === id) {
+    convId = null;
+    document.getElementById('msgs').textContent = '';
+    appendMsg('s', 'Conversation deleted.');
+  }
   toast('Conversation deleted', 'ok');
   loadConvs();
 }
@@ -2689,6 +2991,10 @@ async function sendMsg() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role: 'user', content: text }),
         });
+        // The sidebar is now backed by a real store, so a new conversation (and
+        // the title derived from this first message) has to show up without a
+        // reload.
+        loadConvs();
       } catch (exc) {
         appendMsg('e', 'Could not save message to history (' + errLabel(exc) + ')');
       }
@@ -2782,8 +3088,23 @@ async function loadFiles(path) {
   tree.innerHTML = '<div class="fe-entry" style="color:var(--muted)"><span class="fe-entry-icon">⏳</span><span class="fe-entry-name">Loading…</span></div>';
 
   try {
-    const data = await apiJson(API + '/api/files?path=' + encodeURIComponent(path));
+    // An empty path asks the server to open at its first configured root. The
+    // client no longer assumes C:\ — the jail refuses the drive root, and which
+    // roots exist is the server's business.
+    const q = path ? '?path=' + encodeURIComponent(path) : '';
+    const data = await apiJson(API + '/api/files' + q, { timeoutMs: 15000 });
+    if (data.path) {
+      currentPath = data.path;
+      updateBreadcrumb(data.path);
+    }
     renderFileTree(data.entries || [], tree);
+    if (data.truncated) {
+      const note = document.createElement('div');
+      note.className = 'fe-entry';
+      note.style.cssText = 'color:var(--warn);font-style:italic';
+      note.textContent = '… listing truncated';
+      tree.appendChild(note);
+    }
   } catch (exc) {
     // Say which kind of failure it was, rather than a blank or generic panel.
     tree.textContent = '';
@@ -2947,9 +3268,14 @@ function navigateTo(path) {
 // Built through the DOM with listeners. v8 interpolated each accumulated path
 // into onclick="navigateTo('...')" via esc(), which left `'` intact — and the
 // path segments here derive from directory names, so they are untrusted too.
+// v11: no longer rooted at a hardcoded C:. The crumb chain is built from
+// whatever absolute path the server reported, and the drive crumb navigates to
+// the drive only in the sense of "ask the server" — if that is outside the jail
+// the server refuses it and the panel says so, which is the honest behaviour.
 function updateBreadcrumb(path) {
   const bc = document.getElementById('fe-breadcrumb');
   bc.textContent = '';
+  if (!path) return;
 
   const addCrumb = (label, target) => {
     const span = document.createElement('span');
@@ -2965,14 +3291,13 @@ function updateBreadcrumb(path) {
     bc.appendChild(sep);
   };
 
-  addCrumb('C:', 'C:\\');
-  let buildPath = 'C:';
-  path.split('\\').filter(Boolean).forEach((p, i) => {
-    // The first segment is the drive letter already rendered as the root crumb.
-    if (i === 0 && /^[A-Za-z]:$/.test(p)) return;
-    buildPath += '\\' + p;
-    addSep();
-    addCrumb(p, buildPath);
+  const parts = String(path).split('\\').filter(Boolean);
+  let buildPath = '';
+  parts.forEach((p, i) => {
+    buildPath = i === 0 ? p : buildPath + '\\' + p;
+    if (i > 0) addSep();
+    // A bare drive letter needs its trailing separator to be a valid path.
+    addCrumb(p, /^[A-Za-z]:$/.test(buildPath) ? buildPath + '\\' : buildPath);
   });
 }
 
@@ -3035,7 +3360,7 @@ function renderCmdResults(query) {
 
 // ═══════════ THEMES ═══════════
 const THEMES = ['sentinel', 'matrix', 'tron', 'blood', 'ember', 'frost', 'phantom', 'neon', 'terminal', 'midnight', 'cyberpunk', 'solar', 'arctic'];
-let currentTheme = localStorage.getItem('dash8-theme') || 'sentinel';
+let currentTheme = localStorage.getItem(THEME_KEY) || 'sentinel';
 
 function applyTheme(theme) {
   currentTheme = theme;
@@ -3044,7 +3369,7 @@ function applyTheme(theme) {
   } else {
     document.documentElement.setAttribute('data-theme', theme);
   }
-  localStorage.setItem('dash8-theme', theme);
+  localStorage.setItem(THEME_KEY, theme);
 }
 
 function toggleTheme() {
