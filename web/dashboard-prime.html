@@ -404,6 +404,12 @@ body.resizing { user-select: none; cursor: col-resize; }
 }
 
 #sb-search {
+  /* Layout lives here, not in a style="" attribute: an inline display beats
+     every media query, which is how a 22px input ended up rendering inside
+     the 50px tablet icon rail (measured 2026-08-01). */
+  display: flex;
+  gap: 4px;
+  align-items: center;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -1449,8 +1455,13 @@ body.resizing { user-select: none; cursor: col-resize; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* ── Responsive: Tablet ── */
-@media (max-width: 1199px) {
+/* ── Responsive: Tablet ──
+   min-width floor is load-bearing: without it these icon-rail rules (hide the
+   logo, nav labels, conversation titles, search, footer) also apply at phone
+   width — INSIDE the 280px drawer — which rendered the drawer as a blank
+   black panel (measured at 375px, 2026-08-01). Tablet styles a 50px rail;
+   mobile styles a full-content drawer. They must never overlap. */
+@media (min-width: 768px) and (max-width: 1199px) {
   :root {
     --sidebar-w: 50px;
     --right-w: 280px;
@@ -1540,9 +1551,10 @@ body.resizing { user-select: none; cursor: col-resize; }
     display: none;
   }
 
-  #btabs {
-    display: block;
-  }
+  /* #btabs is shown by a rule AFTER its component block (see "Mobile Bottom
+     Tabs" below) — a same-specificity `display:none` later in the sheet was
+     silently winning over a `display:block` placed here, which is why the
+     bottom tab bar had never rendered at any width. */
 }
 
 /* ── Ultrawide ── */
@@ -1598,6 +1610,14 @@ body.resizing { user-select: none; cursor: col-resize; }
 
 .tbb .ti { font-size: 1.1rem; }
 .tbb.on { color: var(--accent); }
+
+/* Placed AFTER the component block above deliberately. The show rule used to
+   live inside the 767px media section ~30 lines earlier, where the base
+   `#btabs { display:none }` — same specificity, later in source — overrode it
+   at every width. The bar had never rendered. Source order is the fix. */
+@media (max-width: 767px) {
+  #btabs { display: block; }
+}
 
 /* ── Overlay for mobile drawers ── */
 #mob-overlay {
@@ -1667,7 +1687,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       </button>
     </nav>
 
-    <div id="sb-search" style="display:flex;gap:4px;align-items:center">
+    <div id="sb-search">
       <input type="text" id="conv-search" placeholder="Search conversations..." aria-label="Search conversations" oninput="filterConvs(this.value)" style="flex:1">
       <button class="nc-btn" onclick="newConv()" title="New chat" aria-label="New chat" style="flex-shrink:0">＋</button>
     </div>
