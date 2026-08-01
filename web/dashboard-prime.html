@@ -303,6 +303,27 @@ body::before {
   .edge-handle { display: none !important; }
 }
 
+/* ── Rail resizers (v12) ── */
+.rail-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  z-index: 30;
+  cursor: col-resize;
+  background: transparent;
+  transition: background var(--t);
+}
+.rail-grip:hover, .rail-grip.dragging { background: var(--border-active); }
+#grip-left { left: calc(var(--sidebar-w) - 2px); }
+#grip-right { right: calc(var(--right-w) - 2px); }
+#app.sidebar-collapsed #grip-left,
+#app.right-collapsed #grip-right,
+#app.both-collapsed .rail-grip { display: none; }
+@media (max-width: 767px) { .rail-grip { display: none !important; } }
+/* Suppress text selection while dragging, or the whole page highlights. */
+body.resizing { user-select: none; cursor: col-resize; }
+
 /* ── Sidebar ── */
 #sidebar {
   display: flex;
@@ -842,6 +863,112 @@ body::before {
   font-size: .88rem;
   line-height: 1.6;
   word-break: break-word;
+}
+
+/* ── Message column, actions, markdown (v12) ──
+   v10 rendered every message as one escaped blob with no structure and no way
+   to get the text back out. */
+
+.mcol { display: flex; flex-direction: column; min-width: 0; }
+.msg.u .mcol { align-items: flex-end; }
+
+.msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  padding: 0 4px;
+  opacity: 0;
+  transition: opacity var(--t);
+}
+.msg:hover .msg-actions,
+.msg:focus-within .msg-actions { opacity: 1; }
+
+.msg-act {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .68rem;
+  line-height: 1;
+  padding: 2px 6px;
+  transition: color var(--t), border-color var(--t), background var(--t);
+}
+.msg-act:hover { color: var(--accent); border-color: var(--border-active); background: var(--accent-soft); }
+.msg-stamp { font-size: .62rem; color: var(--muted); margin-left: 2px; }
+
+/* A message still being streamed into gets a pulsing caret. */
+.msg.live .mb::after {
+  content: '▌';
+  color: var(--accent);
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink { to { visibility: hidden; } }
+
+.md-p { margin: 0 0 6px; }
+.md-p:last-child { margin-bottom: 0; }
+.md-h { font-weight: 700; margin: 8px 0 4px; color: var(--accent); }
+.md-h1 { font-size: 1.02rem; }
+.md-h2 { font-size: .96rem; }
+.md-h3, .md-h4 { font-size: .9rem; }
+.md-list { margin: 0 0 6px; padding-left: 20px; }
+.md-list li { margin: 2px 0; }
+.md-quote {
+  margin: 6px 0;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--border-active);
+  color: var(--muted);
+}
+.mb hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+.mb a { color: var(--accent2); }
+
+.md-inline-code {
+  background: rgba(0,0,0,.35);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+  font: .84em ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.md-code {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0,0,0,.4);
+}
+.md-code-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.md-code-lang {
+  font-size: .62rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.md-copy {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .64rem;
+  padding: 2px 8px;
+}
+.md-copy:hover { color: var(--accent); border-color: var(--border-active); background: var(--accent-soft); }
+/* Wide code scrolls inside its own box; the transcript never scrolls sideways. */
+.md-code pre { margin: 0; padding: 8px 10px; overflow-x: auto; }
+.md-code pre code {
+  font: .8rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  white-space: pre;
 }
 
 .msg.u .mb {
@@ -1789,6 +1916,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
   </main>
 
+  <div class="rail-grip" id="grip-left" role="separator" aria-orientation="vertical"
+       aria-label="Resize conversation sidebar"></div>
+  <div class="rail-grip" id="grip-right" role="separator" aria-orientation="vertical"
+       aria-label="Resize file explorer"></div>
+
   <!-- ═══════════ FILE EXPLORER ═══════════ -->
   <aside id="file-explorer" role="complementary" aria-label="File explorer">
     <div id="fe-header">
@@ -1893,6 +2025,7 @@ const MAX_MESSAGES = 300;
 const PANEL_KEY = 'dash11-panels';
 const GROUP_KEY = 'dash8-groups';
 const THEME_KEY = 'dash8-theme';
+const WIDTH_KEY = 'dash12-widths';
 
 // ═══════════ ESCAPING (mirrored from web/lib/dash-escape.js) ═══════════
 // This dashboard has to stay a single self-contained file that works from
@@ -2113,36 +2246,160 @@ function formatDuration(seconds) {
 }
 
 // ═══════════ WEBSOCKET ═══════════
+// v12 rewrite. Serving the page (v11) made `location.host` real, which was
+// necessary but NOT sufficient — the socket still could not stay open, and even
+// if it had, nothing would have been rendered. Two further defects:
+//
+//   1. The server requires an auth handshake as the FIRST message:
+//      {"type":"auth","token":"…"}. v10 never sent one, so the server waited
+//      10 s, closed the connection, and the client reconnected forever.
+//   2. v10 listened for `{"type":"message"}`, which the server has never
+//      emitted. What it actually broadcasts is `step` (per agent step), `done`
+//      (with a finish summary) and `error`. So the one message type the
+//      dashboard understood was the one that never arrives, and the summary
+//      carrying the actual answer was discarded.
+//
+// Together those are the whole reason the chat had never displayed a reply.
 let ws = null;
 let wsRetryDelay = 1000;
+let wsPingTimer = null;
+let liveMsgEl = null;      // the assistant bubble currently being streamed into
+let liveMsgText = '';
+
+function wsUrl() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  // Derive from API rather than location so a file:// page still targets the
+  // right host. It still cannot connect from file:// — there is no origin to
+  // borrow — but it fails honestly instead of building `ws:///ws`.
+  try {
+    const u = new URL(API, location.href);
+    return (u.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + u.host + '/ws';
+  } catch {
+    return proto + '//' + location.host + '/ws';
+  }
+}
 
 function connectWS() {
+  if (location.protocol === 'file:') {
+    // Be explicit rather than retrying forever against an unbuildable URL.
+    appendMsg('s', 'Live agent output needs the dashboard served over HTTP — open /prime/ on the Sentinel API.');
+    return;
+  }
   try {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${proto}//${location.host}/ws`);
-    ws.onopen = () => { wsRetryDelay = 1000; };
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'message' && msg.message) {
-          const m = msg.message;
-          if (m.role === 'assistant') appendMsg('a', m.content);
-        } else if (msg.type === 'done') {
-          streaming = false;
-          setDot('ok');
-          document.getElementById('stop-btn').style.display = 'none';
-          document.getElementById('run-btn').style.display = '';
-        }
-      } catch {}
+    ws = new WebSocket(wsUrl());
+
+    ws.onopen = () => {
+      wsRetryDelay = 1000;
+      // The handshake the server has always required and the client never sent.
+      ws.send(JSON.stringify({ type: 'auth', token: getApiToken() }));
+      clearInterval(wsPingTimer);
+      wsPingTimer = setInterval(() => {
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'ping' }));
+      }, 25000);
     };
+
+    ws.onmessage = (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch { return; }
+      handleAgentEvent(msg);
+    };
+
     ws.onclose = () => {
+      clearInterval(wsPingTimer);
       setTimeout(connectWS, wsRetryDelay);
       wsRetryDelay = Math.min(wsRetryDelay * 2, 30000);
     };
-    ws.onerror = () => { ws.close(); };
+    ws.onerror = () => { try { ws.close(); } catch {} };
   } catch {
     setTimeout(connectWS, wsRetryDelay);
   }
+}
+
+/** Render one broadcast from the agent loop. */
+function handleAgentEvent(msg) {
+  switch (msg.type) {
+    case 'auth_error':
+      // A rejected socket token is the same failure as a rejected HTTP token.
+      clearApiToken();
+      appendMsg('e', 'Live connection rejected the API token — reload and re-enter it.');
+      break;
+
+    case 'pong':
+      break;
+
+    case 'step': {
+      // Agent steps are the closest thing this backend has to token streaming:
+      // one event per action, with whatever the model said about it.
+      const line = msg.thought || msg.action || msg.description || msg.summary || '';
+      if (!line) break;
+      setDot('act');
+      streamInto('· ' + line);
+      break;
+    }
+
+    case 'done': {
+      const summary = (msg.result && msg.result.summary) || '';
+      const steps = (msg.result && msg.result.steps) || 0;
+      finishStream(summary, steps);
+      break;
+    }
+
+    case 'error':
+      finishStream('', 0);
+      appendMsg('e', msg.message || 'Agent error');
+      break;
+
+    default:
+      break;
+  }
+}
+
+/** Append to the in-flight assistant bubble, creating it on first use. */
+function streamInto(chunk) {
+  if (!liveMsgEl) {
+    liveMsgEl = appendMsg('a', '', { live: true });
+    liveMsgText = '';
+  }
+  liveMsgText += (liveMsgText ? '\n' : '') + chunk;
+  const body = liveMsgEl.querySelector('.mb');
+  if (body) renderMessageBody(body, liveMsgText);
+  const msgs = document.getElementById('msgs');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+/** Close out a run: render the summary, persist it, reset the composer. */
+function finishStream(summary, steps) {
+  if (summary) {
+    // The summary IS the answer. v10 threw it away.
+    if (liveMsgEl) {
+      liveMsgText = summary;
+      const body = liveMsgEl.querySelector('.mb');
+      if (body) renderMessageBody(body, summary);
+      liveMsgEl.classList.remove('live');
+      stampMessage(liveMsgEl, steps);
+    } else {
+      const el = appendMsg('a', summary);
+      stampMessage(el, steps);
+    }
+    // Persist so the transcript survives a reload.
+    if (convId) {
+      apiFetch(API + '/api/conversations/' + encodeURIComponent(convId) + '/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'assistant', content: summary }),
+      }).then(() => loadConvs()).catch(() => { /* transcript row is best-effort */ });
+    }
+  } else if (liveMsgEl) {
+    liveMsgEl.classList.remove('live');
+    stampMessage(liveMsgEl, steps);
+  }
+  liveMsgEl = null;
+  liveMsgText = '';
+  streaming = false;
+  setDot('ok');
+  document.getElementById('stop-btn').style.display = 'none';
+  document.getElementById('run-btn').style.display = '';
+  document.getElementById('sbtn').disabled = false;
 }
 
 // ═══════════ INIT ═══════════
@@ -2152,6 +2409,8 @@ function connectWS() {
   setupStaticHandlers();
   loadGroupState();
   loadPanelState();
+  loadRailWidths();
+  setupRailResize();
   // allSettled, not all: one dead subsystem must not abort the others.
   await Promise.allSettled([loadModels(), loadConvs(), loadBrainStats(), loadFiles(currentPath),
                             loadCockpit()]);
@@ -2325,6 +2584,69 @@ function closeMobilePanels() {
   document.getElementById('sidebar').classList.remove('mob-open');
   document.getElementById('file-explorer').classList.remove('mob-open');
   syncMobileOverlay();
+}
+
+// ── Rail resizing (v12) ──
+// WIDTH_KEY lives with the other storage keys at the top of this script. It was
+// declared here first and reproduced the exact TDZ bug PANEL_KEY had: the width
+// saved on drag and silently never restored, because init() read the const from
+// above its own declaration. Two for two — hence the rule that every storage
+// key is declared in one place, before init().
+const RAIL_MIN = 180, RAIL_MAX = 620;
+
+function applyRailWidths(w) {
+  const root = document.documentElement;
+  if (w.sidebar) root.style.setProperty('--sidebar-w', w.sidebar + 'px');
+  if (w.right) root.style.setProperty('--right-w', w.right + 'px');
+}
+
+function loadRailWidths() {
+  try {
+    const w = JSON.parse(localStorage.getItem(WIDTH_KEY) || '{}');
+    applyRailWidths(w);
+  } catch (exc) {
+    if (!(exc instanceof SyntaxError)) console.error('loadRailWidths:', exc);
+  }
+}
+
+function setupRailResize() {
+  if (typeof document.addEventListener !== 'function') return;
+
+  const drag = (grip, side) => {
+    if (!grip) return;
+    grip.addEventListener('mousedown', e => {
+      e.preventDefault();
+      grip.classList.add('dragging');
+      document.body.classList.add('resizing');
+
+      const move = ev => {
+        // Left rail grows rightwards from x=0; right rail grows leftwards from
+        // the viewport edge.
+        const raw = side === 'sidebar' ? ev.clientX : (window.innerWidth - ev.clientX);
+        const px = Math.max(RAIL_MIN, Math.min(RAIL_MAX, Math.round(raw)));
+        document.documentElement.style.setProperty(
+          side === 'sidebar' ? '--sidebar-w' : '--right-w', px + 'px');
+      };
+      const up = () => {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        grip.classList.remove('dragging');
+        document.body.classList.remove('resizing');
+        const cs = getComputedStyle(document.documentElement);
+        try {
+          localStorage.setItem(WIDTH_KEY, JSON.stringify({
+            sidebar: parseInt(cs.getPropertyValue('--sidebar-w'), 10) || undefined,
+            right: parseInt(cs.getPropertyValue('--right-w'), 10) || undefined,
+          }));
+        } catch { /* storage blocked */ }
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+  };
+
+  drag(document.getElementById('grip-left'), 'sidebar');
+  drag(document.getElementById('grip-right'), 'right');
 }
 
 // ═══════════ TOP BAR OVERFLOW ═══════════
@@ -2964,6 +3286,7 @@ async function sendMsg() {
   inp.style.height = 'auto';
   setDot('act');
   streaming = true;
+  let launched = false;
   document.getElementById('stop-btn').style.display = '';
   document.getElementById('run-btn').style.display = 'none';
   document.getElementById('sbtn').disabled = true;
@@ -3010,19 +3333,237 @@ async function sendMsg() {
         signal: abort.signal,
         timeoutMs: 30000,
       });
-      appendMsg('a', 'Agent is working on your request…');
+      // The run has STARTED. Output arrives asynchronously over the WebSocket
+      // as `step` events and a final `done` summary, so the composer stays
+      // locked until finishStream() releases it. v10 unlocked here and printed
+      // "Agent is working on your request…" as if that were the answer.
+      if (!ws || ws.readyState !== 1) {
+        appendMsg('s', 'Agent started, but the live connection is down — output will not stream here.');
+        return;   // finally-block below resets the UI
+      }
+      launched = true;
+      streamInto('working…');
     } catch (exc) {
       if (exc.name !== 'AbortError' && !(abort && abort.signal.aborted)) {
         appendMsg('e', 'Failed to start agent: ' + errLabel(exc));
       }
     }
   } finally {
-    streaming = false;
-    setDot('ok');
-    document.getElementById('stop-btn').style.display = 'none';
-    document.getElementById('run-btn').style.display = '';
-    document.getElementById('sbtn').disabled = false;
+    // Only reset if the run never got off the ground. A live run is reset by
+    // finishStream() when `done` or `error` arrives.
+    if (!launched) {
+      streaming = false;
+      setDot('ok');
+      document.getElementById('stop-btn').style.display = 'none';
+      document.getElementById('run-btn').style.display = '';
+      document.getElementById('sbtn').disabled = false;
+    }
   }
+}
+
+// ═══════════ MARKDOWN ═══════════
+// v10 rendered every message as one escaped blob: `<div class="mb">${escHtml(text)}</div>`.
+// No code blocks, no copy button, no structure.
+//
+// This renderer is built ENTIRELY through the DOM. There is no HTML string
+// anywhere in it, so there is no parser to trick and no allow-list to get
+// subtly wrong — the same reasoning the v10 cockpit panels used for neuron
+// text. Model output is untrusted input; it is the second least trustworthy
+// string on this page after a Windows filename.
+
+/** Schemes permitted in a link. Everything else renders as plain text. */
+const SAFE_LINK_SCHEME = /^(https?:|mailto:)/i;
+
+function isSafeLink(href) {
+  const h = String(href || '').trim();
+  // Relative links are fine; absolute ones must use a known-safe scheme.
+  // `javascript:` and `data:` are the ones this exists to stop.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(h)) return SAFE_LINK_SCHEME.test(h);
+  return !h.startsWith('//');
+}
+
+/** Inline spans: `code`, **bold**, *italic*, [text](url). */
+function renderInline(target, text) {
+  const pattern = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(\[[^\]\n]*\]\([^)\s]*\))/g;
+  let last = 0;
+  let m;
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > last) target.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const tok = m[0];
+    if (tok.startsWith('`')) {
+      const c = document.createElement('code');
+      c.className = 'md-inline-code';
+      c.textContent = tok.slice(1, -1);
+      target.appendChild(c);
+    } else if (tok.startsWith('**')) {
+      const b = document.createElement('strong');
+      b.textContent = tok.slice(2, -2);
+      target.appendChild(b);
+    } else if (tok.startsWith('[')) {
+      const close = tok.indexOf('](');
+      const label = tok.slice(1, close);
+      const href = tok.slice(close + 2, -1);
+      if (isSafeLink(href)) {
+        const a = document.createElement('a');
+        a.href = href;
+        a.textContent = label || href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        target.appendChild(a);
+      } else {
+        // Refused schemes render as literal text rather than vanishing, so a
+        // hostile link is visible rather than silently dropped.
+        target.appendChild(document.createTextNode(tok));
+      }
+    } else {
+      const i = document.createElement('em');
+      i.textContent = tok.slice(1, -1);
+      target.appendChild(i);
+    }
+    last = pattern.lastIndex;
+  }
+  if (last < text.length) target.appendChild(document.createTextNode(text.slice(last)));
+}
+
+/** A fenced code block, with its own copy button. */
+function codeBlock(code, lang) {
+  const wrap = document.createElement('div');
+  wrap.className = 'md-code';
+
+  const bar = document.createElement('div');
+  bar.className = 'md-code-bar';
+  const label = document.createElement('span');
+  label.className = 'md-code-lang';
+  label.textContent = lang || 'text';
+  bar.appendChild(label);
+
+  const copy = document.createElement('button');
+  copy.className = 'md-copy';
+  copy.type = 'button';
+  copy.textContent = 'Copy';
+  copy.title = 'Copy this block';
+  copy.addEventListener('click', () => {
+    copyText(code).then(ok => {
+      copy.textContent = ok ? 'Copied' : 'Failed';
+      setTimeout(() => { copy.textContent = 'Copy'; }, 1400);
+    });
+  });
+  bar.appendChild(copy);
+  wrap.appendChild(bar);
+
+  const pre = document.createElement('pre');
+  const c = document.createElement('code');
+  c.textContent = code;          // textContent: code is never parsed as markup
+  pre.appendChild(c);
+  wrap.appendChild(pre);
+  return wrap;
+}
+
+/**
+ * Render markdown into `target`, replacing its contents.
+ *
+ * Deliberately a small subset: fenced code, headings, lists, blockquotes, rules,
+ * paragraphs, and the inline spans above. Anything unrecognised stays literal
+ * text, which is the safe direction to fail in.
+ */
+function renderMessageBody(target, text) {
+  target.textContent = '';
+  const lines = String(text == null ? '' : text).split('\n');
+  let i = 0;
+  let list = null;
+
+  const closeList = () => { list = null; };
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    const fence = /^```(\w+)?\s*$/.exec(line);
+    if (fence) {
+      closeList();
+      const lang = fence[1] || '';
+      const buf = [];
+      i += 1;
+      while (i < lines.length && !/^```\s*$/.test(lines[i])) { buf.push(lines[i]); i += 1; }
+      i += 1;  // consume the closing fence (or fall off the end unterminated)
+      target.appendChild(codeBlock(buf.join('\n'), lang));
+      continue;
+    }
+
+    const heading = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (heading) {
+      closeList();
+      const h = document.createElement('div');
+      h.className = 'md-h md-h' + heading[1].length;
+      renderInline(h, heading[2]);
+      target.appendChild(h);
+      i += 1;
+      continue;
+    }
+
+    if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(line)) {
+      closeList();
+      target.appendChild(document.createElement('hr'));
+      i += 1;
+      continue;
+    }
+
+    const bullet = /^\s*[-*+]\s+(.*)$/.exec(line);
+    const numbered = /^\s*(\d+)[.)]\s+(.*)$/.exec(line);
+    if (bullet || numbered) {
+      const wanted = bullet ? 'ul' : 'ol';
+      if (!list || list.tagName.toLowerCase() !== wanted) {
+        list = document.createElement(wanted);
+        list.className = 'md-list';
+        target.appendChild(list);
+      }
+      const li = document.createElement('li');
+      renderInline(li, bullet ? bullet[1] : numbered[2]);
+      list.appendChild(li);
+      i += 1;
+      continue;
+    }
+
+    const quote = /^>\s?(.*)$/.exec(line);
+    if (quote) {
+      closeList();
+      const q = document.createElement('blockquote');
+      q.className = 'md-quote';
+      renderInline(q, quote[1]);
+      target.appendChild(q);
+      i += 1;
+      continue;
+    }
+
+    if (!line.trim()) { closeList(); i += 1; continue; }
+
+    closeList();
+    const para = document.createElement('div');
+    para.className = 'md-p';
+    // Consecutive non-blank lines join into one paragraph with soft breaks.
+    const buf = [];
+    while (i < lines.length && lines[i].trim()
+           && !/^```/.test(lines[i]) && !/^#{1,4}\s/.test(lines[i])
+           && !/^\s*[-*+]\s/.test(lines[i]) && !/^\s*\d+[.)]\s/.test(lines[i])
+           && !/^>/.test(lines[i])) {
+      buf.push(lines[i]);
+      i += 1;
+    }
+    buf.forEach((l, idx) => {
+      if (idx) para.appendChild(document.createElement('br'));
+      renderInline(para, l);
+    });
+    target.appendChild(para);
+  }
+}
+
+/** Clipboard write that reports success rather than assuming it. */
+function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(() => true, () => false);
+    }
+  } catch { /* fall through */ }
+  return Promise.resolve(false);
 }
 
 // Roles: 'u' user, 'a' assistant, 's' system notice, 'e' error.
@@ -3031,11 +3572,32 @@ async function sendMsg() {
 const MSG_CLASS = { u: 'u', a: 'a', s: 's', e: 'e' };
 const MSG_AVATAR = { u: '👤', a: '🤖', s: '⚙', e: '⚠' };
 
-function appendMsg(role, text) {
+function appendMsg(role, text, opts) {
+  const o = opts || {};
   const msgs = document.getElementById('msgs');
   const div = document.createElement('div');
-  div.className = 'msg ' + (MSG_CLASS[role] || 'a');
-  div.innerHTML = `<div class="mav">${MSG_AVATAR[role] || '🤖'}</div><div class="mb">${escHtml(text)}</div>`;
+  div.className = 'msg ' + (MSG_CLASS[role] || 'a') + (o.live ? ' live' : '');
+
+  // Built through the DOM. v10 used innerHTML with escHtml(), which was safe
+  // but flat — no code blocks, no per-block copy, no actions.
+  const avatar = document.createElement('div');
+  avatar.className = 'mav';
+  avatar.textContent = MSG_AVATAR[role] || '🤖';
+  div.appendChild(avatar);
+
+  const col = document.createElement('div');
+  col.className = 'mcol';
+
+  const body = document.createElement('div');
+  body.className = 'mb';
+  // User text is shown verbatim — markdown in what *you* typed should not be
+  // silently reinterpreted. Everything else gets rendered.
+  if (role === 'u') body.textContent = String(text == null ? '' : text);
+  else renderMessageBody(body, text);
+  col.appendChild(body);
+
+  col.appendChild(messageActions(div, role));
+  div.appendChild(col);
   msgs.appendChild(div);
 
   // Bound the transcript. Without this, #msgs grew without limit — every
@@ -3046,14 +3608,91 @@ function appendMsg(role, text) {
   }
 
   msgs.scrollTop = msgs.scrollHeight;
+  return div;
 }
 
-function stopStream() {
+/** Raw source of a message, for copy and for resend. */
+function messageText(msgEl) {
+  const body = msgEl.querySelector('.mb');
+  if (!body) return '';
+  if (msgEl.classList.contains('u')) return body.textContent;
+  // Rebuild from the rendered tree so a copy round-trips code blocks as code.
+  const parts = [];
+  body.childNodes.forEach(node => {
+    if (node.classList && node.classList.contains('md-code')) {
+      const code = node.querySelector('pre code');
+      const lang = node.querySelector('.md-code-lang');
+      parts.push('```' + (lang && lang.textContent !== 'text' ? lang.textContent : '')
+                 + '\n' + (code ? code.textContent : '') + '\n```');
+    } else {
+      parts.push(node.textContent);
+    }
+  });
+  return parts.join('\n').trim();
+}
+
+/** Hover actions for one message. */
+function messageActions(msgEl, role) {
+  const bar = document.createElement('div');
+  bar.className = 'msg-actions';
+
+  const add = (label, title, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'msg-act';
+    b.textContent = label;
+    b.title = title;
+    b.addEventListener('click', fn);
+    bar.appendChild(b);
+    return b;
+  };
+
+  add('⧉', 'Copy message', function () {
+    const self = this;
+    copyText(messageText(msgEl)).then(ok => {
+      self.textContent = ok ? '✓' : '✕';
+      setTimeout(() => { self.textContent = '⧉'; }, 1200);
+    });
+  });
+
+  if (role === 'u') {
+    add('↻', 'Send this again', () => {
+      const inp = document.getElementById('msginp');
+      inp.value = messageText(msgEl);
+      inp.focus();
+    });
+  }
+
+  add('✕', 'Remove from view', () => msgEl.remove());
+
+  const stamp = document.createElement('span');
+  stamp.className = 'msg-stamp';
+  stamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  bar.appendChild(stamp);
+
+  return bar;
+}
+
+/** Add the step count to a finished assistant message. */
+function stampMessage(msgEl, steps) {
+  if (!msgEl || !steps) return;
+  const stamp = msgEl.querySelector('.msg-stamp');
+  if (stamp) stamp.textContent = steps + ' steps · ' + stamp.textContent;
+}
+
+// v10's Stop aborted the client's fetch. That fetch had already returned — the
+// agent runs on a worker thread server-side — so Stop cancelled nothing and the
+// agent kept going with the UI claiming it had stopped. POST /stop is the
+// endpoint that actually halts it.
+async function stopStream() {
   if (abort) abort.abort();
-  streaming = false;
-  setDot('ok');
-  document.getElementById('stop-btn').style.display = 'none';
-  document.getElementById('run-btn').style.display = '';
+  try {
+    await apiFetch(API + '/stop', { method: 'POST', timeoutMs: 8000 });
+    appendMsg('s', 'Stop requested.');
+  } catch (exc) {
+    appendMsg('e', 'Could not stop the agent (' + errLabel(exc) + ')');
+  }
+  finishStream('', 0);
 }
 
 function newConv() {
@@ -3153,6 +3792,7 @@ function renderFileTree(entries, container) {
           ${entry.type !== 'dir' ? `
             <button class="fe-action-btn" data-act="view" title="View">👁</button>
             <button class="fe-action-btn" data-act="copy" title="Copy path">📋</button>
+            <button class="fe-action-btn" data-act="contents" title="Copy contents">📄</button>
             <button class="fe-action-btn" data-act="download" title="Download">⬇</button>
           ` : ''}
         </div>
@@ -3163,7 +3803,10 @@ function renderFileTree(entries, container) {
     const entryEl = div.querySelector('.fe-entry');
     const childrenEl = div.querySelector('.fe-dir-children');
 
-    const actions = { view: viewFile, copy: copyPath, download: downloadFile };
+    // copyFileContent() existed since v9 and had no button anywhere — the whole
+    // function was unreachable. It is the "copy this file" action the Hermes
+    // rail has, so it gets one.
+    const actions = { view: viewFile, copy: copyPath, contents: copyFileContent, download: downloadFile };
     div.querySelectorAll('.fe-action-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -3242,17 +3885,23 @@ async function viewFile(path) {
 }
 
 function copyPath(path) {
-  navigator.clipboard.writeText(path).then(() => toast('Path copied', 'ok'));
+  // Reports failure instead of assuming success: navigator.clipboard rejects
+  // outside a secure context, and v10 swallowed that into a success toast.
+  copyText(path).then(ok => toast(ok ? 'Path copied' : 'Clipboard unavailable', ok ? 'ok' : 'err'));
 }
 
 async function copyFileContent(path) {
+  let data;
   try {
-    const data = await apiJson(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576', { timeoutMs: 15000 });
-    await navigator.clipboard.writeText(data.content);
-    toast('Content copied to clipboard', 'ok');
+    data = await apiJson(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576', { timeoutMs: 15000 });
   } catch (exc) {
-    toast('Failed to copy content (' + errLabel(exc) + ')', 'err');
+    toast('Failed to read file (' + errLabel(exc) + ')', 'err');
+    return;
   }
+  if (data.is_image) { toast('That is an image — use Download', 'warn'); return; }
+  const ok = await copyText(data.content);
+  toast(ok ? (data.truncated ? 'Copied (truncated)' : 'Content copied') : 'Clipboard unavailable',
+        ok ? 'ok' : 'err');
 }
 
 function downloadFile(path) {
