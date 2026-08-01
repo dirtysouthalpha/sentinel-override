@@ -99,6 +99,22 @@ describe('dashboard-prime cascade structure (Part 4)', () => {
     }
   });
 
+  test('the hamburger is shown at phone width, not only in the tablet block', () => {
+    // Regression, found by the real-cascade probe at 375px and NOT by any
+    // structural check here: `#hbg { display: block }` existed only inside
+    // the tablet block, so flooring that block at 768px (the drawer fix)
+    // left phones with no touch affordance for the drawer at all — #btabs'
+    // Files tab opens the file explorer, and Ctrl+B is not a phone gesture.
+    // There is more than one phone-width block in this sheet, so assert
+    // across all of them rather than the first one found.
+    const phoneBlocks = mediaBlocks().filter(
+      (b) => /max-width:\s*767px/.test(b.query) && !/min-width/.test(b.query));
+    expect(phoneBlocks.length).toBeGreaterThan(0);
+    const shown = phoneBlocks.some(
+      (b) => /#hbg\s*\{[^}]*display:\s*block/.test(css.slice(b.start, b.end)));
+    expect(shown).toBe(true);
+  });
+
   test('#sb-search has no inline style attribute', () => {
     // An inline display beats every media query — this is how a 22px input
     // rendered inside the 50px rail.

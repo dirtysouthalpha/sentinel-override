@@ -1638,6 +1638,15 @@ body.resizing { user-select: none; cursor: col-resize; }
     transform: translateX(0);
   }
 
+  /* The hamburger is the ONLY touch affordance for the conversation drawer:
+     #btabs offers Chat/Files/Brain/Fleet/Commands, and its Files tab opens
+     the file explorer, not the sidebar. This rule used to live only in the
+     tablet block, so adding that block's min-width:768px floor (which fixed
+     the blank drawer) silently left phones with no way to open it at all —
+     Ctrl+B is not reachable on a touch device. Caught by the real-cascade
+     probe at 375px, not by any structural test. */
+  #hbg { display: block; }
+
   /* The top bar sheds labels via its container queries (≤640px), so nothing
      needs hiding here — every control keeps a hit target at phone width. The
      old rules hid whole .top-btn controls and showed an overflow trigger that
