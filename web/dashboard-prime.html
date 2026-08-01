@@ -1662,6 +1662,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       <button class="nb" data-page="fleet" onclick="goPage('fleet', this)" aria-label="Fleet page">
         <span class="ic">🛰️</span><span>Fleet</span>
       </button>
+      <button class="nb" data-page="mind" onclick="goPage('mind', this)" aria-label="Cognition page">
+        <span class="ic">🌀</span><span>Cognition</span>
+      </button>
     </nav>
 
     <div id="sb-search" style="display:flex;gap:4px;align-items:center">
@@ -1962,6 +1965,67 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           </div>
           <div id="fleet-actuators" style="display:flex;flex-wrap:wrap;gap:8px"></div>
           <div id="fleet-confirm" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <!-- ── COGNITION (v15) ──
+           The brain grew a mind on 2026-07-31 and none of it had a surface:
+           /cognitive/*, /creative/*, /causal/*, /v6/tom/*, /wm/*, /brain/dream,
+           the episodic timeline, /agi/reason. Endpoint reach was 13 of 148. -->
+      <div class="pg" id="pg-mind" style="padding:16px;overflow-y:auto">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:1.1rem">🌀</span>
+          <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">COGNITION</span>
+          <span id="mind-meta" style="font-size:.66rem;color:var(--muted)">—</span>
+          <button class="top-btn" id="mind-refresh" style="margin-left:auto">↻ Refresh</button>
+        </div>
+
+        <!-- Vitals the brain scores about itself. -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div><div class="bl-k">Self-confidence</div><div class="bl-v" id="mind-conf">—</div></div>
+          <div><div class="bl-k">Mood / mode</div><div class="bl-v" id="mind-mood">—</div></div>
+          <div><div class="bl-k">Prediction hit rate</div><div class="bl-v" id="mind-hit">—</div></div>
+          <div><div class="bl-k">Transition edges</div><div class="bl-v" id="mind-trans">—</div></div>
+          <div><div class="bl-k">Self-modifications</div><div class="bl-v" id="mind-selfmod">—</div></div>
+          <div><div class="bl-k">Working-memory sessions</div><div class="bl-v" id="mind-wm">—</div></div>
+        </div>
+
+        <!-- REASON: cited, multi-hop, and gradeable as a chain. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <span style="font-size:1.1rem">🧩</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">REASON</span>
+            <span style="font-size:.66rem;color:var(--muted)">multi-hop, with citations · slow by design (~18 s: local inference has been down since 2026-07-28)</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <input id="mind-q" placeholder="ask a question that needs more than one memory…" spellcheck="false"
+                   style="flex:1;background:var(--bg,#0a0e1a);color:inherit;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:.74rem;outline:none">
+            <button class="top-btn" id="mind-go">Reason</button>
+          </div>
+          <div id="mind-answer" style="margin-top:10px;font-size:.74rem"></div>
+        </div>
+
+        <!-- CURIOSITY: a gap list you can actually work. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:1.1rem">❓</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">CURIOSITY QUEUE</span>
+            <span id="mind-gap-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div style="font-size:.66rem;color:var(--muted);margin-bottom:10px">
+            A gap list you cannot act on is a to-do list nobody owns. GAP_COVERAGE_FLOOR is marked unvalidated in code — this queue is the evidence for tuning it.
+          </div>
+          <div id="mind-gaps" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- EPISODES: what happened, when. -->
+        <div style="margin-top:14px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🕰️</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">EPISODIC TIMELINE</span>
+            <span id="mind-ep-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-episodes" style="font-size:.72rem"></div>
         </div>
       </div>
 
@@ -2515,6 +2579,10 @@ function setupStaticHandlers() {
   bind('edge-right', toggleRight);
   bind('mob-overlay', closeMobilePanels);
   bind('fleet-refresh', loadFleetPage);
+  bind('mind-refresh', loadMindPage);
+  bind('mind-go', askReason);
+  const mq = document.getElementById('mind-q');
+  if (mq) mq.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); askReason(); } });
   renderActuators();
 
   // Crossing the mobile breakpoint has to re-assert state, or the desktop grid
@@ -2746,13 +2814,14 @@ function goPage(page, btn) {
   document.getElementById('pg-' + page).classList.add('on');
   document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
   if (btn) btn.classList.add('on');
-  const PAGE_LABEL = { chat: 'Chat', brain: 'Brain Lab', fleet: 'Fleet' };
+  const PAGE_LABEL = { chat: 'Chat', brain: 'Brain Lab', fleet: 'Fleet', mind: 'Cognition' };
   document.getElementById('top-ctx').textContent = PAGE_LABEL[page] || 'Chat';
 
   // Fleet data is fetched on demand rather than at init: it is a page nobody is
   // looking at most of the time, and /fleet/* is three more requests on a load
   // path that already has plenty.
   if (page === 'fleet') loadFleetPage();
+  if (page === 'mind') loadMindPage();
 
   // The Brain Lab is display:none at init, so the canvas measures 0x0 and the
   // first paint goes into a 1x1 buffer. It has to be re-measured the moment the
@@ -3743,6 +3812,193 @@ async function fireActuator(a, card) {
 
 function loadFleetPage() {
   return Promise.allSettled([loadFleet(), loadFleetIssues()]);
+}
+
+// ═══════════ COGNITION (v15) ═══════════
+// Endpoint reach was 13 of 148. The entire cognitive layer — what the brain
+// believes about itself, what it predicts, what it does not know, what it
+// remembers happening — had no surface at all.
+
+async function loadMindVitals() {
+  const grab = async (url, fn) => {
+    try { fn(await apiJson(BRAIN_API + url, { timeoutMs: 12000 })); }
+    catch { /* one dead vital must not blank the rest */ }
+  };
+  await Promise.allSettled([
+    grab('/self/confidence', d => setText('mind-conf',
+      d.overall_confidence == null ? '—' : (d.overall_confidence * 100).toFixed(0) + '%')),
+    grab('/v6/emotion/status', d => setText('mind-mood',
+      (d.mode || '—') + ' · arousal ' + Number(d.avg_arousal || 0).toFixed(2))),
+    grab('/brain/predict/stats', d => {
+      setText('mind-hit', d.hit_rate == null ? '—'
+        : (d.hit_rate * 100).toFixed(1) + '% of ' + (d.predictions_scored || 0).toLocaleString());
+      setText('mind-trans', (d.transition_edges || 0).toLocaleString());
+    }),
+    grab('/evolution/status', d => setText('mind-selfmod', (d.self_modifications || 0).toLocaleString())),
+    grab('/wm/sessions', d => setText('mind-wm', (d.count || 0) + ' active')),
+  ]);
+  setText('mind-meta', 'live from :8001');
+}
+
+/** Multi-hop reasoning with its citations rendered as clickable neurons. */
+async function askReason() {
+  const q = (document.getElementById('mind-q').value || '').trim();
+  if (!q) return;
+  const box = document.getElementById('mind-answer');
+  box.textContent = 'reasoning… (this can take ~18 s — local inference is down, so it falls back to remote)';
+
+  let d;
+  try {
+    d = await apiJson(BRAIN_API + '/brain/reason?query=' + encodeURIComponent(q), { timeoutMs: 90000 });
+  } catch (exc) {
+    box.textContent = 'reasoning failed: ' + errLabel(exc);
+    return;
+  }
+
+  box.textContent = '';
+  const answer = document.createElement('div');
+  answer.style.cssText = 'margin-bottom:8px';
+  renderMessageBody(answer, d.answer || d.conclusion || d.result || '(no answer returned)');
+  box.appendChild(answer);
+
+  const meta = document.createElement('div');
+  meta.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px';
+  if (d.confidence != null) {
+    meta.appendChild(chip('confidence ' + Number(d.confidence).toFixed(2), '#9dc4ff', 'rgba(90,140,255,.16)'));
+  }
+  const hops = d.hops || d.chain || d.steps;
+  if (Array.isArray(hops)) meta.appendChild(chip(hops.length + ' hops', 'var(--muted)', 'transparent'));
+  const contradictions = d.contradictions;
+  if (Array.isArray(contradictions) && contradictions.length) {
+    // A contradiction is the most interesting thing this endpoint can return.
+    meta.appendChild(chip('⚠ ' + contradictions.length + ' contradictions', '#ffb870', '#3a2410'));
+  }
+  box.appendChild(meta);
+
+  // Citations light up on the brain map, so a chain of reasoning is something
+  // you can watch traverse the store.
+  const cited = Array.isArray(d.citations) ? d.citations
+    : (Array.isArray(d.neuron_ids) ? d.neuron_ids : []);
+  const ids = cited.map(c => (typeof c === 'object' ? c.id : c)).filter(v => v != null);
+  if (ids.length) {
+    mapHighlightRecall(ids);
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:.66rem;color:var(--muted)';
+    note.textContent = ids.length + ' cited neurons highlighted on the Brain Map';
+    box.appendChild(note);
+  }
+}
+
+/** The curiosity queue, with something to actually do about each gap. */
+async function loadMindGaps() {
+  const list = document.getElementById('mind-gaps');
+  if (!list) return;
+  list.textContent = '';
+  let g;
+  try {
+    g = await apiJson(BRAIN_API + '/brain/curiosity/gaps', { timeoutMs: 12000 });
+  } catch (exc) {
+    setText('mind-gap-badge', errLabel(exc));
+    return;
+  }
+  const gaps = Array.isArray(g.gaps) ? g.gaps : [];
+  setText('mind-gap-badge', gaps.length + ' open');
+  if (!gaps.length) { list.textContent = 'no open gaps'; return; }
+
+  gaps.slice(0, 15).forEach(gp => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+
+    const q = document.createElement('span');
+    q.style.cssText = 'flex:1;min-width:180px;word-break:break-word';
+    q.textContent = String(gp.query || '');
+    row.appendChild(q);
+
+    const status = document.createElement('span');
+    status.style.cssText = 'font-size:.66rem;color:var(--muted)';
+
+    const act = (label, title, run) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'top-btn';
+      b.style.cssText = 'font-size:.64rem;padding:2px 8px';
+      b.textContent = label;
+      b.title = title;
+      b.addEventListener('click', async () => {
+        status.textContent = '…';
+        try {
+          await run();
+          status.textContent = '';
+          row.appendChild(chip('✓ ' + label, '#5ce39a', '#12351f'));
+          loadMindGaps();
+        } catch (exc) {
+          status.textContent = '';
+          row.appendChild(chip('failed: ' + errLabel(exc), '#ff8ba0', '#5a1520'));
+        }
+      });
+      return b;
+    };
+
+    // Let it go and find out for itself.
+    row.appendChild(act('Auto-fill', 'Let the brain research this gap', () =>
+      apiJson(BRAIN_API + '/brain/curiosity/fill', {
+        method: 'POST', timeoutMs: 60000,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: gp.query }),
+      })));
+
+    // Or answer it yourself — a human verdict is source weight 1.0, the
+    // highest-trust signal the system has.
+    row.appendChild(act('Answer', 'Answer it yourself (source weight 1.0)', () => {
+      const a = window.prompt('Answer for: ' + gp.query);
+      if (!a) throw new Error('cancelled');
+      return apiJson(BRAIN_API + '/brain/curiosity/answer', {
+        method: 'POST', timeoutMs: 30000,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: gp.query, answer: a }),
+      });
+    }));
+
+    row.appendChild(status);
+    list.appendChild(row);
+  });
+}
+
+async function loadMindEpisodes() {
+  const list = document.getElementById('mind-episodes');
+  if (!list) return;
+  list.textContent = '';
+  let d;
+  try {
+    d = await apiJson(BRAIN_API + '/brain/timeline', { timeoutMs: 15000 });
+  } catch (exc) {
+    setText('mind-ep-badge', errLabel(exc));
+    return;
+  }
+  const eps = Array.isArray(d.episodes) ? d.episodes : [];
+  setText('mind-ep-badge', eps.length + ' over ' + (d.days || 0) + ' days');
+  if (!eps.length) { list.textContent = 'no episodes recorded'; return; }
+
+  eps.slice(0, 20).forEach(ep => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:8px 0';
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;gap:6px;margin-bottom:3px;flex-wrap:wrap';
+    if (ep.chain_id) head.appendChild(chip(String(ep.chain_id), 'var(--muted)', 'transparent'));
+    if (ep.when || ep.created) {
+      head.appendChild(chip(String(ep.when || ep.created).slice(0, 10), 'var(--muted)', 'transparent'));
+    }
+    row.appendChild(head);
+    const body = document.createElement('div');
+    body.style.cssText = 'color:var(--text);opacity:.9;word-break:break-word';
+    body.textContent = String(ep.summary || ep.text || '').slice(0, 400);
+    row.appendChild(body);
+    list.appendChild(row);
+  });
+}
+
+function loadMindPage() {
+  return Promise.allSettled([loadMindVitals(), loadMindGaps(), loadMindEpisodes()]);
 }
 
 function loadCockpit() {
