@@ -1993,6 +1993,23 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <div id="map-detail" style="margin-top:8px;font-size:.7rem;color:var(--muted);min-height:1.4em">click a neuron to inspect it</div>
         </div>
 
+        <!-- BRAIN 3D (Phase 5): the semantic-projection showcase, served by
+             the brain itself at :8001/viz (the :5173 dev server is retired).
+             Loaded on CLICK, never on page load — it holds a WebGL context
+             on the same GPU the embedder uses, and this page's rule is that
+             nothing heavy rides a load path. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🧊</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">BRAIN 3D</span>
+            <span style="font-size:.66rem;color:var(--muted)">semantic projection · positions are meaning</span>
+            <button class="top-btn" id="brain3d-load" style="margin-left:auto" onclick="loadBrain3D()">Load</button>
+          </div>
+          <div id="brain3d-box" style="min-height:1.4em;font-size:.7rem;color:var(--muted)">
+            not loaded — the 3D scene shares the GPU with the embedder, so it waits for a click
+          </div>
+        </div>
+
         <!-- ASK: the learning loop's input AND output in one place -->
         <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -3783,6 +3800,20 @@ function mapFlash(id) {
   if (!MAP.byId.has(id)) return;
   MAP.flashes.set(id, 1);
   if (!MAP.raf) MAP.raf = requestAnimationFrame(mapTick);
+}
+
+// ═══════════ BRAIN 3D EMBED (Phase 5) ═══════════
+function loadBrain3D() {
+  const box = document.getElementById('brain3d-box');
+  if (box.querySelector('iframe')) return;
+  box.textContent = '';
+  const frame = document.createElement('iframe');
+  frame.src = BRAIN_API + '/viz/';
+  frame.title = 'Neuralis 3D brain';
+  frame.style.cssText = 'width:100%;height:480px;border:0;border-radius:8px;background:#020208';
+  frame.setAttribute('loading', 'lazy');
+  box.appendChild(frame);
+  document.getElementById('brain3d-load').textContent = 'Loaded';
 }
 
 function mapRenderRegionChips() {
