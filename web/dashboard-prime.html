@@ -1659,6 +1659,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       <button class="nb" data-page="brain" onclick="goPage('brain', this)" aria-label="Brain Lab page">
         <span class="ic">🧠</span><span>Brain Lab</span>
       </button>
+      <button class="nb" data-page="fleet" onclick="goPage('fleet', this)" aria-label="Fleet page">
+        <span class="ic">🛰️</span><span>Fleet</span>
+      </button>
     </nav>
 
     <div id="sb-search" style="display:flex;gap:4px;align-items:center">
@@ -1924,6 +1927,44 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         </div>
       </div>
 
+      <!-- ── FLEET (v14) ──
+           /fleet/sense has upserted a heartbeat per node every 5 minutes since
+           2026-07-31 and nothing has ever drawn it. hackbox has been reporting
+           `offline` with agent-zero down that entire time, on no screen. -->
+      <div class="pg" id="pg-fleet" style="padding:16px;overflow-y:auto">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:1.1rem">🛰️</span>
+          <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">FLEET</span>
+          <span id="fleet-meta" style="font-size:.66rem;color:var(--muted)">—</span>
+          <button class="top-btn" id="fleet-refresh" style="margin-left:auto">↻ Refresh</button>
+        </div>
+        <div id="fleet-nodes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px"></div>
+
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">⚠</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">ISSUES &amp; PREDICTIONS</span>
+            <span id="fleet-issue-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="fleet-issues" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- Actuators. /actuator/* and /orchestrate/task have existed with no UI
+             and no confirmation since v12 of the brain. Everything here is
+             two-step and names exactly what will run. -->
+        <div style="margin-top:14px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:1.1rem">🎛️</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">ACTUATORS</span>
+          </div>
+          <div style="font-size:.66rem;color:var(--muted);margin-bottom:10px">
+            Every action is confirmed twice and names the node, the command and the endpoint before it fires.
+          </div>
+          <div id="fleet-actuators" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          <div id="fleet-confirm" style="margin-top:10px"></div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Mobile Bottom Tabs -->
@@ -1932,6 +1973,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         <button class="tbb on" onclick="goPage('chat',null);mobTabActive(this)"><span class="ti">💬</span><span>Chat</span></button>
         <button class="tbb" onclick="toggleRight();mobTabActive(this)"><span class="ti">📁</span><span>Files</span></button>
         <button class="tbb" onclick="goPage('brain',null);mobTabActive(this)"><span class="ti">🧠</span><span>Brain</span></button>
+        <button class="tbb" onclick="goPage('fleet',null);mobTabActive(this)"><span class="ti">🛰️</span><span>Fleet</span></button>
         <button class="tbb" onclick="openCmdPalette();mobTabActive(this)"><span class="ti">⌘</span><span>Commands</span></button>
       </div>
     </div>
@@ -2048,6 +2090,14 @@ const PANEL_KEY = 'dash11-panels';
 const GROUP_KEY = 'dash8-groups';
 const THEME_KEY = 'dash8-theme';
 const WIDTH_KEY = 'dash12-widths';
+
+// Fleet actuators. Declared here because renderActuators() runs during init().
+const ACTUATORS = [
+  { id: 'sense',   label: 'Re-sense the fleet', endpoint: '/fleet/sense', method: 'POST',
+    describe: () => 'Probe every node and refresh its heartbeat row.', destructive: false },
+  { id: 'briefing', label: 'Generate briefing', endpoint: '/comm/briefing', method: 'POST',
+    describe: () => 'Ask the brain to write a fleet briefing.', destructive: false },
+];
 
 // ═══════════ ESCAPING (mirrored from web/lib/dash-escape.js) ═══════════
 // This dashboard has to stay a single self-contained file that works from
@@ -2464,6 +2514,8 @@ function setupStaticHandlers() {
   bind('edge-left', toggleSidebar);
   bind('edge-right', toggleRight);
   bind('mob-overlay', closeMobilePanels);
+  bind('fleet-refresh', loadFleetPage);
+  renderActuators();
 
   // Crossing the mobile breakpoint has to re-assert state, or the desktop grid
   // classes and the mobile overlay classes both linger and fight each other.
@@ -2694,7 +2746,13 @@ function goPage(page, btn) {
   document.getElementById('pg-' + page).classList.add('on');
   document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
   if (btn) btn.classList.add('on');
-  document.getElementById('top-ctx').textContent = page === 'chat' ? 'Chat' : 'Brain Lab';
+  const PAGE_LABEL = { chat: 'Chat', brain: 'Brain Lab', fleet: 'Fleet' };
+  document.getElementById('top-ctx').textContent = PAGE_LABEL[page] || 'Chat';
+
+  // Fleet data is fetched on demand rather than at init: it is a page nobody is
+  // looking at most of the time, and /fleet/* is three more requests on a load
+  // path that already has plenty.
+  if (page === 'fleet') loadFleetPage();
 
   // The Brain Lab is display:none at init, so the canvas measures 0x0 and the
   // first paint goes into a 1x1 buffer. It has to be re-measured the moment the
@@ -3469,6 +3527,222 @@ function mapHighlightRecall(ids) {
   MAP.highlight = new Set(ids || []);
   ids.forEach(id => mapFlash(id));
   mapDraw();
+}
+
+// ═══════════ FLEET (v14) ═══════════
+// The nervous system got senses on 2026-07-31: /fleet/sense upserts one
+// heartbeat row per node every 5 minutes. Nothing has ever rendered them, so
+// hackbox has been `offline` with agent-zero down, continuously, on no screen.
+
+const NODE_STATUS = {
+  online:   { color: 'var(--ok)',   bg: 'rgba(0,255,136,.10)' },
+  degraded: { color: 'var(--warn)', bg: 'rgba(255,204,68,.10)' },
+  stale:    { color: 'var(--warn)', bg: 'rgba(255,204,68,.10)' },
+  offline:  { color: 'var(--err)',  bg: 'rgba(255,68,102,.10)' },
+  unknown:  { color: 'var(--muted)', bg: 'transparent' },
+};
+
+/** How long ago, from an ISO timestamp. Staleness is the point here. */
+function sinceLabel(iso) {
+  if (!iso) return 'never';
+  const secs = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (!isFinite(secs)) return 'unknown';
+  return formatDuration(Math.max(0, secs)) + ' ago';
+}
+
+function renderFleetNode(node) {
+  const status = String(node.status || 'unknown').toLowerCase();
+  const look = NODE_STATUS[status] || NODE_STATUS.unknown;
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--surface);border:1px solid var(--border);'
+    + 'border-left:3px solid ' + look.color + ';border-radius:var(--r);padding:12px';
+
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px';
+  const name = document.createElement('span');
+  name.style.cssText = 'font-size:.86rem;font-weight:700';
+  name.textContent = node.name || 'unnamed';
+  head.appendChild(name);
+  head.appendChild(chip(status, look.color, look.bg));
+  card.appendChild(head);
+
+  const meta = document.createElement('div');
+  meta.style.cssText = 'font-size:.66rem;color:var(--muted);margin-bottom:8px';
+  meta.textContent = (node.role || '—') + ' · ' + (node.ip || '—')
+    + ' · ' + (node.beats || 0) + ' beats · seen ' + sinceLabel(node.last_seen);
+  card.appendChild(meta);
+
+  // Per-service state. A node whose services are down is not "online", and this
+  // is where that becomes impossible to miss.
+  const svcMap = node.service_status && typeof node.service_status === 'object'
+    ? node.service_status : {};
+  const names = Object.keys(svcMap);
+  const svcRow = document.createElement('div');
+  svcRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px';
+  if (!names.length) {
+    svcRow.appendChild(chip('no service probes', 'var(--muted)', 'transparent'));
+  } else {
+    names.forEach(s => {
+      const up = String(svcMap[s]).toLowerCase() === 'up';
+      svcRow.appendChild(chip(
+        (up ? '● ' : '✕ ') + s,
+        up ? 'var(--ok)' : 'var(--err)',
+        up ? 'rgba(0,255,136,.10)' : 'rgba(255,68,102,.12)'));
+    });
+  }
+  card.appendChild(svcRow);
+  return card;
+}
+
+async function loadFleet() {
+  const box = document.getElementById('fleet-nodes');
+  if (!box) return;
+  box.textContent = '';
+
+  let state;
+  try {
+    state = await apiJson(BRAIN_API + '/fleet/state', { timeoutMs: 10000 });
+  } catch (exc) {
+    setText('fleet-meta', 'fleet state ' + errLabel(exc));
+    return;
+  }
+
+  const nodes = Array.isArray(state.nodes) ? state.nodes : [];
+  const down = nodes.filter(n => String(n.status).toLowerCase() !== 'online').length;
+  setText('fleet-meta', nodes.length + ' nodes · ' + (down ? down + ' not online' : 'all online')
+    + ' · sensed ' + sinceLabel(state.topology_time));
+  nodes.forEach(n => box.appendChild(renderFleetNode(n)));
+  if (!nodes.length) box.textContent = 'no nodes reported';
+}
+
+async function loadFleetIssues() {
+  const list = document.getElementById('fleet-issues');
+  if (!list) return;
+  list.textContent = '';
+
+  const rows = [];
+  // Two independent endpoints; one being down must not blank the other.
+  const [issues, preds] = await Promise.allSettled([
+    apiJson(BRAIN_API + '/fleet/issues', { timeoutMs: 10000 }),
+    apiJson(BRAIN_API + '/fleet/predictions', { timeoutMs: 10000 }),
+  ]);
+
+  const pull = (settled, key, label) => {
+    if (settled.status !== 'fulfilled') return;
+    const v = settled.value;
+    const arr = Array.isArray(v) ? v : (Array.isArray(v[key]) ? v[key] : []);
+    arr.forEach(item => rows.push({
+      label,
+      text: typeof item === 'string' ? item
+        : (item.issue || item.prediction || item.message || item.detail || JSON.stringify(item)),
+    }));
+  };
+  pull(issues, 'issues', 'now');
+  pull(preds, 'predictions', 'predicted');
+
+  setText('fleet-issue-badge', rows.length ? rows.length + ' open' : 'nothing reported');
+  if (!rows.length) { list.textContent = 'no issues or predictions reported'; return; }
+
+  rows.slice(0, 20).forEach(r => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:6px 0;display:flex;gap:8px;align-items:flex-start';
+    row.appendChild(chip(r.label, r.label === 'now' ? 'var(--err)' : 'var(--warn)', 'transparent'));
+    const t = document.createElement('span');
+    t.style.cssText = 'flex:1;min-width:0;word-break:break-word';
+    t.textContent = String(r.text);
+    row.appendChild(t);
+    list.appendChild(row);
+  });
+}
+
+// ── Actuators, behind an explicit two-step confirm ──
+// Nothing here fires on a single click, nothing pre-selects a destructive
+// option, and the confirmation names the node, the command and the endpoint.
+// ACTUATORS is declared with the other init-time constants at the top of this
+// script. Declared here it was the THIRD temporal-dead-zone bug in this file:
+// renderActuators() runs from setupStaticHandlers() inside init(), read the
+// const from above its own declaration, threw ReferenceError, and took the
+// whole of init() down with it — silently, because the fleet page is wired by
+// inline onclick and kept working.
+
+function renderActuators() {
+  const box = document.getElementById('fleet-actuators');
+  if (!box) return;
+  box.textContent = '';
+  ACTUATORS.forEach(a => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'top-btn' + (a.destructive ? ' danger' : '');
+    b.textContent = a.label;
+    b.addEventListener('click', () => promptActuator(a));
+    box.appendChild(b);
+  });
+}
+
+/** Step one: state exactly what is about to happen and demand a second click. */
+function promptActuator(a) {
+  const box = document.getElementById('fleet-confirm');
+  if (!box) return;
+  box.textContent = '';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--surface2);border:1px solid var(--border-active);'
+    + 'border-radius:8px;padding:10px';
+
+  const what = document.createElement('div');
+  what.style.cssText = 'font-size:.72rem;margin-bottom:6px';
+  what.textContent = a.describe();
+  card.appendChild(what);
+
+  const target = document.createElement('div');
+  target.style.cssText = 'font-size:.66rem;color:var(--muted);margin-bottom:8px';
+  // The exact call, spelled out. No "are you sure?" without a subject.
+  target.textContent = a.method + ' ' + BRAIN_API + a.endpoint + '  ·  node: homeserver  ·  as: dashboard';
+  card.appendChild(target);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;align-items:center';
+
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.className = 'top-btn' + (a.destructive ? ' danger' : ' primary');
+  go.textContent = 'Confirm — run it';
+  go.addEventListener('click', () => fireActuator(a, card));
+  row.appendChild(go);
+
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'top-btn';
+  cancel.textContent = 'Cancel';
+  cancel.addEventListener('click', () => { box.textContent = ''; });
+  row.appendChild(cancel);
+
+  card.appendChild(row);
+  box.appendChild(card);
+}
+
+async function fireActuator(a, card) {
+  card.textContent = 'running ' + a.label + '…';
+  try {
+    const res = await apiJson(BRAIN_API + a.endpoint, { method: a.method, timeoutMs: 60000 });
+    card.textContent = '';
+    card.appendChild(chip('✓ ' + a.label, '#5ce39a', '#12351f'));
+    const out = document.createElement('div');
+    out.style.cssText = 'margin-top:6px;font-size:.66rem;color:var(--muted);word-break:break-word';
+    out.textContent = JSON.stringify(res).slice(0, 400);
+    card.appendChild(out);
+    toast(a.label + ' completed', 'ok');
+    loadFleet();
+  } catch (exc) {
+    card.textContent = '';
+    card.appendChild(chip('✕ failed: ' + errLabel(exc), '#ff8ba0', '#5a1520'));
+    toast(a.label + ' failed', 'err');
+  }
+}
+
+function loadFleetPage() {
+  return Promise.allSettled([loadFleet(), loadFleetIssues()]);
 }
 
 function loadCockpit() {

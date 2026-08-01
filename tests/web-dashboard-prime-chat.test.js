@@ -232,7 +232,7 @@ describe('storage keys are reachable from init()', () => {
   // the runtime symptom is "nothing happens".
   const script = inlineScript(html);
 
-  it.each(['PANEL_KEY', 'GROUP_KEY', 'THEME_KEY', 'WIDTH_KEY'])(
+  it.each(['PANEL_KEY', 'GROUP_KEY', 'THEME_KEY', 'WIDTH_KEY', 'ACTUATORS'])(
     '%s is declared before init() runs',
     (name) => {
       const decl = script.indexOf(`const ${name} =`);
@@ -242,6 +242,18 @@ describe('storage keys are reachable from init()', () => {
       expect(decl).toBeLessThan(init);
     },
   );
+
+  it('init() completes — nothing it calls throws from the dead zone', async () => {
+    // The generic guard. The three TDZ bugs all had the same signature: init()
+    // died partway, and the page looked fine because the surviving pieces are
+    // wired by inline onclick. Asserting that everything init() sets up is
+    // actually present catches the next one whatever constant it involves.
+    const { document, sandbox } = await boot();
+    expect(typeof sandbox.loadPanelState).toBe('function');
+    // setupStaticHandlers() runs renderActuators(); if init aborted, the
+    // actuator buttons are missing.
+    expect(document.querySelectorAll('#fleet-actuators button').length).toBeGreaterThan(0);
+  });
 
   it('restores persisted panel and width state on boot', async () => {
     const { document, sandbox } = await boot();
