@@ -1663,6 +1663,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
             <div><div class="bl-k">Recalls graded</div><div class="bl-v" id="ll-graded">—</div></div>
             <div><div class="bl-k">Outcomes recorded</div><div class="bl-v" id="ll-outcomes">—</div></div>
             <div><div class="bl-k">Golden eval</div><div class="bl-v" id="ll-eval">—</div></div>
+            <!-- The brain's only self-scored accuracy number: 4,185 predictions
+                 graded against what actually happened. It was on no dashboard,
+                 in no trend and in no audit, while `outcomes` (22 rows) was
+                 being treated as the learning signal. -->
+            <div><div class="bl-k">Prediction hit rate</div><div class="bl-v" id="ll-hitrate">—</div></div>
+            <div><div class="bl-k">Learning ↑ / ↓</div><div class="bl-v" id="ll-learn">—</div></div>
             <div><div class="bl-k">Edges / neuron</div><div class="bl-v" id="ll-density">—</div></div>
             <div><div class="bl-k">Quality &ge; 0.6</div><div class="bl-v" id="ll-good">—</div></div>
             <div><div class="bl-k">Trend points</div><div class="bl-v" id="ll-points">—</div></div>
@@ -2459,6 +2465,17 @@ async function loadLearningLoop() {
         ? 'not recorded' : (last.golden_eval * 100).toFixed(0) + '%');
       setText('ll-density', last.edges_per_neuron);
       setText('ll-good', (last.good_neurons || 0).toLocaleString());
+      setText('ll-hitrate', last.predict_hit_rate === null || last.predict_hit_rate === undefined
+        ? 'not recorded'
+        : (last.predict_hit_rate * 100).toFixed(0) + '% of '
+          + (last.predictions_scored || 0).toLocaleString());
+      // Shown as a ratio, not two totals: 449 up against 1 down is the shape
+      // that says weight can rise but effectively never falls.
+      const up = last.learn_strengthens, down = last.learn_weakens;
+      setText('ll-learn', (up === null || up === undefined)
+        ? '—'
+        : up.toLocaleString() + ' ↑ / ' + (down || 0).toLocaleString() + ' ↓'
+          + (down === 0 || up / Math.max(down || 1, 1) > 20 ? '  ⚠ one-way' : ''));
     }
     // One point is a reading, not a trend. Say which one this is.
     setText('loop-badge', series.length < 2 ? 'no trend yet (needs 2+ days)' : 'trending');
