@@ -1604,6 +1604,82 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           </div>
           <button class="top-btn" id="brain-refresh" style="margin-top:12px">↻ Refresh brain</button>
         </div>
+
+        <!-- ── Cockpit panels (v10) ──
+             v9 reached exactly two brain endpoints: /brain/stats and
+             /brain/diagnostics. The brain exposes 143. Everything the brain
+             actually thinks — what it knows about itself, what it does not
+             know, whether it is learning — had no surface anywhere.
+
+             Every panel below is built through the DOM, never innerHTML with
+             API-supplied text. Neuron content is arbitrary stored text and is
+             the least trustworthy string on this page. -->
+
+        <!-- ASK: the learning loop's input AND output in one place -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🔎</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">ASK</span>
+            <span style="font-size:.66rem;color:var(--muted)">recall · then grade what came back</span>
+            <span id="ask-graded" style="margin-left:auto;font-size:.64rem;color:var(--muted)"></span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <input id="ask-q" placeholder="ask the brain…" spellcheck="false"
+                   style="flex:1;background:var(--bg,#0a0e1a);color:inherit;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:.74rem;outline:none">
+            <button class="top-btn" id="ask-go">Ask</button>
+          </div>
+          <div id="ask-results" style="margin-top:10px"></div>
+        </div>
+
+        <!-- SELF: what it believes about itself -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🪞</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">SELF MODEL</span>
+            <span id="self-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+            <div><div class="bl-k">Identity</div><div class="bl-v" id="sm-identity">—</div></div>
+            <div><div class="bl-k">Avg quality</div><div class="bl-v" id="sm-quality">—</div></div>
+            <div><div class="bl-k">Domains / sources</div><div class="bl-v" id="sm-domains">—</div></div>
+            <div><div class="bl-k">Current focus</div><div class="bl-v" id="sm-focus">—</div></div>
+          </div>
+          <div class="bl-k" style="margin-top:12px">Strongest regions</div>
+          <div id="sm-strong" style="font-size:.7rem;color:var(--muted)">—</div>
+          <div class="bl-k" style="margin-top:10px">Weakest regions</div>
+          <div id="sm-weak" style="font-size:.7rem;color:var(--muted)">—</div>
+          <div class="bl-k" style="margin-top:10px">Known limitations</div>
+          <div id="sm-limits" style="font-size:.7rem;color:var(--muted)">—</div>
+        </div>
+
+        <!-- LEARNING LOOP: is it actually getting better? -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">📈</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">LEARNING LOOP</span>
+            <span id="loop-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+            <div><div class="bl-k">Recalls graded</div><div class="bl-v" id="ll-graded">—</div></div>
+            <div><div class="bl-k">Outcomes recorded</div><div class="bl-v" id="ll-outcomes">—</div></div>
+            <div><div class="bl-k">Golden eval</div><div class="bl-v" id="ll-eval">—</div></div>
+            <div><div class="bl-k">Edges / neuron</div><div class="bl-v" id="ll-density">—</div></div>
+            <div><div class="bl-k">Quality &ge; 0.6</div><div class="bl-v" id="ll-good">—</div></div>
+            <div><div class="bl-k">Trend points</div><div class="bl-v" id="ll-points">—</div></div>
+          </div>
+          <div class="bl-k" style="margin-top:12px">Writes accepted / refused today</div>
+          <div id="ll-writes" style="font-size:.7rem;color:var(--muted)">—</div>
+        </div>
+
+        <!-- CURIOSITY: what it knows it does not know -->
+        <div style="margin-top:14px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">❓</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">KNOWLEDGE GAPS</span>
+            <span id="gap-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="gap-list" style="font-size:.72rem"></div>
+        </div>
       </div>
 
     </div>
@@ -1924,7 +2000,8 @@ function connectWS() {
   setupStaticHandlers();
   loadGroupState();
   // allSettled, not all: one dead subsystem must not abort the others.
-  await Promise.allSettled([loadModels(), loadConvs(), loadBrainStats(), loadFiles(currentPath)]);
+  await Promise.allSettled([loadModels(), loadConvs(), loadBrainStats(), loadFiles(currentPath),
+                            loadCockpit()]);
   ping();
   connectWS();
 })();
@@ -1933,7 +2010,15 @@ function connectWS() {
 // onclick= attributes so the page stays compatible with a strict CSP.
 function setupStaticHandlers() {
   const refreshBtn = document.getElementById('brain-refresh');
-  if (refreshBtn) refreshBtn.addEventListener('click', () => loadBrainStats());
+  if (refreshBtn) refreshBtn.addEventListener('click', () => { loadBrainStats(); loadCockpit(); });
+
+  // Kept out of inline onclick= so the page stays CSP-strict (see comment above).
+  const askBtn = document.getElementById('ask-go');
+  if (askBtn) askBtn.addEventListener('click', () => askBrain());
+  const askInput = document.getElementById('ask-q');
+  if (askInput) {
+    askInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); askBrain(); } });
+  }
   document.querySelectorAll('#fe-breadcrumb .bc-item').forEach(el => {
     el.addEventListener('click', () => navigateTo('C:\\'));
   });
@@ -2192,6 +2277,240 @@ async function delConv(id) {
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
+}
+
+// ═══════════ COCKPIT (v10) ═══════════
+// v9 read two brain endpoints. These panels reach eleven more, and every one of
+// them renders through the DOM: neuron content is arbitrary stored text, and it
+// is the least trustworthy string on this page.
+
+/** A small labelled chip. Text goes in via textContent, never markup. */
+function chip(text, fg, bg) {
+  const s = document.createElement('span');
+  s.textContent = text;
+  s.style.cssText = 'border-radius:5px;padding:1px 6px;font-size:.62rem;white-space:nowrap;'
+    + 'color:' + fg + ';background:' + bg;
+  return s;
+}
+
+function setList(id, items, empty) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = '';
+  if (!items || !items.length) { el.textContent = empty || '—'; return; }
+  items.forEach(t => {
+    const d = document.createElement('div');
+    d.textContent = '· ' + t;
+    el.appendChild(d);
+  });
+}
+
+// ── ASK ───────────────────────────────────────────────────────────────────────
+let askQuery = '';
+let askGraded = 0;
+
+async function askBrain() {
+  const q = (document.getElementById('ask-q').value || '').trim();
+  if (!q) return;
+  askQuery = q;
+  const box = document.getElementById('ask-results');
+  box.textContent = 'recalling…';
+
+  let data;
+  try {
+    // rerank off: measured ~14x latency for no ranking gain, and it currently
+    // times out. feedback stays ON — this is real use. Benchmarks, and only
+    // benchmarks, pass feedback=false.
+    data = await apiJson(BRAIN_API + '/recall?context=' + encodeURIComponent(q)
+                         + '&rerank=false', { timeoutMs: 30000 });
+  } catch (exc) {
+    box.textContent = 'recall failed: ' + errLabel(exc);
+    return;
+  }
+
+  const hits = Array.isArray(data.direct) ? data.direct : [];
+  box.textContent = '';
+  if (!hits.length) {
+    box.textContent = 'nothing recalled — that is itself a knowledge gap';
+    return;
+  }
+
+  hits.slice(0, 8).forEach(n => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:8px 0;display:flex;gap:10px;align-items:flex-start';
+
+    const left = document.createElement('div');
+    left.style.cssText = 'flex:1;min-width:0';
+
+    const meta = document.createElement('div');
+    meta.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:3px;flex-wrap:wrap';
+    meta.appendChild(chip('#' + n.id, 'var(--muted)', 'transparent'));
+    meta.appendChild(chip(Number(n.confidence || 0).toFixed(3), '#9dc4ff', 'rgba(90,140,255,.16)'));
+    if (n.usefulness_boost > 0) {
+      // Shown deliberately: a rank that moved because of a past human verdict
+      // must be visible, or the loop is unauditable.
+      meta.appendChild(chip('↑ feedback +' + Number(n.usefulness_boost).toFixed(3),
+                            '#5ce39a', '#12351f'));
+    }
+    if (n.region) meta.appendChild(chip(n.region, 'var(--muted)', 'transparent'));
+    left.appendChild(meta);
+
+    const body = document.createElement('div');
+    body.style.cssText = 'font-size:.72rem;opacity:.9;word-break:break-word';
+    body.textContent = String(n.content || '').slice(0, 260);
+    left.appendChild(body);
+
+    row.appendChild(left);
+    row.appendChild(verdictControl(n.id));
+    box.appendChild(row);
+  });
+}
+
+/** Useful / not-useful buttons for one recalled neuron. */
+function verdictControl(neuronId) {
+  const wrap = document.createElement('span');
+  wrap.style.cssText = 'display:flex;gap:5px';
+
+  const mk = (label, useful, title) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.title = title;
+    b.style.cssText = 'cursor:pointer;background:transparent;color:#8fb4e8;'
+      + 'border:1px solid var(--border);border-radius:5px;font-size:.68rem;padding:1px 7px';
+    b.addEventListener('click', async () => {
+      wrap.textContent = '…';
+      try {
+        // Two distinct signals. useful_ids is query-conditional and is what
+        // actually moves ranking for this question; /brain/outcome records the
+        // credit-assignment row used for calibration.
+        if (useful) {
+          await apiJson(BRAIN_API + '/brain/recall/useful', {
+            method: 'POST', timeoutMs: 15000,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ neuron_ids: [neuronId], context: askQuery }),
+          });
+        }
+        await apiJson(BRAIN_API + '/brain/outcome', {
+          method: 'POST', timeoutMs: 15000,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            neuron_ids: [neuronId],
+            outcome: useful ? 'good' : 'bad',
+            note: askQuery.slice(0, 200),
+          }),
+        });
+        wrap.textContent = '';
+        wrap.appendChild(useful ? chip('✓ useful', '#5ce39a', '#12351f')
+                                : chip('✗ not', '#ffb870', '#3a2410'));
+        askGraded += 1;
+        setText('ask-graded', askGraded + ' graded this session');
+      } catch (exc) {
+        wrap.textContent = '';
+        wrap.appendChild(chip('failed', '#ff8ba0', '#5a1520'));
+      }
+    });
+    return b;
+  };
+
+  wrap.appendChild(mk('✓', true, 'this answered my question'));
+  wrap.appendChild(mk('✗', false, 'this did not help'));
+  return wrap;
+}
+
+// ── SELF MODEL ────────────────────────────────────────────────────────────────
+async function loadSelfModel() {
+  try {
+    const sm = await apiJson(BRAIN_API + '/agi/self_model', { timeoutMs: 10000 });
+    setText('sm-identity', sm.identity);
+    setText('sm-focus', sm.current_focus);
+    if (sm.knowledge) {
+      setText('sm-quality', sm.knowledge.avg_quality);
+      setText('sm-domains', (sm.knowledge.domains || 0) + ' / ' + (sm.knowledge.sources || 0));
+    }
+    setList('sm-limits', sm.limitations);
+    setText('self-badge', sm.state || 'ok');
+  } catch (exc) {
+    ['sm-identity', 'sm-focus', 'sm-quality', 'sm-domains'].forEach(id => setText(id, '—'));
+    setText('self-badge', errLabel(exc));
+  }
+
+  try {
+    const aw = await apiJson(BRAIN_API + '/self/awareness', { timeoutMs: 10000 });
+    const fmt = r => r.region + ' (' + (r.cnt || 0) + ', q=' + Number(r.avg_q || 0).toFixed(2) + ')';
+    setList('sm-strong', (aw.strong_areas || []).slice(0, 5).map(fmt));
+    setList('sm-weak', (aw.weak_areas || []).slice(0, 5).map(fmt));
+  } catch {
+    setList('sm-strong', null); setList('sm-weak', null);
+  }
+}
+
+// ── LEARNING LOOP ─────────────────────────────────────────────────────────────
+async function loadLearningLoop() {
+  try {
+    const t = await apiJson(BRAIN_API + '/brain/quality/trend', { timeoutMs: 10000 });
+    const series = Array.isArray(t.series) ? t.series : [];
+    const last = series.length ? series[series.length - 1] : null;
+    setText('ll-points', t.days);
+    if (last) {
+      setText('ll-graded', (last.graded_recalls || 0).toLocaleString()
+        + ' / ' + (last.total_recalls || 0).toLocaleString());
+      setText('ll-outcomes', (last.outcomes || 0).toLocaleString());
+      setText('ll-eval', last.golden_eval === null || last.golden_eval === undefined
+        ? 'not recorded' : (last.golden_eval * 100).toFixed(0) + '%');
+      setText('ll-density', last.edges_per_neuron);
+      setText('ll-good', (last.good_neurons || 0).toLocaleString());
+    }
+    // One point is a reading, not a trend. Say which one this is.
+    setText('loop-badge', series.length < 2 ? 'no trend yet (needs 2+ days)' : 'trending');
+  } catch (exc) {
+    setText('loop-badge', errLabel(exc));
+  }
+
+  try {
+    const w = await apiJson(BRAIN_API + '/brain/write-stats', { timeoutMs: 10000 });
+    const rows = Object.entries(w.sources || {})
+      .map(([src, v]) => {
+        const refused = Object.values(v.rejected || {}).reduce((a, b) => a + (b || 0), 0);
+        return { src, acc: v.accepted || 0, ref: refused };
+      })
+      .sort((a, b) => (b.acc + b.ref) - (a.acc + a.ref))
+      .slice(0, 8)
+      .map(r => r.src + ': ' + r.acc + ' accepted, ' + r.ref + ' refused');
+    setList('ll-writes', rows, 'no writes recorded today');
+  } catch {
+    setList('ll-writes', null);
+  }
+}
+
+// ── KNOWLEDGE GAPS ────────────────────────────────────────────────────────────
+async function loadGaps() {
+  const list = document.getElementById('gap-list');
+  if (!list) return;
+  list.textContent = '';
+  try {
+    const g = await apiJson(BRAIN_API + '/brain/curiosity/gaps', { timeoutMs: 10000 });
+    const gaps = Array.isArray(g.gaps) ? g.gaps : [];
+    setText('gap-badge', gaps.length + ' open');
+    if (!gaps.length) { list.textContent = 'no open gaps'; return; }
+    gaps.slice(0, 12).forEach(gp => {
+      const row = document.createElement('div');
+      row.style.cssText = 'border-top:1px solid var(--border);padding:6px 0;display:flex;gap:8px;align-items:center';
+      const q = document.createElement('span');
+      q.style.cssText = 'flex:1;min-width:0;word-break:break-word';
+      q.textContent = String(gp.query || '');
+      row.appendChild(q);
+      if (gp.created) row.appendChild(chip(String(gp.created).slice(0, 10), 'var(--muted)', 'transparent'));
+      list.appendChild(row);
+    });
+  } catch (exc) {
+    setText('gap-badge', errLabel(exc));
+    list.textContent = '—';
+  }
+}
+
+function loadCockpit() {
+  // allSettled: one dead panel must not blank the others.
+  return Promise.allSettled([loadSelfModel(), loadLearningLoop(), loadGaps()]);
 }
 
 function setBrainBadge(state, text) {
