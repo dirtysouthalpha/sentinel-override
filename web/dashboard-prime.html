@@ -2228,7 +2228,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
             <span style="font-size:1.1rem">❓</span>
             <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">CURIOSITY QUEUE</span>
-            <span id="mind-gap-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+            <button class="top-btn" id="mind-fill-all" style="margin-left:auto;font-size:.64rem;padding:2px 8px" title="Research the top 5 open gaps automatically">Fill top 5</button>
+            <span id="mind-gap-badge" style="font-size:.64rem;color:var(--muted)">—</span>
           </div>
           <div style="font-size:.66rem;color:var(--muted);margin-bottom:10px">
             A gap list you cannot act on is a to-do list nobody owns. GAP_COVERAGE_FLOOR is marked unvalidated in code — this queue is the evidence for tuning it.
@@ -2789,6 +2790,7 @@ function setupStaticHandlers() {
   bind('mob-overlay', closeMobilePanels);
   bind('fleet-refresh', loadFleetPage);
   bind('mind-refresh', loadMindPage);
+  bind('mind-fill-all', fillAllGaps);
   bind('mind-go', askReason);
   const mq = document.getElementById('mind-q');
   if (mq) mq.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); askReason(); } });
@@ -4332,7 +4334,40 @@ async function loadMindToM() {
       box.appendChild(r);
     });
   } catch { /* predictions are an optional second layer */ }
-  if (!box.childNodes.length) box.textContent = 'no model yet';
+  if (!box.childNodes.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'color:var(--muted)';
+    empty.textContent = 'no model yet';
+    box.appendChild(empty);
+  }
+  // v18 — let the operator correct a belief. A human write is the highest-trust
+  // signal the ToM model gets (/v6/tom/update), and it closes the read-only
+  // loop on this panel.
+  const ctl = document.createElement('div');
+  ctl.style.cssText = 'border-top:1px solid var(--border);margin-top:8px;padding-top:8px';
+  const correct = document.createElement('button');
+  correct.type = 'button';
+  correct.className = 'top-btn';
+  correct.style.cssText = 'font-size:.64rem;padding:2px 8px';
+  correct.textContent = '✎ Correct a belief';
+  correct.title = 'Tell the brain what it should believe about you';
+  correct.addEventListener('click', async () => {
+    const field = window.prompt('Belief field (e.g. focus, goals, frustration):');
+    if (!field || !field.trim()) return;
+    const value = window.prompt('Value for "' + field.trim() + '":');
+    if (value == null) return;
+    try {
+      await apiJson(BRAIN_API + '/v6/tom/update', {
+        method: 'POST', timeoutMs: 15000,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: field.trim(), value: value, confidence: 1.0, source: 'operator' }),
+      });
+      toast('Belief updated: ' + field.trim(), 'ok');
+      loadMindToM();
+    } catch (exc) { toast('Update failed: ' + errLabel(exc), 'err'); }
+  });
+  ctl.appendChild(correct);
+  box.appendChild(ctl);
   setText('mind-tom-badge', beliefs + ' beliefs');
 }
 
@@ -4474,6 +4509,27 @@ async function askReason() {
   }
 }
 
+/** v18 — batch-research the top open gaps (/brain/curiosity/fill-all). */
+async function fillAllGaps() {
+  const btn = document.getElementById('mind-fill-all');
+  if (btn) { btn.disabled = true; btn.textContent = 'filling…'; }
+  try {
+    const d = await apiJson(BRAIN_API + '/brain/curiosity/fill-all', {
+      method: 'POST', timeoutMs: 120000,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limit: 5 }),
+    });
+    const n = Number(d.filled != null ? d.filled
+      : (Array.isArray(d.results) ? d.results.length : 0));
+    toast('Filled ' + n + ' gap' + (n === 1 ? '' : 's'), 'ok');
+  } catch (exc) {
+    toast('Fill-all failed: ' + errLabel(exc), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Fill top 5'; }
+    loadMindGaps();
+  }
+}
+
 /** The curiosity queue, with something to actually do about each gap. */
 async function loadMindGaps() {
   const list = document.getElementById('mind-gaps');
@@ -4524,23 +4580,25 @@ async function loadMindGaps() {
       return b;
     };
 
-    // Let it go and find out for itself.
+    // Let it go and find out for itself. The route keys on gap_neuron_id, not
+    // the query text — sending {query} was a silent 422 (v18 fix).
     row.appendChild(act('Auto-fill', 'Let the brain research this gap', () =>
       apiJson(BRAIN_API + '/brain/curiosity/fill', {
         method: 'POST', timeoutMs: 60000,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: gp.query }),
+        body: JSON.stringify({ gap_neuron_id: gp.id, max_results: 3 }),
       })));
 
     // Or answer it yourself — a human verdict is source weight 1.0, the
-    // highest-trust signal the system has.
+    // highest-trust signal the system has. The route keys on gap_id (not the
+    // query text); sending {query} silently wrote nothing (v18 fix).
     row.appendChild(act('Answer', 'Answer it yourself (source weight 1.0)', () => {
       const a = window.prompt('Answer for: ' + gp.query);
       if (!a) throw new Error('cancelled');
       return apiJson(BRAIN_API + '/brain/curiosity/answer', {
         method: 'POST', timeoutMs: 30000,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: gp.query, answer: a }),
+        body: JSON.stringify({ gap_id: gp.id, answer: a }),
       });
     }));
 
