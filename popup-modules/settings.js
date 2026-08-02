@@ -332,6 +332,51 @@ if (soundEnabledToggle) {
 }
 
 // ========== Adaptive Prompts (3.15.0) ==========
+// Platform profile override. Detection is heuristic and keys off the URL, so a
+// white-labelled or on-prem portal can go unrecognised — this pins the profile.
+// Options are built from the registry rather than hardcoded, so a profile added
+// to background/platforms/ appears here with no edit to this file.
+const platformProfileSelect = document.getElementById('platformProfileSelect');
+
+if (platformProfileSelect) {
+  // List comes from platform-profiles.generated.js, loaded as a plain script above.
+  // Guarded because this file also runs in test harnesses that load it standalone.
+  for (const profile of (window.SENTINEL_PLATFORM_PROFILES || [])) {
+    const option = document.createElement('option');
+    option.value = profile.id;
+    option.textContent = profile.label;
+    platformProfileSelect.appendChild(option);
+  }
+
+  chrome.storage.local.get(['platform_profile_override'], (result) => {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+      console.warn('[Sentinel/settings] Failed to read platform override:', window.getErrorMessage ? window.getErrorMessage(chrome.runtime.lastError) : String(chrome.runtime.lastError));
+      return;
+    }
+    // Falls back to auto-detect if the stored profile no longer exists.
+    const stored = (result && result.platform_profile_override) || '';
+    platformProfileSelect.value = stored;
+    if (stored && platformProfileSelect.value !== stored) platformProfileSelect.value = '';
+  });
+
+  platformProfileSelect.addEventListener('change', () => {
+    const v = platformProfileSelect.value;
+    chrome.storage.local.set({ platform_profile_override: v }, () => {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+        console.error('[Sentinel/settings] Failed to save platform override:', window.getErrorMessage ? window.getErrorMessage(chrome.runtime.lastError) : String(chrome.runtime.lastError));
+        showToast('Failed to save setting', 'error');
+        return;
+      }
+      try {
+        const label = v
+          ? (platformProfileSelect.options[platformProfileSelect.selectedIndex] || {}).textContent
+          : 'Auto-detect';
+        showToast(`Platform profile: ${label}`, 'info');
+      } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+    });
+  });
+}
+
 // Pre-execution platform-aware goal rewrite. Two settings:
 //   adaptivePromptsMode: 'auto' | 'approval' | 'off' (default 'auto')
 //   adaptiveExpansionMode: 'off' | 'light' | 'full' (default 'light')

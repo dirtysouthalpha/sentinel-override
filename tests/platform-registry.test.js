@@ -13,7 +13,10 @@ import { readdirSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
-import { getPlatformProfile, listAllProfiles, findMismatchHints } from '../background/platforms/index.js';
+import {
+  getPlatformProfile, listAllProfiles, findMismatchHints,
+  setPlatformOverride, getPlatformOverride,
+} from '../background/platforms/index.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLATFORMS_DIR = path.join(ROOT, 'background', 'platforms');
@@ -53,6 +56,37 @@ describe('platform registry generation', () => {
       const source = readFileSync(path.join(PLATFORMS_DIR, file), 'utf8');
       expect(source).toMatch(/^\s*priority:\s*\d+/m);
     }
+  });
+});
+
+describe('popup profile list', () => {
+  // popup-modules/*.js are classic scripts and cannot import the registry, so the
+  // generator emits a global for them. If the two drift, the settings dropdown
+  // offers ids that no longer resolve.
+  const loadPopupList = () => {
+    const source = readFileSync(path.join(ROOT, 'popup-modules', 'platform-profiles.generated.js'), 'utf8');
+    const window = {};
+    new Function('window', source)(window);
+    return window.SENTINEL_PLATFORM_PROFILES;
+  };
+
+  it('exposes the same ids, in the same order, as the registry', () => {
+    expect(loadPopupList().map(p => p.id)).toEqual(listAllProfiles().map(p => p.id));
+  });
+
+  it('carries a label for every entry', () => {
+    for (const entry of loadPopupList()) {
+      expect(typeof entry.label).toBe('string');
+      expect(entry.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('is loaded by popup.html before settings.js reads it', () => {
+    const html = readFileSync(path.join(ROOT, 'popup.html'), 'utf8');
+    const listAt = html.indexOf('platform-profiles.generated.js');
+    const settingsAt = html.indexOf('popup-modules/settings.js');
+    expect(listAt).toBeGreaterThan(-1);
+    expect(listAt).toBeLessThan(settingsAt);
   });
 });
 
@@ -157,6 +191,53 @@ describe('getPlatformProfile', () => {
     // getPlatformProfile catches per-profile errors and continues; assert that a
     // malformed url cannot take the whole lookup down.
     expect(() => getPlatformProfile('not-a-url', 'anything')).not.toThrow();
+  });
+});
+
+describe('platform override', () => {
+  // Module-level state — every test must put it back or it leaks into the rest of
+  // the suite, which shares one module instance.
+  afterEach(() => setPlatformOverride(null));
+
+  it('is off by default', () => {
+    expect(getPlatformOverride()).toBeNull();
+  });
+
+  it('pins the chosen profile regardless of url', () => {
+    setPlatformOverride('itglue');
+    expect(getPlatformProfile('https://my.connectwise.com/ServiceDesk', '').id).toBe('itglue');
+  });
+
+  it('pins even when nothing would otherwise match', () => {
+    setPlatformOverride('freshservice');
+    expect(getPlatformProfile('https://example.com/', 'buy milk').id).toBe('freshservice');
+  });
+
+  it('returns to auto-detection when cleared', () => {
+    setPlatformOverride('itglue');
+    setPlatformOverride(null);
+    expect(getPlatformOverride()).toBeNull();
+    expect(getPlatformProfile('https://my.connectwise.com/ServiceDesk/Tickets/1', '').id).toBe('connectwise_manage');
+  });
+
+  it.each([null, undefined, ''])('treats %p as auto-detection', value => {
+    setPlatformOverride('itglue');
+    expect(setPlatformOverride(value)).toBe(true);
+    expect(getPlatformOverride()).toBeNull();
+  });
+
+  it('refuses an unknown id and leaves the previous setting intact', () => {
+    setPlatformOverride('itglue');
+    expect(setPlatformOverride('no_such_platform')).toBe(false);
+    expect(getPlatformOverride()).toBe('itglue');
+  });
+
+  it('accepts every id the settings UI can offer', () => {
+    // The dropdown is built from listAllProfiles(), so each of those must be settable.
+    for (const { id } of listAllProfiles()) {
+      expect(setPlatformOverride(id)).toBe(true);
+      expect(getPlatformProfile('https://example.com/', '').id).toBe(id);
+    }
   });
 });
 

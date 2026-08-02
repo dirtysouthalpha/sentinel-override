@@ -3,8 +3,10 @@
 Everything that can be prepared without a developer account is done. What remains needs
 Brandon's Google account and the $5 registration fee.
 
-**Package:** `dist/sentinel-override-v21.6.76.zip` — 1.78 MB, 161 files, rebuilt and verified
-2026-08-02. (Issue #43 referenced `v21.5.2`; that is stale.) Rebuild any time with `npm run build`.
+**Package:** `dist/sentinel-override-v21.6.76.zip` — 1.79 MB, 164 files, rebuilt and verified
+2026-08-02 after the platform-profile work landed. (Issue #43 referenced `v21.5.2`; that is
+stale.) Rebuild any time with `npm run build` — always rebuild immediately before uploading,
+since the zip is not committed.
 
 ## Pre-flight — verified
 
@@ -12,7 +14,7 @@ Brandon's Google account and the $5 registration fee.
 |---|---|
 | Manifest V3 | ✅ `manifest_version: 3` |
 | Version matches `package.json` | ✅ both `21.6.76` |
-| Package builds cleanly | ✅ 161 files, debug stripped from 44 |
+| Package builds cleanly | ✅ 164 files, debug stripped from 44 |
 | Screenshots | ✅ 3 × 1280x800 PNG in `docs/screenshots-cws/` |
 | Privacy policy | ✅ `PRIVACY.md`, public at the URL in `CWS-LISTING.md` |
 | Listing copy | ✅ `CWS-LISTING.md` — name, summary, description, category, single purpose |

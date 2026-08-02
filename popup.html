@@ -456,6 +456,12 @@
             </select>
           </div>
           <div class="modal-field">
+            <label>Platform Profile</label>
+            <select id="platformProfileSelect" class="form-input" style="font-size:12px;" title="Pin the platform profile instead of detecting it from the URL. Useful on white-labelled or on-prem portals the detector does not recognise.">
+              <option value="">Auto-detect (recommended)</option>
+            </select>
+          </div>
+          <div class="modal-field">
             <label>Adaptive Prompts</label>
             <select id="adaptivePromptsModeSelect" class="form-input" style="font-size:12px;">
               <option value="auto">Auto (silent rewrite)</option>
@@ -1124,6 +1130,7 @@
   <script src="lib/marked.min.js"></script>
   <script src="popup-modules/helpers.js"></script>
   <script src="popup-modules/ui-common.js"></script>
+  <script src="popup-modules/platform-profiles.generated.js"></script>
   <script src="popup-modules/settings.js"></script>
   <script src="popup-modules/activity-feed.js"></script>
 <script src="popup-modules/chat.js"></script>
