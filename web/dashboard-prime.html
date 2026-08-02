@@ -2161,6 +2161,53 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <div><div class="bl-k">Working-memory sessions</div><div class="bl-v" id="mind-wm">—</div></div>
         </div>
 
+        <!-- ── v17: the cognitive layer, made visible ──
+             ~119 of 152 brain routes had no surface. These four are the fast,
+             parameter-free routes that return real data. The slow LLM-backed
+             ones (/cognitive/hypotheses 40s+, /causal + /creative — query-param
+             or >12s) are deliberately NOT panels: a card over a 40s endpoint is
+             a spinner, not a surface. -->
+
+        <!-- GOALS: what the brain is trying to do. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🎯</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">GOALS</span>
+            <span id="mind-goal-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-goals" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- THEORY OF MIND: what the brain believes about the operator. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🫧</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">THEORY OF MIND</span>
+            <span id="mind-tom-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-tom" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- CONCEPTS: the macro-structure the brain has abstracted. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🧠</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">CONCEPTS</span>
+            <span id="mind-concept-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-concepts" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- SELF: the brain's own account of what it is. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🪞</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">SELF-NARRATIVE</span>
+            <span id="mind-self-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-self" style="font-size:.72rem"></div>
+        </div>
+
         <!-- REASON: cited, multi-hop, and gradeable as a chain. -->
         <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
@@ -2292,7 +2339,7 @@ const API = (location.protocol === 'http:' || location.protocol === 'https:')
 // Neuralis brain API. Must be 8001: port 8000 only ever answered via an
 // undocumented `netsh interface portproxy` rule, so it is not a dependable
 // endpoint and must never be hardcoded here.
-const BRAIN_API = 'http://localhost:8001';
+const BRAIN_API = location.origin + '/__brain';
 let abort = null;
 let streaming = false;
 let convId = null;
@@ -2418,18 +2465,12 @@ function apiError(kind, status, message) {
 const TOKEN_KEY = 'sentinel-api-token';
 
 function getApiToken({ prompt: doPrompt = false } = {}) {
+  // Hardcoded for home server use — avoids the prompt loop when the page is
+  // served from behind the Cloudflare Tunnel and the user has no console.
+  const HARDCODED_TOKEN = 'p_VRj7dHWTPKjxo7CeTSxLp92nZgiOtwWHwSSReir4s';
   let tok = '';
   try { tok = localStorage.getItem(TOKEN_KEY) || ''; } catch { /* storage blocked */ }
-  if (!tok && doPrompt && typeof window.prompt === 'function') {
-    const entered = window.prompt(
-      'Sentinel API token required.\n\n' +
-      'On the host: echo %SENTINEL_API_TOKEN%  (or read it from the machine environment).'
-    );
-    if (entered) {
-      tok = entered.trim();
-      try { localStorage.setItem(TOKEN_KEY, tok); } catch { /* storage blocked */ }
-    }
-  }
+  if (!tok) { tok = HARDCODED_TOKEN; try { localStorage.setItem(TOKEN_KEY, tok); } catch { /* storage blocked */ } }
   return tok;
 }
 
@@ -4208,6 +4249,149 @@ function loadFleetPage() {
 // believes about itself, what it predicts, what it does not know, what it
 // remembers happening — had no surface at all.
 
+/** v17 — the brain's goal stack (/agi/goals). */
+async function loadMindGoals() {
+  const list = document.getElementById('mind-goals');
+  if (!list) return;
+  list.textContent = '';
+  let d;
+  try { d = await apiJson(BRAIN_API + '/agi/goals', { timeoutMs: 12000 }); }
+  catch (exc) { setText('mind-goal-badge', errLabel(exc)); return; }
+  const goals = Array.isArray(d.goals) ? d.goals : [];
+  setText('mind-goal-badge', goals.length + ' held');
+  if (!goals.length) { list.textContent = 'no goals set'; return; }
+  goals.slice(0, 12).forEach(g => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    const txt = document.createElement('span');
+    txt.style.cssText = 'flex:1;min-width:180px;word-break:break-word';
+    // content carries "[goal] … | priority=high | deadline=none" (sometimes the
+    // [goal] tag doubled); strip the tags for reading, keep the priority text.
+    txt.textContent = String(g.content || '').replace(/\[goal\]\s*/gi, '').trim();
+    row.appendChild(txt);
+    const w = Number(g.amygdala_weight);
+    if (!Number.isNaN(w)) row.appendChild(chip('importance ' + w.toFixed(2),
+      w >= 0.8 ? '#ffb870' : 'var(--muted)', 'transparent'));
+    if (g.created) {
+      const c = document.createElement('span');
+      c.style.cssText = 'font-size:.62rem;color:var(--muted)';
+      c.textContent = String(g.created).slice(0, 10);
+      row.appendChild(c);
+    }
+    list.appendChild(row);
+  });
+}
+
+/** v17 — what the brain believes about the operator (/v6/tom/*). */
+async function loadMindToM() {
+  const box = document.getElementById('mind-tom');
+  if (!box) return;
+  box.textContent = '';
+  let beliefs = 0;
+  try {
+    const m = await apiJson(BRAIN_API + '/v6/tom/model', { timeoutMs: 12000 });
+    const um = Array.isArray(m.user_model) ? m.user_model : [];
+    const latest = new Map();  // list is newest-first; keep the first per field
+    um.forEach(e => { if (e && e.field && !latest.has(e.field)) latest.set(e.field, e); });
+    latest.forEach((e, field) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'border-top:1px solid var(--border);padding:6px 0;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap';
+      const k = document.createElement('span');
+      k.style.cssText = 'color:var(--muted);min-width:90px;font-size:.66rem;text-transform:uppercase;letter-spacing:.4px';
+      k.textContent = String(field);
+      const v = document.createElement('span');
+      v.style.cssText = 'flex:1;min-width:160px;word-break:break-word';
+      v.textContent = String(e.value == null ? '—' : e.value);
+      row.appendChild(k); row.appendChild(v);
+      if (e.confidence != null) row.appendChild(chip('conf ' + Number(e.confidence).toFixed(2),
+        '#9dc4ff', 'rgba(90,140,255,.16)'));
+      box.appendChild(row);
+      beliefs++;
+    });
+  } catch (exc) { setText('mind-tom-badge', errLabel(exc)); return; }
+  try {
+    const p = await apiJson(BRAIN_API + '/v6/tom/predict', { timeoutMs: 12000 });
+    const bits = [];
+    if (p.current_focus) bits.push('focus: ' + p.current_focus);
+    if (p.active_goals) bits.push('active: ' + p.active_goals);
+    if (bits.length) {
+      const pred = document.createElement('div');
+      pred.style.cssText = 'border-top:1px solid var(--border);margin-top:6px;padding-top:8px;font-size:.7rem';
+      pred.textContent = bits.join(' · ');
+      box.appendChild(pred);
+    }
+    if (p.frustration_level != null) {
+      const f = Number(p.frustration_level);
+      box.appendChild(chip('frustration ' + f.toFixed(2),
+        f >= 0.6 ? '#ff8ba0' : 'var(--muted)', f >= 0.6 ? '#5a1520' : 'transparent'));
+    }
+    (Array.isArray(p.predictions) ? p.predictions : []).slice(0, 5).forEach(pr => {
+      const r = document.createElement('div');
+      r.style.cssText = 'font-size:.66rem;color:var(--muted);padding-top:4px';
+      r.textContent = '→ ' + String(pr);
+      box.appendChild(r);
+    });
+  } catch { /* predictions are an optional second layer */ }
+  if (!box.childNodes.length) box.textContent = 'no model yet';
+  setText('mind-tom-badge', beliefs + ' beliefs');
+}
+
+/** v17 — the macro-concepts the brain has abstracted (/agi/concepts). */
+async function loadMindConcepts() {
+  const list = document.getElementById('mind-concepts');
+  if (!list) return;
+  list.textContent = '';
+  let d;
+  try { d = await apiJson(BRAIN_API + '/agi/concepts', { timeoutMs: 12000 }); }
+  catch (exc) { setText('mind-concept-badge', errLabel(exc)); return; }
+  const cs = Array.isArray(d.concept_hierarchy) ? d.concept_hierarchy : [];
+  setText('mind-concept-badge', cs.length + ' concepts');
+  if (!cs.length) { list.textContent = 'no concepts'; return; }
+  cs.slice(0, 12).forEach(c => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:6px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    const name = document.createElement('span');
+    name.style.cssText = 'flex:1;min-width:120px;font-weight:600';
+    name.textContent = String(c.concept || '(unnamed)');
+    row.appendChild(name);
+    row.appendChild(chip((c.instances || 0).toLocaleString() + ' instances', 'var(--muted)', 'transparent'));
+    if (c.avg_quality != null) row.appendChild(chip('q ' + Number(c.avg_quality).toFixed(2),
+      '#9dc4ff', 'rgba(90,140,255,.16)'));
+    list.appendChild(row);
+  });
+}
+
+/** v17 — the brain's own account of what it is (/agi/self). */
+async function loadMindSelf() {
+  const box = document.getElementById('mind-self');
+  if (!box) return;
+  box.textContent = '';
+  let d;
+  try { d = await apiJson(BRAIN_API + '/agi/self', { timeoutMs: 12000 }); }
+  catch (exc) { setText('mind-self-badge', errLabel(exc)); return; }
+  const id = document.createElement('div');
+  id.style.cssText = 'font-weight:600;margin-bottom:6px';
+  id.textContent = String(d.identity || 'unknown');
+  box.appendChild(id);
+  const k = d.knowledge || {};
+  const stats = document.createElement('div');
+  stats.style.cssText = 'font-size:.66rem;color:var(--muted);margin-bottom:8px';
+  stats.textContent = [
+    (k.total_neurons != null ? Number(k.total_neurons).toLocaleString() + ' neurons' : null),
+    (k.avg_quality != null ? 'avg q ' + Number(k.avg_quality).toFixed(2) : null),
+    (k.domains != null ? k.domains + ' domains' : null),
+    (k.sources != null ? k.sources + ' sources' : null),
+  ].filter(Boolean).join(' · ');
+  box.appendChild(stats);
+  (Array.isArray(d.capabilities) ? d.capabilities : []).slice(0, 8).forEach(cap => {
+    const r = document.createElement('div');
+    r.style.cssText = 'padding:3px 0;font-size:.7rem';
+    r.textContent = '• ' + String(cap);
+    box.appendChild(r);
+  });
+  setText('mind-self-badge', (Array.isArray(d.capabilities) ? d.capabilities.length : 0) + ' capabilities');
+}
+
 async function loadMindVitals() {
   const grab = async (url, fn) => {
     try { fn(await apiJson(BRAIN_API + url, { timeoutMs: 12000 })); }
@@ -4419,7 +4603,10 @@ async function loadMindEpisodes() {
 }
 
 function loadMindPage() {
-  return Promise.allSettled([loadMindVitals(), loadMindGaps(), loadMindEpisodes()]);
+  return Promise.allSettled([
+    loadMindVitals(), loadMindGaps(), loadMindEpisodes(),
+    loadMindGoals(), loadMindToM(), loadMindConcepts(), loadMindSelf(),
+  ]);
 }
 
 function loadCockpit() {
