@@ -12,6 +12,7 @@ const _NVD_HOST_RE = /nvd\.nist\.gov|cve\.mitre\.org|cve\.org/;
 const _NVD_GOAL_RE = /\b(nvd|cve\s*database|nist\s*nvd|cve\s*search)\b/i;
 
 export const nvd = {
+  priority: 160,
   id: 'nvd',
   label: 'NIST NVD / CVE Database',
   memoryKeyPrefix: 'nvd_',

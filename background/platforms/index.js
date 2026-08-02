@@ -1,17 +1,19 @@
 // background/platforms/index.js
-// Platform profile registry — v3.22.0
+// Platform profile registry — GENERATED FILE, DO NOT EDIT BY HAND.
 //
-// Adds new platforms by importing the profile here and registering it. The
-// Adaptive Prompts engine (background/adaptive-prompts.js) iterates the list
-// in order and picks the FIRST profile whose `detect(url, goal)` returns true.
+// Regenerate with:  node scripts/generate-platform-registry.cjs
+// CI fails if this file does not match the profiles on disk.
 //
-// Order matters: more-specific profiles must come before fallback profiles
-// (e.g., sonicwall_nsm before sonicwall_onbox).
+// To add a platform, drop a profile in this directory exporting an object with
+// an `id`, a `priority` and a `detect(url, goal)`, then regenerate. The
+// Adaptive Prompts engine (background/adaptive-prompts.js) iterates this list in
+// order and picks the FIRST profile whose detect() returns true, so a specific
+// profile needs a lower priority than any catch-all that would also match it.
 
-import { teamsAdmin } from './teams_admin.js';
 import { sonicwallNsm } from './sonicwall_nsm.js';
 import { sonicwallOnbox } from './sonicwall_onbox.js';
 import { m365Admin } from './m365_admin.js';
+import { teamsAdmin } from './teams_admin.js';
 import { fortigate } from './fortigate.js';
 import { itglue } from './itglue.js';
 import { aruba } from './aruba.js';
@@ -19,6 +21,7 @@ import { ambioViewlinc } from './ambio_viewlinc.js';
 import { screenconnect } from './screenconnect.js';
 import { ninjarmm } from './ninjarmm.js';
 import { connectwiseManage } from './connectwise_manage.js';
+import { autotask } from './autotask.js';
 import { dattoRmm } from './datto_rmm.js';
 import { cisco } from './cisco.js';
 import { paloalto } from './paloalto.js';
@@ -26,37 +29,31 @@ import { sentinelone } from './sentinelone.js';
 import { nvd } from './nvd.js';
 import { virustotal } from './virustotal.js';
 import { huntress } from './huntress.js';
+import { freshservice } from './freshservice.js';
 import { networkDevice } from './network_device.js';
 
 const PROFILES = [
-  // Most-specific first. NSM before on-box, ITG before generic. Aruba covers
-  // Central + Instant + OS-CX in one profile and lives after Microsoft/Sonic
-  // because those have stricter URL matches.
-  // (3.36.0) ambioViewlinc detects on the specific 192.168.100.x server +
-  // viewlinc/oq keyword combo, so it slots before the catch-alls.
-  // (3.37.0) ScreenConnect and NinjaRMM added for run_remote_command support.
-  // (3.38.0) ConnectWise Manage and Datto RMM added.
-  // (3.44.0) Cisco, Palo Alto, SentinelOne, NVD, VirusTotal, Huntress profiles.
-  //   networkDevice is catch-all on goal keywords — MUST be last.
-  sonicwallNsm,
-  sonicwallOnbox,
-  m365Admin,
-  teamsAdmin,
-  fortigate,
-  itglue,
-  aruba,
-  ambioViewlinc,
-  screenconnect,
-  ninjarmm,
-  connectwiseManage,
-  dattoRmm,
-  cisco,
-  paloalto,
-  sentinelone,
-  nvd,
-  virustotal,
-  huntress,
-  networkDevice,
+  sonicwallNsm,          // 10
+  sonicwallOnbox,        // 20
+  m365Admin,             // 30
+  teamsAdmin,            // 40
+  fortigate,             // 50
+  itglue,                // 60
+  aruba,                 // 70
+  ambioViewlinc,         // 80
+  screenconnect,         // 90
+  ninjarmm,              // 100
+  connectwiseManage,     // 110
+  autotask,              // 115
+  dattoRmm,              // 120
+  cisco,                 // 130
+  paloalto,              // 140
+  sentinelone,           // 150
+  nvd,                   // 160
+  virustotal,            // 170
+  huntress,              // 180
+  freshservice,          // 195
+  networkDevice,         // 9999
 ];
 
 /**

@@ -13,6 +13,7 @@ const _S1_SHORT_RE = /s1\.com$/i;
 const _S1_GOAL_RE = /\b(sentinelone|singularity)\b/i;
 
 export const sentinelone = {
+  priority: 150,
   id: 'sentinelone',
   label: 'SentinelOne Singularity Console',
   memoryKeyPrefix: 's1_',

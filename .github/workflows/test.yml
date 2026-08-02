@@ -49,6 +49,25 @@ jobs:
       # (e.g. importing seedBuiltinTemplates when it was never exported)
       - name: Import Resolution Checker
         run: node scripts/check-imports.cjs
+      # ━━━ Step 1b2: Manifest Validation ━━━
+      # A malformed manifest.json makes the extension unloadable, and a version
+      # that has drifted from package.json ships a mislabelled build. Neither is
+      # caught anywhere else in this workflow.
+      - name: Validate manifest.json
+        run: |
+          node -e "
+          const fs = require('fs');
+          const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (manifest.manifest_version !== 3) throw new Error('expected manifest_version 3, got ' + manifest.manifest_version);
+          if (manifest.version !== pkg.version) throw new Error('manifest.json version ' + manifest.version + ' != package.json ' + pkg.version);
+          console.log('manifest.json valid, v' + manifest.version);
+          "
+      # ━━━ Step 1b3: Platform Registry Drift Gate ━━━
+      # background/platforms/index.js is generated. A profile added without
+      # regenerating would exist on disk but never match anything.
+      - name: Platform Registry Up To Date
+        run: node scripts/generate-platform-registry.cjs --check
       # ━━━ Step 1c: Module Loader Check ━━━
       # Catches runtime ReferenceErrors (stray characters, bare identifiers)
       # that node --check misses because it only validates syntax

@@ -12,6 +12,7 @@ const _SC_PATH_RE = /\/Host#Access|\/Host#Support|\/Backstage|\/Host#Join/i;
 const _SC_GOAL_RE = /\b(?:screenconnect|control\.connectwise|sc\.local|schost)\b/i;
 
 export const screenconnect = {
+  priority: 90,
   id: 'screenconnect',
   label: 'ConnectWise ScreenConnect (Control)',
   memoryKeyPrefix: 'screenconnect_',

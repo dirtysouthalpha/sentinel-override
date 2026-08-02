@@ -13,6 +13,7 @@ const _CW_API_PATH_RE = /\/v4_6_release\/services\/system_io\/router\/api\.rails
 const _CW_GOAL_RE = /\b(?:connectwise\s+manage|cw\s+manage|cwmanage|connectwise\s+psa)\b/i;
 
 export const connectwiseManage = {
+  priority: 110,
   id: 'connectwise_manage',
   label: 'ConnectWise Manage (PSA)',
   memoryKeyPrefix: 'cwm_',

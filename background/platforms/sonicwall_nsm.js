@@ -11,6 +11,7 @@ const _NSM_CLOUD_HOST_RE = /(^|\.)cloud\.sonicwall\.com$/i;
 const _NSM_GOAL_RE = /\bsonicwall\s+nsm|network\s+security\s+manager\b/i;
 
 export const sonicwallNsm = {
+  priority: 10,
   id: 'sonicwall_nsm',
   label: 'SonicWall Network Security Manager',
   memoryKeyPrefix: 'sonicwall_',

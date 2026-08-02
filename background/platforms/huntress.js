@@ -10,6 +10,7 @@ const _HUNTRESS_HOST_RE = /huntress/i;
 const _HUNTRESS_GOAL_RE = /\bhuntress\b/i;
 
 export const huntress = {
+  priority: 180,
   id: 'huntress',
   label: 'Huntress MDR',
   memoryKeyPrefix: 'huntress_',

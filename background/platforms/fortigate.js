@@ -17,6 +17,7 @@ const _IP_ADDRESS_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 const _FORTI_GOAL_RE = /\b(fortigate|fortimanager|fortinet|fortiweb|fortianalyzer)\b/i;
 
 export const fortigate = {
+  priority: 50,
   id: 'fortigate',
   label: 'FortiGate / FortiManager',
   memoryKeyPrefix: 'fortigate_',
