@@ -2321,6 +2321,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 <script>
 'use strict';
 
+// v32 — evict any stale PWA. An older cockpit build (v17-boot.js/council.js)
+// registered a service worker that kept serving itself from cache, overriding
+// this page. This dashboard uses no service worker, so on load we unregister
+// every SW and drop every cache — once this runs, the cached app is gone.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations()
+    .then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+  if (window.caches && caches.keys) {
+    caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
+  }
+}
+
 // ═══════════ STATE ═══════════
 // Sentinel Desktop API.
 //
