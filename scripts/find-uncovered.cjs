@@ -1,38 +1,92 @@
+#!/usr/bin/env node
+/**
+ * Report uncovered statements and branches for a source file from an istanbul
+ * coverage run.
+ *
+ * Usage: node scripts/find-uncovered.cjs [relative/path/to/file.js]
+ *        (defaults to background/agent-engine.js)
+ *
+ * Run `npm run test:coverage` first to produce coverage/coverage-final.json.
+ */
 const fs = require('fs');
 const path = require('path');
 
-// Read coverage and source files
-const cov = JSON.parse(fs.readFileSync('coverage/coverage-final.json', 'utf8'));
-const agentEnginePath = path.resolve(__dirname, '..', 'background', 'agent-engine.js');
-const data = cov[agentEnginePath];
+const REPO_ROOT = path.resolve(__dirname, '..');
+const DEFAULT_TARGET = path.join('background', 'agent-engine.js');
 
-// Read source file
-const sourceLines = fs.readFileSync('background/agent-engine.js', 'utf8').split('\n');
+function fail(message) {
+  console.error(`find-uncovered: ${message}`);
+  process.exit(1);
+}
 
-// Find uncovered statements
+// Coverage keys are absolute paths written by whichever machine ran the tests, so they
+// can differ from a locally resolved path in separator style and drive-letter case.
+// Compare normalised forms, and fall back to a path-segment suffix match.
+function normalise(p) {
+  const n = path.normalize(p).split(path.sep).join('/');
+  return process.platform === 'win32' ? n.toLowerCase() : n;
+}
+
+function findCoverageEntry(coverage, absoluteTarget, relativeTarget) {
+  const wanted = normalise(absoluteTarget);
+  const wantedSuffix = normalise(relativeTarget);
+
+  for (const [key, value] of Object.entries(coverage)) {
+    if (normalise(key) === wanted) return value;
+  }
+  // Coverage produced elsewhere (CI, a container) won't share our absolute prefix.
+  const suffixMatches = Object.entries(coverage)
+    .filter(([key]) => normalise(key).endsWith(`/${wantedSuffix}`));
+  if (suffixMatches.length === 1) return suffixMatches[0][1];
+  if (suffixMatches.length > 1) {
+    fail(`${relativeTarget} matches ${suffixMatches.length} coverage entries; pass a more specific path`);
+  }
+  return null;
+}
+
+const targetArg = process.argv[2] || DEFAULT_TARGET;
+const absoluteTarget = path.resolve(REPO_ROOT, targetArg);
+const relativeTarget = path.relative(REPO_ROOT, absoluteTarget);
+
+const coveragePath = path.join(REPO_ROOT, 'coverage', 'coverage-final.json');
+if (!fs.existsSync(coveragePath)) {
+  fail(`no coverage at ${coveragePath} — run "npm run test:coverage" first`);
+}
+if (!fs.existsSync(absoluteTarget)) {
+  fail(`no such source file: ${absoluteTarget}`);
+}
+
+let coverage;
+try {
+  coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+} catch (err) {
+  fail(`could not parse ${coveragePath}: ${err.message}`);
+}
+
+const data = findCoverageEntry(coverage, absoluteTarget, relativeTarget);
+if (!data) {
+  fail(`${relativeTarget} has no entry in coverage-final.json — was it exercised by the test run?`);
+}
+
+const sourceLines = fs.readFileSync(absoluteTarget, 'utf8').split('\n');
+const lineText = line => (sourceLines[line - 1] || '').trim();
+
 const uncoveredStmts = Object.entries(data.s)
-  .filter(([id, count]) => count === 0)
-  .map(([id]) => {
-    const info = data.statementMap[id];
-    return { line: info.start.line, col: info.start.column };
-  })
+  .filter(([, count]) => count === 0)
+  .map(([id]) => data.statementMap[id].start)
   .sort((a, b) => a.line - b.line);
 
-console.log('Uncovered statements in agent-engine.js:');
+console.log(`Uncovered statements in ${relativeTarget}:`);
 console.log('');
-uncoveredStmts.forEach(({ line, col }) => {
-  console.log(`Line ${line}: ${sourceLines[line - 1].trim()}`);
-});
+uncoveredStmts.forEach(({ line }) => console.log(`Line ${line}: ${lineText(line)}`));
 
-// Find uncovered branches
 console.log('');
 console.log('Uncovered branches:');
 Object.entries(data.b).forEach(([id, counts]) => {
+  const { line } = data.branchMap[id].loc.start;
   if (counts.every(c => c === 0)) {
-    const info = data.branchMap[id];
-    console.log(`Line ${info.loc.start.line}: ${sourceLines[info.loc.start.line - 1].trim().substring(0, 80)}`);
+    console.log(`Line ${line}: ${lineText(line).substring(0, 80)}`);
   } else if (counts.some(c => c === 0)) {
-    const info = data.branchMap[id];
-    console.log(`Line ${info.loc.start.line}: PARTIAL (${counts.filter(c => c > 0).length}/${counts.length} taken)`);
+    console.log(`Line ${line}: PARTIAL (${counts.filter(c => c > 0).length}/${counts.length} taken)`);
   }
 });

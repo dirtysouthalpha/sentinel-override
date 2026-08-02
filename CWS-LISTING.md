@@ -81,9 +81,45 @@ Without `<all_urls>`, the agent would require users to manually grant access to 
 
 The extension does not read data from tabs the user hasn't opened. It does not monitor browsing history. It does not communicate with any external servers except the LLM provider the user configures.
 
-## Screenshots Needed
-- 1280x800 or 640x400 PNG
-- Suggested: side panel with agent running alongside a web page
-- Suggested: settings modal with provider catalog
-- Suggested: theme gallery showing multiple themes
-- Suggested: Quick Assist panel floating on a page
+### Remaining permissions
+
+The dashboard requires a justification for **every** permission, not just the sensitive
+ones. Each entry below names the module that uses it.
+
+| Permission | Justification |
+|---|---|
+| `activeTab` | Grants access to the tab the user starts a run on, so a run can begin without a broader grant. |
+| `scripting` | Injects the content scripts that index elements and execute actions (`chrome.scripting.executeScript`). The agent cannot interact with a page without them. |
+| `tabs` | Reads tab URL/title to give the agent page context, and opens/switches tabs when a task spans several pages. |
+| `tabGroups` | Groups the tabs a single run opens (`background/agent-tabs.js`) so a multi-tab task stays visually contained and is easy to close. |
+| `sidePanel` | The agent's entire UI is a side panel (`background/agent-tabs.js`, `background/index.js`) — it runs alongside the page rather than as a popup that closes on click. |
+| `storage` | Stores the user's provider configuration, API keys, themes and saved runbooks locally. |
+| `unlimitedStorage` | Run history, screenshots and generated reports exceed the 5 MB `storage.local` quota on long investigations. |
+| `debugger` | See the dedicated section above — CDP screenshot capture is the core vision mechanism. |
+| `webNavigation` | Detects page loads and sub-frame navigation (`background/frame-router.js`) so the agent waits for a page to settle before acting, and re-indexes elements after navigation. |
+| `alarms` | Drives scheduled runs and the page-monitor watch feature (`background/page-monitor.js`); service workers are terminated when idle, so timers must survive as alarms. |
+| `notifications` | Notifies the user when a long run finishes, fails, or pauses for MFA (`background/agent-reporting.js`) while they are working in another window. |
+| `downloads` | Saves generated reports and extracted data to disk (`background/index.js`). |
+| `contextMenus` | Adds the right-click actions that send highlighted text to Quick Assist (`background/context-menu.js`). |
+| `cookies` | Per-client session persistence (`background/session-manager.js`) — saves and restores cookies so the agent authenticates once instead of on every run. Cookies are stored locally and never transmitted anywhere. |
+| `proxy` | Per-client proxy routing (`background/proxy-manager.js`) — routes agent traffic through a client-specified proxy for IP allowlisting and network isolation, which MSP clients frequently require. |
+
+### Remote code
+
+The extension executes no remote code. All logic ships in the package. The only network
+calls are to the LLM endpoint the user configures, and they carry prompts and screenshots
+only — never extension code.
+
+## Screenshots
+
+Three 1280x800 PNGs are ready in `docs/screenshots-cws/` (CWS accepts 1280x800 or 640x400,
+up to 5 images):
+
+| File | Shows |
+|---|---|
+| `01-overview.png` | Side panel with the agent running alongside a page |
+| `02-command-palette.png` | Command palette |
+| `03-theme-customizer.png` | Theme gallery |
+
+Optional additions if more are wanted: the settings modal with the provider catalog, and
+the Quick Assist panel floating on a page.
