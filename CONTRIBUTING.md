@@ -99,8 +99,16 @@ node scripts/generate-platform-registry.cjs
 npm test
 ```
 
-**Do not edit `background/platforms/index.js`** — it is generated, and CI fails if it
-does not match the profiles on disk.
+**Do not edit `background/platforms/index.js` or
+`popup-modules/platform-profiles.generated.js`** — both are generated, and CI fails if
+either does not match the profiles on disk. There are two outputs because the popup
+loads classic scripts and cannot import the registry, so the generator emits a plain
+`window.SENTINEL_PLATFORM_PROFILES` list for the settings dropdown. Regenerating keeps
+them in step; a test asserts they agree.
+
+Your profile appears in Settings → Platform Profile automatically once regenerated.
+That dropdown pins detection to one profile, which is how a user works around a
+white-labelled or on-prem portal your `detect()` cannot recognise.
 
 ### Priority
 

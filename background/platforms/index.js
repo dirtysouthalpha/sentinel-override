@@ -56,14 +56,49 @@ const PROFILES = [
   networkDevice,         // 9999
 ];
 
+// Manual profile override. Detection is heuristic, so a user on an unusual host
+// (a white-labelled portal, an on-prem instance behind a vanity domain) can pin the
+// profile themselves. Held in module scope because getPlatformProfile is sync and
+// called on the agent's hot path, while chrome.storage is async — the service worker
+// loads the stored value once at startup and on change via setPlatformOverride.
+let _overrideId = null;
+
+/**
+ * Pin profile selection to one id, or pass a falsy value to return to auto-detection.
+ * @param {string|null} profileId - A profile id, or null/'' for automatic.
+ * @returns {boolean} True if the id was applied; false if it matched no profile.
+ */
+export function setPlatformOverride(profileId) {
+  if (!profileId) { _overrideId = null; return true; }
+  if (!PROFILES.some(p => p.id === profileId)) {
+    console.warn('[Sentinel] Ignoring unknown platform override:', profileId);
+    return false;
+  }
+  _overrideId = profileId;
+  return true;
+}
+
+/**
+ * The currently pinned profile id, or null when detection is automatic.
+ * @returns {string|null}
+ */
+export function getPlatformOverride() {
+  return _overrideId;
+}
+
 /**
  * Resolve the best-matching platform profile for the current URL and goal.
- * Iterates PROFILES in order and returns the first whose detect() returns true.
+ * Returns the pinned profile when one is set; otherwise iterates PROFILES in order
+ * and returns the first whose detect() returns true.
  * @param {string} currentUrl - The active tab's URL.
  * @param {string} goal - The user's goal text.
  * @returns {object|null} The matching platform profile, or null if none matched.
  */
 export function getPlatformProfile(currentUrl, goal) {
+  if (_overrideId) {
+    const pinned = PROFILES.find(p => p.id === _overrideId);
+    if (pinned) return pinned;
+  }
   for (const p of PROFILES) {
     try {
       if (p && typeof p.detect === 'function' && p.detect(currentUrl, goal)) return p;

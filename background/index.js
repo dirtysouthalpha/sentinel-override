@@ -25,6 +25,7 @@ import {setClientProxy, clearProxy, getActiveProxy, listProxyConfigs} from './pr
 import {tel, listPersistedRuns, loadPersistedRun, deletePersistedRun} from './telemetry.js';
 import {getRecentActions, generateUndoCommand, popLastAction} from './agent-learning.js';
 import {ONE_MINUTE_MS} from './constants.js';
+import {setPlatformOverride} from './platforms/index.js';
 
 // Precompute valid log levels for O(1) lookup
 const VALID_LOG_LEVELS = new Set(['error', 'warn', 'info', 'debug', 'trace']);
@@ -58,6 +59,24 @@ if (typeof self !== 'undefined' && self.addEventListener && typeof window === 'u
 
 // Service worker health heartbeat — confirms the SW event loop is alive
 chrome.alarms.create('sw_heartbeat', { periodInMinutes: 0.5 });
+
+// ========== Platform profile override ==========
+// getPlatformProfile() is sync and sits on the agent's hot path, so the pinned
+// profile is mirrored into module scope rather than read from storage per call.
+// Load it at startup and follow changes, so toggling the setting takes effect
+// without reloading the extension.
+chrome.storage.local.get(['platform_profile_override'], (result) => {
+  if (chrome.runtime.lastError) {
+    console.warn('[Sentinel] Platform override load failed:', getErrorMessage(chrome.runtime.lastError));
+    return;
+  }
+  if (result.platform_profile_override) setPlatformOverride(result.platform_profile_override);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.platform_profile_override) return;
+  setPlatformOverride(changes.platform_profile_override.newValue || null);
+});
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
