@@ -29,6 +29,7 @@ const _TEAMS_MEETING_RE = /(meeting.*polic|teams.*meeting|lobby.*bypass|who.*byp
 const _TEAMS_CALLING_RE = /(calling.*polic|call.*park|call.*forward|teams.*calling)/i;
 
 export const teamsAdmin = {
+  priority: 40,
   id: 'teams_admin',
   label: 'Teams Admin Center',
   memoryKeyPrefix: 'teams_',

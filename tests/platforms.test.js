@@ -2,6 +2,8 @@
 // Unit tests for platform profile detection logic.
 // Profiles are pure objects with a detect(url, goal) function — no chrome.* needed.
 
+import { readdirSync } from 'fs';
+
 import { getPlatformProfile, listAllProfiles, findMismatchHints } from '../background/platforms/index.js';
 
 // ========== Individual profile detect() tests ==========
@@ -534,7 +536,12 @@ describe('listAllProfiles', () => {
   test('returns an array of profile descriptors', () => {
     const list = listAllProfiles();
     expect(Array.isArray(list)).toBe(true);
-    expect(list.length).toBe(19);
+    // Counted from the profiles on disk rather than hardcoded: the registry is
+    // generated, so a legitimate new platform used to fail this assertion for no
+    // reason. tests/platform-registry.test.js pins the exact match order.
+    const profileFiles = readdirSync(new URL('../background/platforms/', import.meta.url))
+      .filter(f => f.endsWith('.js') && f !== 'index.js');
+    expect(list.length).toBe(profileFiles.length);
   });
 
   test('each profile descriptor has id, label, and memoryKeyPrefix', () => {

@@ -16,6 +16,7 @@ const _AUTOTASK_HOST_RE = /autotask\.net|atask\.net/i;
 const _DATTO_GOAL_RE = /\b(?:datto\s+rmm|autotask|centrastage)\b/i;
 
 export const dattoRmm = {
+  priority: 120,
   id: 'datto_rmm',
   label: 'Datto RMM / Autotask PSA',
   memoryKeyPrefix: 'datto_',

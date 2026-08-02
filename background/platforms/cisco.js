@@ -13,6 +13,7 @@ const _ISE_HOST_RE = /\.ise\./i;
 const _CISCO_GOAL_RE = /\b(cisco\s*asa|firepower|meraki|cisco\s*ise)\b/i;
 
 export const cisco = {
+  priority: 130,
   id: 'cisco',
   label: 'Cisco Management (ASA/FMC/Meraki/ISE)',
   memoryKeyPrefix: 'cisco_',

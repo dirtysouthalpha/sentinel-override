@@ -64,8 +64,66 @@ v21.5.0: Streaming LLM token display + cross-origin iframe support
 | `background/` | Service worker — agent engine, LLM client, tab management |
 | `content/` | Content scripts injected into pages |
 | `popup-modules/` | UI modules for the side panel |
-| `tests/` | Jest test suites (ESM, 228 suites, 10,232+ tests) |
-| `platforms/` | Platform-specific profiles (Teams Admin, M365, etc.) |
+| `tests/` | Jest test suites (ESM, 242 suites, 10,400+ tests) |
+| `background/platforms/` | Platform profiles — 21 of them; `index.js` is generated, see below |
+
+## Contributing a Platform Profile
+
+A platform profile teaches the agent one web application: how to recognise it, what
+its pages are, and how its workflows actually run. They live in
+`background/platforms/`, and adding one is the most useful contribution you can make
+without touching the engine.
+
+Create `background/platforms/<your_platform>.js` exporting a single object:
+
+```js
+export const yourPlatform = {
+  priority: 175,             // match order — see below
+  id: 'your_platform',       // unique, snake_case, matches the filename
+  label: 'Your Platform',    // shown in the UI
+  memoryKeyPrefix: 'yp_',    // namespaces anything the agent saves to memory
+
+  detect(url, goal) { /* return true when this profile should handle the page */ },
+
+  pageTypes: [ { name, urlMatch: /re/, hint: 'what this screen is' } ],
+  workflowHints: [ { match: /re/, hint: 'Phase 1: ... Phase 2: ...' } ],
+  knownGotchas: [ 'things that mislead an agent on this platform' ],
+  commitFlow: 'how an edit is actually saved',
+};
+```
+
+Then regenerate the registry and run the tests:
+
+```
+node scripts/generate-platform-registry.cjs
+npm test
+```
+
+**Do not edit `background/platforms/index.js`** — it is generated, and CI fails if it
+does not match the profiles on disk.
+
+### Priority
+
+`getPlatformProfile()` returns the **first** profile whose `detect()` returns true, and
+`priority` decides that order (lower matches first). Existing profiles are spaced by 10
+so a new one can slot between two without renumbering. A profile that detects on a
+specific hostname can sit anywhere; one that detects on goal keywords must sit after
+everything it could otherwise shadow. `network_device` is a deliberate catch-all pinned
+last at 9999 — nothing may sort after it.
+
+### What makes a profile good
+
+`detect()` must be tight. Match the real hostname, not a substring — `example.com`
+containing your product's name is not your product, and neither is
+`yourplatform.com.evil.test`. Anchor host regexes with `(^|\.)yourhost\.com$`.
+
+`workflowHints` earn their place by encoding what an agent gets *wrong*: which button
+actually commits, which field must be set first because it filters the others, whether
+a "reply" emails the customer. A hint that only restates the page title is noise.
+
+Third-party profiles cannot be loaded into a published build at runtime — Chrome MV3
+has no filesystem to enumerate, and shipping remote code would breach Chrome Web Store
+policy. Contribute profiles by pull request so they ship in the package.
 
 ## Provider Compatibility
 

@@ -20,6 +20,7 @@ const _CISCO_PATH_EXCLUDE_RE = /\/(?:fmc|asdm)/i;
 const _SONICOS_GOAL_RE = /\b(?:sonicwall|sonicos|tz\d+|nsa\d+|soho|gen[57]\b)/i;
 
 export const sonicwallOnbox = {
+  priority: 20,
   id: 'sonicwall_onbox',
   label: 'SonicWall on-box web admin (SonicOS)',
   memoryKeyPrefix: 'sonicwall_',

@@ -21,6 +21,7 @@ const _VALIDATION_CODE_RE = /\boq[\s_-]?\d|\biq[\s_-]?\d|\bpq[\s_-]?\d/;
 const _CHAMBER_RE = /threshold|rfl100|chamber|stability/;
 
 export const ambioViewlinc = {
+  priority: 80,
   id: 'ambio_viewlinc',
   label: 'Ambio viewLinc',
   memoryKeyPrefix: 'viewlinc_',

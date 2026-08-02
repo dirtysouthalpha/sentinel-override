@@ -18,6 +18,7 @@ const _ITGLUE_PARTNER_HOST_RE = /(^|\.)partner\.itglue\.com$/i;
 const _ITGLUE_GOAL_RE = /\bit\s*glue\b/i;
 
 export const itglue = {
+  priority: 60,
   id: 'itglue',
   label: 'IT Glue',
   memoryKeyPrefix: 'itglue_',

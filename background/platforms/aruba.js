@@ -21,6 +21,7 @@ const _IP_ADDRESS_RE3 = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 const _ARUBA_GOAL_RE = /\b(aruba|arubaos|aruba\s+central|aruba\s+instant|aos-?cx|hpe\s+aruba)\b/i;
 
 export const aruba = {
+  priority: 70,
   id: 'aruba',
   label: 'Aruba Central / Instant / OS-CX',
   memoryKeyPrefix: 'aruba_',

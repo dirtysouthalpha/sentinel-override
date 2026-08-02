@@ -6,6 +6,7 @@
 // Primary extraction: read_network_requests filtering for the VT JSON API.
 
 export const virustotal = {
+  priority: 170,
   id: 'virustotal',
   label: 'VirusTotal',
   memoryKeyPrefix: 'vt_',

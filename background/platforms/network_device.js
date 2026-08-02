@@ -7,6 +7,7 @@
 // matched. Must be registered LAST in the profile list.
 
 export const networkDevice = {
+  priority: 9999,
   id: 'network_device',
   label: 'Network/Security Device Management (generic)',
   memoryKeyPrefix: 'netdev_',

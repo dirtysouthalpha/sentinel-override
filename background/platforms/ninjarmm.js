@@ -11,6 +11,7 @@ const _NINJA_HOST_SHORT_RE = /ninjarmm/i;
 const _NINJA_GOAL_RE = /\b(?:ninjarmm|ninjaone|ninja[\s-]?rmm)\b/i;
 
 export const ninjarmm = {
+  priority: 100,
   id: 'ninjarmm',
   label: 'NinjaOne (NinjaRMM)',
   memoryKeyPrefix: 'ninja_',

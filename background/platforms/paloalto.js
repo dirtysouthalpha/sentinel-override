@@ -6,6 +6,7 @@
  * Ext JS widgets needing click-arrow-then-click-option.
  */
 export const paloalto = {
+  priority: 140,
   id: 'paloalto',
   label: 'Palo Alto Networks (PAN-OS / Panorama)',
   memoryKeyPrefix: 'pa_',

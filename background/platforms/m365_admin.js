@@ -22,6 +22,7 @@ const _M365_DEFENDER_RE = /(defender|threat\s+hunt|incident|alert|kql|advanced\s
 const _M365_INTUNE_RE = /(intune|endpoint|device\s+config|compliance\s+policy|app\s+protection)/i;
 
 export const m365Admin = {
+  priority: 30,
   id: 'm365_admin',
   label: 'Microsoft 365 admin surfaces',
   memoryKeyPrefix: 'm365_',
