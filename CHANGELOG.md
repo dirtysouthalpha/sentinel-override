@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased] - Agent loop guard
+
+### Fixed
+- **Announce-loop with reasoning models (LongCat-2.0, observed live 2026-08-03)**: a model that narrates ("Let me update the domain config:") without emitting an action JSON had its prose preserved as a `Parse error (will retry)` note (v20.2) — but nothing broke the cycle, so the model saw its own announcement in history and repeated it verbatim until the step cap (~80 wasted LLM calls). New `proseLoopVerdict()` (pure, in `agent-loop-helpers.js`, 8 tests) tracks consecutive identical no-action prose: 1st repeat injects a corrective SYSTEM note ("respond with exactly ONE action JSON"), 3rd identical reply stops the run early with a clear report, mirroring the stuck-click watchdog. Transient notes (e.g. API failures) neither advance nor reset the streak, so flaky-network runs still trip the guard.
+
 ## [Unreleased] - Web dashboards v9
 
 ### Added

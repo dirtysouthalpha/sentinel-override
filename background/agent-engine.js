@@ -1,5 +1,5 @@
 // Sentinel Override v3 -- Agent Engine
-import {buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames, formatVisionHistory, buildVisionSystemPrompt, buildVisionUserContent, buildRunLogEntry, isExplicitNavigation} from './agent-loop-helpers.js';
+import {buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames, formatVisionHistory, buildVisionSystemPrompt, buildVisionUserContent, buildRunLogEntry, isExplicitNavigation, proseLoopVerdict} from './agent-loop-helpers.js';
 // Agent loop, planning, self-healing, state management.
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
@@ -685,6 +685,15 @@ let _clickAtLoopFires = 0;
 // streak actually changed the page. A streak that produces nothing new AND
 // never moves the page is stuck regardless of earlier progress.
 let _clickAtStreakBaseline = 0;
+// (loop-guard) No-action prose repetition breaker — state for proseLoopVerdict()
+// (agent-loop-helpers.js). Catches reasoning models (LongCat-2.0, 2026-08-03)
+// that announce ("Let me update the domain config:") without emitting an action
+// JSON: the prose becomes a 'Parse error (will retry)' note, the model sees its
+// own announcement in history and repeats it verbatim. 1st repeat → corrective
+// SYSTEM note; 3rd identical reply → stop the run instead of grinding to the
+// step cap.
+let _lastNoActionProse = '';
+let _noActionProseRepeats = 0;
 let _clickAtStreakSawPageChange = false;
 // (3.30.0) Trust-score counters. Module-level so the loop can update them
 // from any branch and the run finalize block can read them at the end.
@@ -1088,6 +1097,8 @@ export function resetAgentState() {
   _consecutiveScrolls = 0;
   _clickAtStreakBaseline = 0;
   _clickAtStreakSawPageChange = false;
+  _lastNoActionProse = '';
+  _noActionProseRepeats = 0;
   consecutiveFailures = 0;
   sharedState.pageStagnation = 0;
   currentStrategies = [];
@@ -3824,6 +3835,34 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
       // so synthesize a note rather than crashing on null dereference.
       if (!command) {
         command = { type: 'note', text: 'No response from AI — check API key and provider settings.' };
+      }
+
+      // (loop-guard) Break identical no-action prose cycles (state decl near the
+      // click_at watchdog; pure logic in agent-loop-helpers.js). Without this a
+      // model that narrates instead of acting repeats the same announcement to
+      // the step cap — observed live with LongCat-2.0, 2026-08-03.
+      {
+        const _plv = proseLoopVerdict(_lastNoActionProse, _noActionProseRepeats, command);
+        _lastNoActionProse = _plv.prose;
+        _noActionProseRepeats = _plv.repeats;
+        if (_plv.verdict === 'nudge') {
+          promptHistory.push({
+            step: stepCount,
+            action: { type: 'note' },
+            result: 'SYSTEM: your last two replies were IDENTICAL prose with no action JSON — you are looping. Respond now with exactly ONE action JSON object and no surrounding narration. If the goal is blocked, respond {"type":"finish","summary":"<why it is blocked>"}.'
+          });
+        } else if (_plv.verdict === 'abort') {
+          const _prosePeek = command.text.replace(/^Parse error \(will retry\)[^:]*:\s*/, '').substring(0, 140);
+          const _loopSummary = `Stopped early: the model repeated the same no-action reply ${_noActionProseRepeats + 1} times ("${_prosePeek}…") — it is announcing instead of acting (common with reasoning models). Try a different model or a more concrete goal.`;
+          sendSilentUpdate(_loopSummary, stepCount);
+          finished = true;
+          reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+          chrome.runtime.sendMessage({ action: 'agent_finished', summary: `⏹ ${_loopSummary}` }).catch((e) => {
+            console.error('[prose-loop abort] Unhandled rejection:', e);
+          });
+          sendReportUpdate('generating');
+          break;
+        }
       }
 
       // Advance plan step if the LLM signalled it's done with the current step
