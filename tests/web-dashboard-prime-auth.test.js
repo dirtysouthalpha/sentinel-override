@@ -24,8 +24,8 @@ function inlineScript(source) {
 }
 
 /** Boot the dashboard with a caller-controlled localStorage and fetch spy. */
-async function boot({ seedToken = null, respond } = {}) {
-  const { document, window, location } = parseHTML(html);
+async function boot({ seedToken = null, respond, origin = 'http://localhost:8091' } = {}) {
+  const { document, window } = parseHTML(html);
   const store = new Map();
   if (seedToken) store.set(TOKEN_KEY, seedToken);
   const calls = [];
@@ -38,7 +38,12 @@ async function boot({ seedToken = null, respond } = {}) {
   const sandbox = {
     document,
     window,
-    location: location || { protocol: 'http:', host: 'localhost:8091' },
+    // The page origin decides what `API` resolves to, so it is explicit here
+    // rather than inherited from linkedom's default (which is a bare
+    // http://localhost and silently changed what these tests measured).
+    location: origin === 'file://'
+      ? { protocol: 'file:', host: '', origin: 'null', href: 'file:///C:/web/dashboard-prime.html' }
+      : { protocol: 'http:', host: origin.replace(/^https?:\/\//, ''), origin, href: origin + '/prime/dashboard-prime.html' },
     console: { log() {}, warn() {}, error() {} },
     fetch: fetchImpl,
     AbortSignal: { timeout: () => new AbortController().signal, any: (s) => s[0] },
@@ -54,6 +59,7 @@ async function boot({ seedToken = null, respond } = {}) {
     },
     WebSocket: function WebSocketStub() { this.close = () => {}; },
     navigator: { clipboard: { writeText: async () => {} } },
+    URL,
     Promise, Object, Array, String, Number, Math, JSON, Date, Error, RegExp, isFinite, parseInt,
   };
   sandbox.globalThis = sandbox;
@@ -85,7 +91,7 @@ describe('dashboard-prime API token', () => {
       respond: async () => jsonResponse({ status: 'ok' }),
     });
 
-    const apiCalls = calls.filter((c) => c.url.startsWith('http://localhost:8091'));
+    const apiCalls = calls.filter((c) => new URL(c.url).origin === 'http://localhost:8091');
     expect(apiCalls.length).toBeGreaterThan(0);
     for (const c of apiCalls) {
       const headers = c.init.headers || {};
@@ -93,17 +99,50 @@ describe('dashboard-prime API token', () => {
     }
   });
 
-  it('does not leak the token to hosts other than the API', async () => {
+  it('falls back to the Desktop API host when opened from file://', async () => {
+    // The page must stay openable straight from the repo. It cannot receive a
+    // chat reply there (location.host is empty, so the WebSocket URL has no
+    // host) but it must still authenticate its HTTP calls.
+    const { calls } = await boot({
+      origin: 'file://',
+      seedToken: 'test-token-abc123',
+      respond: async () => jsonResponse({ status: 'ok' }),
+    });
+    const apiCalls = calls.filter((c) => new URL(c.url).origin === 'http://localhost:8091');
+    expect(apiCalls.length).toBeGreaterThan(0);
+    expect(apiCalls[0].init.headers.Authorization).toBe('Bearer test-token-abc123');
+  });
+
+  it('does not leak the token to any origin but the API', async () => {
     const { calls } = await boot({
       seedToken: 'test-token-abc123',
       respond: async () => jsonResponse({ status: 'ok' }),
     });
 
     for (const c of calls) {
-      if (!c.url.startsWith('http://localhost:8091')) {
+      if (new URL(c.url).origin !== 'http://localhost:8091') {
         const headers = c.init.headers || {};
         expect(headers.Authorization).toBeUndefined();
       }
+    }
+  });
+
+  it('never sends the Desktop token to the brain, even on a shared host', async () => {
+    // Regression guard for v11. `API` became same-origin, so on a page served
+    // from a bare host it can be 'http://localhost' - which is a *string
+    // prefix* of 'http://localhost:8001', the brain. The old
+    // `url.startsWith(API)` check would have shipped the Desktop API's
+    // credential to a different service. Origins are compared, not prefixes.
+    const { calls } = await boot({
+      origin: 'http://localhost',
+      seedToken: 'test-token-abc123',
+      respond: async () => jsonResponse({ status: 'ok' }),
+    });
+
+    const brainCalls = calls.filter((c) => new URL(c.url).port === '8001');
+    expect(brainCalls.length).toBeGreaterThan(0);
+    for (const c of brainCalls) {
+      expect((c.init.headers || {}).Authorization).toBeUndefined();
     }
   });
 

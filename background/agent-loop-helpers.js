@@ -266,3 +266,46 @@ export function isExplicitNavigation(goalText) {
     || /\bbegin at:\s*\S/i.test(goalText)
     || /\bstart url:\s*\S/i.test(goalText));
 }
+
+// ========== No-Action Prose Loop Guard ==========
+
+/** Consecutive identical no-action replies tolerated before the run is aborted.
+ *  repeats=1 → corrective nudge; repeats>=2 (3rd identical reply) → abort. */
+export const PROSE_LOOP_ABORT_REPEATS = 2;
+
+/**
+ * Decide how the loop should react to a possible no-action prose repetition.
+ *
+ * Reasoning models (LongCat-2.0 observed 2026-08-03) can reply with an
+ * announcement ("Let me update the domain config:") and no action JSON.
+ * parseLLMResponse preserves that prose as a 'Parse error (will retry)' note
+ * (v20.2), but nothing broke the cycle: the model sees its own announcement in
+ * history and repeats it verbatim until the step cap. This helper tracks the
+ * streak of identical captured prose.
+ *
+ * Streak semantics: a real action resets the streak; an unrelated note (e.g.
+ * "API call failed") neither resets nor advances it, so transient API errors
+ * between identical announcements don't hide the loop.
+ *
+ * @param {string} prevProse - Normalized prose from the previous parse-error note ('' if none)
+ * @param {number} prevRepeats - Consecutive identical repeats seen so far
+ * @param {{type?: string, text?: string}|null} command - The parsed command for this step
+ * @returns {{prose: string, repeats: number, verdict: 'ok'|'first'|'nudge'|'abort'}}
+ */
+export function proseLoopVerdict(prevProse, prevRepeats, command) {
+  const isParseNote = !!(command && command.type === 'note'
+    && typeof command.text === 'string'
+    && command.text.startsWith('Parse error (will retry)'));
+  if (!isParseNote) {
+    if (command && command.type === 'note') {
+      return { prose: prevProse, repeats: prevRepeats, verdict: 'ok' };
+    }
+    return { prose: '', repeats: 0, verdict: 'ok' };
+  }
+  const prose = command.text.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (prose && prose === prevProse) {
+    const repeats = prevRepeats + 1;
+    return { prose, repeats, verdict: repeats >= PROSE_LOOP_ABORT_REPEATS ? 'abort' : 'nudge' };
+  }
+  return { prose, repeats: 0, verdict: 'first' };
+}

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Sentinel Command Center v9</title>
+<title>Sentinel Command Center v11</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -220,6 +220,110 @@ body::before {
   grid-template-columns: 0 1fr 0;
 }
 
+/* ── Collapse affordances ──
+   Collapsing already worked, but the only triggers were the top-bar hamburger,
+   the top-bar Files button and two keyboard shortcuts. Nothing on either panel
+   said it could be collapsed, and once a rail was 0 wide there was no way back
+   without the keyboard. Two additions fix both halves: a chevron in each
+   panel's own header, and a thin always-present handle at each screen edge. */
+
+.panel-collapse {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .8rem;
+  line-height: 1;
+  padding: 4px 6px;
+  transition: color var(--t), background var(--t), border-color var(--t);
+}
+.panel-collapse:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--border-active);
+}
+.panel-collapse:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The reopen handles. Rendered only while their rail is collapsed, so they
+   never sit on top of panel content. */
+.edge-handle {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 40;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 76px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  font-size: .7rem;
+  line-height: 1;
+  transition: color var(--t), background var(--t), width var(--t);
+}
+.edge-handle:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+  width: 22px;
+}
+.edge-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+#edge-left {
+  left: 0;
+  border-left: none;
+  border-radius: 0 var(--r) var(--r) 0;
+}
+#edge-right {
+  right: 0;
+  border-right: none;
+  border-radius: var(--r) 0 0 var(--r);
+}
+#app.sidebar-collapsed ~ #edge-left,
+#app.both-collapsed ~ #edge-left { display: flex; }
+#app.right-collapsed ~ #edge-right,
+#app.both-collapsed ~ #edge-right { display: flex; }
+
+/* On mobile the rails are overlays driven by .mob-open, not grid columns, so
+   the edge handles would be lying about the state. Hide them there. */
+@media (max-width: 767px) {
+  .edge-handle { display: none !important; }
+}
+
+/* ── Rail resizers (v12) ── */
+.rail-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  z-index: 30;
+  cursor: col-resize;
+  background: transparent;
+  transition: background var(--t);
+}
+.rail-grip:hover, .rail-grip.dragging { background: var(--border-active); }
+#grip-left { left: calc(var(--sidebar-w) - 2px); }
+#grip-right { right: calc(var(--right-w) - 2px); }
+#app.sidebar-collapsed #grip-left,
+#app.right-collapsed #grip-right,
+#app.both-collapsed .rail-grip { display: none; }
+@media (max-width: 767px) { .rail-grip { display: none !important; } }
+/* Suppress text selection while dragging, or the whole page highlights. */
+body.resizing { user-select: none; cursor: col-resize; }
+
 /* ── Sidebar ── */
 #sidebar {
   display: flex;
@@ -300,6 +404,12 @@ body::before {
 }
 
 #sb-search {
+  /* Layout lives here, not in a style="" attribute: an inline display beats
+     every media query, which is how a 22px input ended up rendering inside
+     the 50px tablet icon rail (measured 2026-08-01). */
+  display: flex;
+  gap: 4px;
+  align-items: center;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -520,23 +630,19 @@ body::before {
   container-name: topbar;
 }
 
-/* Container queries: progressive hiding into overflow */
-@container topbar (max-width: 500px) {
-  #top-actions .top-btn:not(#run-btn):not(#stop-btn) {
-    display: none;
-  }
-  #top-overflow {
-    display: block;
-  }
-  .top-btn .btn-label {
-    display: none;
-  }
+/* Container queries: the bar degrades by shedding LABELS, never controls.
+   Pills drop their names (the dots stay), Stop drops its label, the Ctrl+K
+   hint goes — but every control keeps a non-zero hit target at every width.
+   The old bar hid whole buttons into an overflow whose own trigger was
+   display:none — four controls with no mouse affordance anywhere. */
+@container topbar (max-width: 640px) {
+  .pill .pill-name { display: none; }
+  .top-btn .btn-label { display: none; }
+  #omni-key { display: none; }
 }
 
-@container topbar (max-width: 350px) {
-  #top-ctx {
-    display: none;
-  }
+@container topbar (max-width: 420px) {
+  #omni-glyph { display: none; }
 }
 
 #top-left {
@@ -562,21 +668,108 @@ body::before {
   background: var(--accent-soft);
 }
 
-#sdot {
+/* ── Omnibox: the palette promoted to a permanent control ── */
+#omni-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 4px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color var(--t);
+}
+
+#omni-wrap:focus-within { border-color: var(--border-active); }
+
+#omni-glyph { color: var(--muted); font-size: .8rem; flex-shrink: 0; }
+
+#omni {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: .82rem;
+  padding: 2px 0;
+}
+
+#omni-key {
+  flex-shrink: 0;
+  font-size: .66rem;
+  font-family: inherit;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+#omni-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 6px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  z-index: 300;
+  display: none;
+  box-shadow: 0 16px 64px rgba(0,0,0,0.6);
+}
+
+#omni-results.open { display: block; }
+
+.omni-group {
+  padding: 6px 12px 2px;
+  font-size: .64rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ── Health pills: one per service, with a real colour and a popover.
+   "degraded" = the service answered and reported itself unhealthy, which is
+   a different situation from not answering at all. ── */
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: .72rem;
+  cursor: pointer;
+  transition: all var(--t);
+  white-space: nowrap;
+}
+
+.pill:hover { border-color: var(--border-active); color: var(--text); }
+
+.pill .pd {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--ok);
-  box-shadow: 0 0 8px var(--ok);
+  background: var(--muted);
   flex-shrink: 0;
   transition: all var(--t);
 }
 
-#sdot.err { background: var(--err); box-shadow: 0 0 8px var(--err); }
-/* "degraded" = we reached the service and it reported itself unhealthy (503),
-   which is a different situation from not reaching it at all. */
-#sdot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
-#sdot.act {
+.pill.ok .pd   { background: var(--ok);   box-shadow: 0 0 8px var(--ok); }
+.pill.warn .pd { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+.pill.err .pd  { background: var(--err);  box-shadow: 0 0 8px var(--err); }
+.pill.act .pd  {
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
   animation: dotpulse 1.4s ease-in-out infinite;
@@ -587,20 +780,11 @@ body::before {
   50% { opacity: .6; box-shadow: 0 0 14px var(--accent); }
 }
 
-#top-ctx {
-  font-size: .82rem;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
-}
-
-#top-actions {
+#top-right {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -637,46 +821,105 @@ body::before {
   color: var(--err);
 }
 
-#top-overflow {
-  display: none;
-  position: relative;
-}
-
-#top-overflow-menu {
+/* ── Popovers: health-pill detail and ⚙ settings ── */
+#pill-pop, #settings-pop {
   position: absolute;
   top: 100%;
   right: 0;
-  margin-top: 4px;
-  background: var(--surface2);
+  margin-top: 6px;
+  background: var(--bg2);
   backdrop-filter: var(--glass);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 4px;
-  min-width: 180px;
-  z-index: 100;
+  border-radius: 10px;
+  padding: 10px;
+  min-width: 240px;
+  max-width: 320px;
+  z-index: 300;
   display: none;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
-#top-overflow-menu.open {
-  display: block;
+#pill-pop.open, #settings-pop.open { display: block; }
+
+#settings-wrap { position: relative; }
+
+#settings-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: .95rem;
+  cursor: pointer;
+  padding: 3px 9px;
+  transition: all var(--t);
 }
 
-.overflow-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
+#settings-btn:hover { color: var(--accent); border-color: var(--border-active); }
+
+.set-sec {
+  font-size: .64rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 10px 0 6px;
+}
+
+.set-sec:first-child { margin-top: 0; }
+
+#theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.theme-opt {
+  padding: 5px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text);
-  font-size: .82rem;
+  font-size: .74rem;
   cursor: pointer;
-  transition: background var(--t);
+  text-align: left;
+  transition: all var(--t);
 }
 
-.overflow-item:hover {
-  background: var(--accent-soft);
+.theme-opt:hover { border-color: var(--border-active); }
+.theme-opt.on { border-color: var(--accent); color: var(--accent); }
+
+#settings-pop select {
+  width: 100%;
+  padding: 5px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: .78rem;
 }
+
+.set-tog { margin-top: 6px; }
+
+.set-btn {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: .76rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--t);
+}
+
+.set-btn:hover { border-color: var(--border-active); color: var(--accent); }
+
+/* Pill-pop rows are DOM-built (textContent only — API strings render inert) */
+.pop-title { font-size: .8rem; font-weight: 700; margin-bottom: 6px; }
+.pop-row { font-size: .74rem; color: var(--text); padding: 3px 0; display: flex; gap: 6px; align-items: baseline; }
+.pop-row .pop-k { color: var(--muted); flex-shrink: 0; }
+.pop-row.bad { color: var(--err); }
+.pop-row.warn { color: var(--warn); }
 
 /* ── Content Area ── */
 #content {
@@ -759,6 +1002,112 @@ body::before {
   font-size: .88rem;
   line-height: 1.6;
   word-break: break-word;
+}
+
+/* ── Message column, actions, markdown (v12) ──
+   v10 rendered every message as one escaped blob with no structure and no way
+   to get the text back out. */
+
+.mcol { display: flex; flex-direction: column; min-width: 0; }
+.msg.u .mcol { align-items: flex-end; }
+
+.msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  padding: 0 4px;
+  opacity: 0;
+  transition: opacity var(--t);
+}
+.msg:hover .msg-actions,
+.msg:focus-within .msg-actions { opacity: 1; }
+
+.msg-act {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .68rem;
+  line-height: 1;
+  padding: 2px 6px;
+  transition: color var(--t), border-color var(--t), background var(--t);
+}
+.msg-act:hover { color: var(--accent); border-color: var(--border-active); background: var(--accent-soft); }
+.msg-stamp { font-size: .62rem; color: var(--muted); margin-left: 2px; }
+
+/* A message still being streamed into gets a pulsing caret. */
+.msg.live .mb::after {
+  content: '▌';
+  color: var(--accent);
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink { to { visibility: hidden; } }
+
+.md-p { margin: 0 0 6px; }
+.md-p:last-child { margin-bottom: 0; }
+.md-h { font-weight: 700; margin: 8px 0 4px; color: var(--accent); }
+.md-h1 { font-size: 1.02rem; }
+.md-h2 { font-size: .96rem; }
+.md-h3, .md-h4 { font-size: .9rem; }
+.md-list { margin: 0 0 6px; padding-left: 20px; }
+.md-list li { margin: 2px 0; }
+.md-quote {
+  margin: 6px 0;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--border-active);
+  color: var(--muted);
+}
+.mb hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+.mb a { color: var(--accent2); }
+
+.md-inline-code {
+  background: rgba(0,0,0,.35);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+  font: .84em ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.md-code {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0,0,0,.4);
+}
+.md-code-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.md-code-lang {
+  font-size: .62rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.md-copy {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .64rem;
+  padding: 2px 8px;
+}
+.md-copy:hover { color: var(--accent); border-color: var(--border-active); background: var(--accent-soft); }
+/* Wide code scrolls inside its own box; the transcript never scrolls sideways. */
+.md-code pre { margin: 0; padding: 8px 10px; overflow-x: auto; }
+.md-code pre code {
+  font: .8rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  white-space: pre;
 }
 
 .msg.u .mb {
@@ -1120,48 +1469,8 @@ body::before {
 }
 
 /* ── Command Palette ── */
-#cmd-palette {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  z-index: 400;
-  display: none;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 15vh;
-  backdrop-filter: blur(4px);
-}
-
-#cmd-palette.open {
-  display: flex;
-}
-
-#cmd-box {
-  width: 90%;
-  max-width: 520px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 16px 64px rgba(0,0,0,0.6);
-}
-
-#cmd-input {
-  width: 100%;
-  padding: 14px 16px;
-  background: var(--surface2);
-  border: none;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  font-size: .95rem;
-  outline: none;
-}
-
-#cmd-results {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
+/* The #cmd-palette modal CSS is gone with the modal itself — the omnibox in
+   the top bar owns search now. .cmd-item survives: omnibox rows reuse it. */
 .cmd-item {
   display: flex;
   align-items: center;
@@ -1239,8 +1548,13 @@ body::before {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* ── Responsive: Tablet ── */
-@media (max-width: 1199px) {
+/* ── Responsive: Tablet ──
+   min-width floor is load-bearing: without it these icon-rail rules (hide the
+   logo, nav labels, conversation titles, search, footer) also apply at phone
+   width — INSIDE the 280px drawer — which rendered the drawer as a blank
+   black panel (measured at 375px, 2026-08-01). Tablet styles a 50px rail;
+   mobile styles a full-content drawer. They must never overlap. */
+@media (min-width: 768px) and (max-width: 1199px) {
   :root {
     --sidebar-w: 50px;
     --right-w: 280px;
@@ -1324,15 +1638,24 @@ body::before {
     transform: translateX(0);
   }
 
-  #top-overflow { display: block; }
+  /* The hamburger is the ONLY touch affordance for the conversation drawer:
+     #btabs offers Chat/Files/Brain/Fleet/Commands, and its Files tab opens
+     the file explorer, not the sidebar. This rule used to live only in the
+     tablet block, so adding that block's min-width:768px floor (which fixed
+     the blank drawer) silently left phones with no way to open it at all —
+     Ctrl+B is not reachable on a touch device. Caught by the real-cascade
+     probe at 375px, not by any structural test. */
+  #hbg { display: block; }
 
-  #top-actions .top-btn:not(.primary):not(.danger) {
-    display: none;
-  }
+  /* The top bar sheds labels via its container queries (≤640px), so nothing
+     needs hiding here — every control keeps a hit target at phone width. The
+     old rules hid whole .top-btn controls and showed an overflow trigger that
+     another rule immediately re-hid: 0×0 at 375px, measured. */
 
-  #btabs {
-    display: block;
-  }
+  /* #btabs is shown by a rule AFTER its component block (see "Mobile Bottom
+     Tabs" below) — a same-specificity `display:none` later in the sheet was
+     silently winning over a `display:block` placed here, which is why the
+     bottom tab bar had never rendered at any width. */
 }
 
 /* ── Ultrawide ── */
@@ -1389,6 +1712,14 @@ body::before {
 .tbb .ti { font-size: 1.1rem; }
 .tbb.on { color: var(--accent); }
 
+/* Placed AFTER the component block above deliberately. The show rule used to
+   live inside the 767px media section ~30 lines earlier, where the base
+   `#btabs { display:none }` — same specificity, later in source — overrode it
+   at every width. The bar had never rendered. Source order is the fix. */
+@media (max-width: 767px) {
+  #btabs { display: block; }
+}
+
 /* ── Overlay for mobile drawers ── */
 #mob-overlay {
   position: fixed;
@@ -1433,9 +1764,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
   <!-- ═══════════ SIDEBAR ═══════════ -->
   <aside id="sidebar" role="navigation" aria-label="Conversation history">
-    <div id="sb-logo">
-      <div class="logo-name">SENTINEL</div>
-      <div class="logo-sub">Command Center v9</div>
+    <div id="sb-logo" style="display:flex;align-items:flex-start;gap:8px">
+      <div style="min-width:0">
+        <div class="logo-name">SENTINEL</div>
+        <div class="logo-sub">Command Center v11</div>
+      </div>
+      <button class="panel-collapse" id="sb-collapse" title="Collapse conversations (Ctrl+B)"
+              aria-label="Collapse conversation sidebar" aria-controls="sidebar" aria-expanded="true">‹‹</button>
     </div>
 
     <nav id="sb-nav">
@@ -1445,9 +1780,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       <button class="nb" data-page="brain" onclick="goPage('brain', this)" aria-label="Brain Lab page">
         <span class="ic">🧠</span><span>Brain Lab</span>
       </button>
+      <button class="nb" data-page="fleet" onclick="goPage('fleet', this)" aria-label="Fleet page">
+        <span class="ic">🛰️</span><span>Fleet</span>
+      </button>
+      <button class="nb" data-page="mind" onclick="goPage('mind', this)" aria-label="Cognition page">
+        <span class="ic">🌀</span><span>Cognition</span>
+      </button>
     </nav>
 
-    <div id="sb-search" style="display:flex;gap:4px;align-items:center">
+    <div id="sb-search">
       <input type="text" id="conv-search" placeholder="Search conversations..." aria-label="Search conversations" oninput="filterConvs(this.value)" style="flex:1">
       <button class="nc-btn" onclick="newConv()" title="New chat" aria-label="New chat" style="flex-shrink:0">＋</button>
     </div>
@@ -1502,30 +1843,49 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   <!-- ═══════════ MAIN ═══════════ -->
   <main id="main">
 
-    <!-- Top Bar -->
+    <!-- Top Bar — command-first (Part 3).
+         The v11 bar had 7 controls; four (Theme, Palette, Export Log,
+         Screenshot) had no mouse affordance at ANY width — the ⋯ trigger
+         measured 0×0 at 375px. Files duplicated the panel chevron, Ctrl+. and
+         the edge handle; Run duplicated the composer send; #top-ctx repeated
+         the nav highlight; the status dot was 8px with a tooltip-only label.
+         Replacement: one omnibox, three health pills with popovers, ⚙. -->
     <header id="top" role="banner">
       <div id="top-left">
         <button id="hbg" onclick="toggleSidebar()" aria-label="Toggle sidebar">☰</button>
-        <div id="sdot" title="Status: Connected"></div>
-        <span id="top-ctx">Chat</span>
       </div>
-      <div id="top-actions">
-        <button class="top-btn" onclick="toggleRight()" title="Toggle file explorer (Ctrl+.)">
-          <span class="ic">📁</span><span class="btn-label">Files</span>
+      <div id="omni-wrap" role="search">
+        <span id="omni-glyph" aria-hidden="true">⌘</span>
+        <input type="text" id="omni" placeholder="Search or run a command…"
+               aria-label="Search pages, conversations, files, neurons, commands and themes"
+               autocomplete="off" oninput="omniInput()" onfocus="omniInput()">
+        <kbd id="omni-key" aria-hidden="true">Ctrl+K</kbd>
+        <div id="omni-results" role="listbox" aria-label="Omnibox results"></div>
+      </div>
+      <div id="top-right">
+        <button class="pill" id="pill-brain" onclick="togglePillPop('brain')" aria-haspopup="true">
+          <span class="pd"></span><span class="pill-name">brain</span>
         </button>
-        <button class="top-btn primary" id="run-btn" onclick="sendMsg()" title="Run (Ctrl+Enter)">
-          <span class="ic">▶</span><span class="btn-label">Run</span>
+        <button class="pill" id="pill-desktop" onclick="togglePillPop('desktop')" aria-haspopup="true">
+          <span class="pd"></span><span class="pill-name">desktop</span>
         </button>
+        <button class="pill" id="pill-fleet" onclick="togglePillPop('fleet')" aria-haspopup="true">
+          <span class="pd"></span><span class="pill-name">fleet</span>
+        </button>
+        <div id="pill-pop" role="dialog" aria-label="Service health detail"></div>
         <button class="top-btn danger" id="stop-btn" onclick="stopStream()" style="display:none" title="Stop (Esc)">
           <span class="ic">⬛</span><span class="btn-label">Stop</span>
         </button>
-        <div id="top-overflow">
-          <button class="top-btn" onclick="toggleOverflow()" aria-label="More actions">⋯</button>
-          <div id="top-overflow-menu">
-            <div class="overflow-item" onclick="openCmdPalette()"><span>⌘</span> Command Palette <span class="cmd-item-key">Ctrl+K</span></div>
-            <div class="overflow-item" onclick="toggleTheme()"><span>🎨</span> Switch Theme</div>
-            <div class="overflow-item" onclick="exportLog()"><span>📋</span> Export Log</div>
-            <div class="overflow-item" onclick="takeScreenshot()"><span>📸</span> Screenshot</div>
+        <div id="settings-wrap">
+          <button id="settings-btn" onclick="toggleSettings()" aria-label="Settings" aria-haspopup="true" title="Settings">⚙</button>
+          <div id="settings-pop" role="dialog" aria-label="Settings">
+            <div class="set-sec">Theme</div>
+            <div id="theme-grid"></div>
+            <div class="set-sec">Model</div>
+            <select id="model-sel-top" aria-label="Model selector"></select>
+            <label class="tog-row set-tog"><span>Auto-route</span><input type="checkbox" id="ar-tog-top" aria-label="Toggle auto-route"></label>
+            <div class="set-sec">Session</div>
+            <button class="set-btn" onclick="resetApiToken()">Reset API token…</button>
           </div>
         </div>
       </div>
@@ -1538,17 +1898,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       <div class="pg on" id="pg-chat">
         <div id="chat-area">
           <div id="msgs" role="log" aria-live="polite">
-            <div class="msg s"><div class="mb">Sentinel Command Center v9 — Ready. Describe a goal and press Enter.</div></div>
+            <div class="msg s"><div class="mb">Sentinel Command Center v11 — Ready. Describe a goal and press Enter.</div></div>
           </div>
           <div id="inp-area">
             <div class="inp-row">
               <textarea id="msginp" placeholder="Describe what you want done… (Ctrl+Enter to run)" rows="1" aria-label="Message input"></textarea>
               <div class="ia">
-                <button class="ab" onclick="document.getElementById('fup').click()" title="Attach file" aria-label="Attach file">📎</button>
+                <!-- The 📎 attach button is gone, not hidden: it fed a stub
+                     that toasted "N file(s) attached (Phase 5)" and dropped
+                     them. A control that lies is worse than no control. -->
                 <button class="sb" id="sbtn" onclick="sendMsg()" title="Send (Ctrl+Enter)" aria-label="Send message">▶</button>
               </div>
             </div>
-            <input type="file" id="fup" multiple style="display:none" onchange="onFileInput(this)" aria-hidden="true">
           </div>
         </div>
       </div>
@@ -1569,7 +1930,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">
             <div style="font-size:1.5rem;margin-bottom:4px">🗺️</div>
             <div style="font-size:1.4rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent" id="sv-r">—</div>
-            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Regions</div>
+            <!-- "Anatomical", because the SELF MODEL panel counts the same DB
+                 column a different way (76 labels in use vs these 12 anchor
+                 rows) and the two figures sat 6x apart on one page with the
+                 same name (§2.11). -->
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px" title="The 12 anchor rows of the region table. The Self Model's 'region labels in use' counts distinct labels on neurons in the same column — different taxonomy, same data.">Anatomical regions</div>
           </div>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center">
             <div style="font-size:1.5rem;margin-bottom:4px">🔖</div>
@@ -1604,6 +1969,283 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           </div>
           <button class="top-btn" id="brain-refresh" style="margin-top:12px">↻ Refresh brain</button>
         </div>
+
+        <!-- ── Cockpit panels (v10) ──
+             v9 reached exactly two brain endpoints: /brain/stats and
+             /brain/diagnostics. The brain exposes 143. Everything the brain
+             actually thinks — what it knows about itself, what it does not
+             know, whether it is learning — had no surface anywhere.
+
+             Every panel below is built through the DOM, never innerHTML with
+             API-supplied text. Neuron content is arbitrary stored text and is
+             the least trustworthy string on this page. -->
+
+        <!-- ── BRAIN MAP (v13) ──
+             The 3D view lives in a separate React app on :5173 that Prime
+             cannot import — Prime is deliberately one self-contained file that
+             also has to open from file://. So this is the same visualisation
+             rendered on a 2D canvas with no library: bootstrap once from a
+             bounded /graph, then live deltas from /events.
+
+             It doubles as the WebGL fallback the plan asked for, and it makes
+             Prime an SSE subscriber for the first time — `subscribers` had been
+             0 in every reading since the bus was built. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <span style="font-size:1.1rem">🗺️</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">BRAIN MAP</span>
+            <span id="map-meta" style="font-size:.66rem;color:var(--muted)">—</span>
+            <span id="map-live" style="margin-left:auto;font-size:.64rem;text-transform:uppercase;letter-spacing:1px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--muted)">offline</span>
+          </div>
+          <div id="map-regions" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px"></div>
+          <canvas id="brain-map" style="width:100%;height:380px;display:block;border-radius:8px;background:#02040a;cursor:crosshair"></canvas>
+          <div id="map-detail" style="margin-top:8px;font-size:.7rem;color:var(--muted);min-height:1.4em">click a neuron to inspect it</div>
+        </div>
+
+        <!-- BRAIN 3D (Phase 5): the semantic-projection showcase, served by
+             the brain itself at :8001/viz (the :5173 dev server is retired).
+             Loaded on CLICK, never on page load — it holds a WebGL context
+             on the same GPU the embedder uses, and this page's rule is that
+             nothing heavy rides a load path. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🧊</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">BRAIN 3D</span>
+            <span style="font-size:.66rem;color:var(--muted)">semantic projection · positions are meaning</span>
+            <button class="top-btn" id="brain3d-load" style="margin-left:auto" onclick="loadBrain3D()">Load</button>
+          </div>
+          <div id="brain3d-box" style="min-height:1.4em;font-size:.7rem;color:var(--muted)">
+            not loaded — the 3D scene shares the GPU with the embedder, so it waits for a click
+          </div>
+        </div>
+
+        <!-- ASK: the learning loop's input AND output in one place -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🔎</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">ASK</span>
+            <span style="font-size:.66rem;color:var(--muted)">recall · then grade what came back</span>
+            <span id="ask-graded" style="margin-left:auto;font-size:.64rem;color:var(--muted)"></span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <input id="ask-q" placeholder="ask the brain…" spellcheck="false"
+                   style="flex:1;background:var(--bg,#0a0e1a);color:inherit;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:.74rem;outline:none">
+            <button class="top-btn" id="ask-go">Ask</button>
+          </div>
+          <div id="ask-results" style="margin-top:10px"></div>
+        </div>
+
+        <!-- SELF: what it believes about itself -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🪞</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">SELF MODEL</span>
+            <span id="self-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+            <div><div class="bl-k">Identity</div><div class="bl-v" id="sm-identity">—</div></div>
+            <div><div class="bl-k">Avg quality</div><div class="bl-v" id="sm-quality">—</div></div>
+            <!-- Same DB column as the "Anatomical regions" stat up top, two
+                 taxonomies: 12 anchor rows vs 76 labels in use (§2.11). -->
+            <div><div class="bl-k" title="Distinct region labels stored on neurons — the same column the 12 anatomical anchors index, not a second taxonomy">Region labels in use / sources</div><div class="bl-v" id="sm-domains">—</div></div>
+            <div><div class="bl-k">Current focus</div><div class="bl-v" id="sm-focus">—</div></div>
+          </div>
+          <!-- Ranked by COUNT, displayed with quality. Calling them
+               "strongest" while `events` (q=0.46) outranked four of the five
+               was the §2.9 lie — the label now says what the sort key is. -->
+          <div class="bl-k" style="margin-top:12px" title="Ranked by neuron count; the q= figure is average quality, not the sort key">Largest regions (by count)</div>
+          <div id="sm-strong" style="font-size:.7rem;color:var(--muted)">—</div>
+          <div class="bl-k" style="margin-top:10px" title="Ranked by neuron count; the q= figure is average quality, not the sort key">Smallest regions (by count)</div>
+          <div id="sm-weak" style="font-size:.7rem;color:var(--muted)">—</div>
+          <div class="bl-k" style="margin-top:10px">Known limitations</div>
+          <div id="sm-limits" style="font-size:.7rem;color:var(--muted)">—</div>
+        </div>
+
+        <!-- LEARNING LOOP: is it actually getting better? -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">📈</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">LEARNING LOOP</span>
+            <span id="loop-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+            <div><div class="bl-k">Recalls graded</div><div class="bl-v" id="ll-graded">—</div></div>
+            <div><div class="bl-k">Outcomes recorded</div><div class="bl-v" id="ll-outcomes">—</div></div>
+            <div><div class="bl-k" title="Live-corpus reading — it drifted 92→83→92% in one evening with no code change. The reproducible, comparable number is frozen_eval.py (byte-identical across runs, corpus-fingerprinted); run it before believing any ranking change.">Golden eval (live corpus — drifts)</div><div class="bl-v" id="ll-eval">—</div></div>
+            <!-- The brain's only self-scored accuracy number: 4,185 predictions
+                 graded against what actually happened. It was on no dashboard,
+                 in no trend and in no audit, while `outcomes` (22 rows) was
+                 being treated as the learning signal. -->
+            <div><div class="bl-k">Prediction hit rate</div><div class="bl-v" id="ll-hitrate">—</div></div>
+            <div><div class="bl-k">Learning ↑ / ↓</div><div class="bl-v" id="ll-learn">—</div></div>
+            <div><div class="bl-k">Edges / neuron</div><div class="bl-v" id="ll-density">—</div></div>
+            <div><div class="bl-k">Quality &ge; 0.6</div><div class="bl-v" id="ll-good">—</div></div>
+            <div><div class="bl-k">Trend points</div><div class="bl-v" id="ll-points">—</div></div>
+            <!-- These eight figures are one daily 05:30 snapshot, ~12h stale
+                 by evening, and already disagreed with the live header
+                 (7,636 vs 7,803) with nothing saying so (§2.2). -->
+            <div><div class="bl-k">As of</div><div class="bl-v" id="ll-asof">—</div></div>
+          </div>
+          <div class="bl-k" style="margin-top:12px">Writes accepted / refused today</div>
+          <div id="ll-writes" style="font-size:.7rem;color:var(--muted)">—</div>
+        </div>
+
+        <!-- CURIOSITY: what it knows it does not know -->
+        <div style="margin-top:14px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">❓</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">KNOWLEDGE GAPS</span>
+            <span id="gap-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="gap-list" style="font-size:.72rem"></div>
+        </div>
+      </div>
+
+      <!-- ── FLEET (v14) ──
+           /fleet/sense has upserted a heartbeat per node every 5 minutes since
+           2026-07-31 and nothing has ever drawn it. hackbox has been reporting
+           `offline` with agent-zero down that entire time, on no screen. -->
+      <div class="pg" id="pg-fleet" style="padding:16px;overflow-y:auto">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:1.1rem">🛰️</span>
+          <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">FLEET</span>
+          <span id="fleet-meta" style="font-size:.66rem;color:var(--muted)">—</span>
+          <button class="top-btn" id="fleet-refresh" style="margin-left:auto">↻ Refresh</button>
+        </div>
+        <div id="fleet-nodes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px"></div>
+
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">⚠</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">ISSUES &amp; PREDICTIONS</span>
+            <span id="fleet-issue-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="fleet-issues" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- Actuators. /actuator/* and /orchestrate/task have existed with no UI
+             and no confirmation since v12 of the brain. Everything here is
+             two-step and names exactly what will run. -->
+        <div style="margin-top:14px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:1.1rem">🎛️</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">ACTUATORS</span>
+          </div>
+          <div style="font-size:.66rem;color:var(--muted);margin-bottom:10px">
+            Every action is confirmed twice and names the node, the command and the endpoint before it fires.
+          </div>
+          <div id="fleet-actuators" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          <div id="fleet-confirm" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <!-- ── COGNITION (v15) ──
+           The brain grew a mind on 2026-07-31 and none of it had a surface:
+           /cognitive/*, /creative/*, /causal/*, /v6/tom/*, /wm/*, /brain/dream,
+           the episodic timeline, /agi/reason. Endpoint reach was 13 of 148. -->
+      <div class="pg" id="pg-mind" style="padding:16px;overflow-y:auto">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:1.1rem">🌀</span>
+          <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">COGNITION</span>
+          <span id="mind-meta" style="font-size:.66rem;color:var(--muted)">—</span>
+          <button class="top-btn" id="mind-refresh" style="margin-left:auto">↻ Refresh</button>
+        </div>
+
+        <!-- Vitals the brain scores about itself. -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div><div class="bl-k">Self-confidence</div><div class="bl-v" id="mind-conf">—</div></div>
+          <div><div class="bl-k">Mood / mode</div><div class="bl-v" id="mind-mood">—</div></div>
+          <div><div class="bl-k">Prediction hit rate</div><div class="bl-v" id="mind-hit">—</div></div>
+          <div><div class="bl-k">Transition edges</div><div class="bl-v" id="mind-trans">—</div></div>
+          <div><div class="bl-k">Self-modifications</div><div class="bl-v" id="mind-selfmod">—</div></div>
+          <div><div class="bl-k">Working-memory sessions</div><div class="bl-v" id="mind-wm">—</div></div>
+        </div>
+
+        <!-- ── v17: the cognitive layer, made visible ──
+             ~119 of 152 brain routes had no surface. These four are the fast,
+             parameter-free routes that return real data. The slow LLM-backed
+             ones (/cognitive/hypotheses 40s+, /causal + /creative — query-param
+             or >12s) are deliberately NOT panels: a card over a 40s endpoint is
+             a spinner, not a surface. -->
+
+        <!-- GOALS: what the brain is trying to do. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🎯</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">GOALS</span>
+            <span id="mind-goal-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-goals" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- THEORY OF MIND: what the brain believes about the operator. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🫧</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">THEORY OF MIND</span>
+            <span id="mind-tom-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-tom" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- CONCEPTS: the macro-structure the brain has abstracted. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🧠</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">CONCEPTS</span>
+            <span id="mind-concept-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-concepts" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- SELF: the brain's own account of what it is. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🪞</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">SELF-NARRATIVE</span>
+            <span id="mind-self-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-self" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- REASON: cited, multi-hop, and gradeable as a chain. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <span style="font-size:1.1rem">🧩</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">REASON</span>
+            <span style="font-size:.66rem;color:var(--muted)">multi-hop, with citations · slow by design (~18 s: local inference has been down since 2026-07-28)</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <input id="mind-q" placeholder="ask a question that needs more than one memory…" spellcheck="false"
+                   style="flex:1;background:var(--bg,#0a0e1a);color:inherit;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:.74rem;outline:none">
+            <button class="top-btn" id="mind-go">Reason</button>
+          </div>
+          <div id="mind-answer" style="margin-top:10px;font-size:.74rem"></div>
+        </div>
+
+        <!-- CURIOSITY: a gap list you can actually work. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:1.1rem">❓</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">CURIOSITY QUEUE</span>
+            <button class="top-btn" id="mind-fill-all" style="margin-left:auto;font-size:.64rem;padding:2px 8px" title="Research the top 5 open gaps automatically">Fill top 5</button>
+            <span id="mind-gap-badge" style="font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div style="font-size:.66rem;color:var(--muted);margin-bottom:10px">
+            A gap list you cannot act on is a to-do list nobody owns. GAP_COVERAGE_FLOOR is marked unvalidated in code — this queue is the evidence for tuning it.
+          </div>
+          <div id="mind-gaps" style="font-size:.72rem"></div>
+        </div>
+
+        <!-- EPISODES: what happened, when. -->
+        <div style="margin-top:14px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🕰️</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">EPISODIC TIMELINE</span>
+            <span id="mind-ep-badge" style="margin-left:auto;font-size:.64rem;color:var(--muted)">—</span>
+          </div>
+          <div id="mind-episodes" style="font-size:.72rem"></div>
+        </div>
       </div>
 
     </div>
@@ -1614,20 +2256,30 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         <button class="tbb on" onclick="goPage('chat',null);mobTabActive(this)"><span class="ti">💬</span><span>Chat</span></button>
         <button class="tbb" onclick="toggleRight();mobTabActive(this)"><span class="ti">📁</span><span>Files</span></button>
         <button class="tbb" onclick="goPage('brain',null);mobTabActive(this)"><span class="ti">🧠</span><span>Brain</span></button>
-        <button class="tbb" onclick="openCmdPalette();mobTabActive(this)"><span class="ti">⌘</span><span>Commands</span></button>
+        <button class="tbb" onclick="goPage('fleet',null);mobTabActive(this)"><span class="ti">🛰️</span><span>Fleet</span></button>
+        <button class="tbb" onclick="omniFocus();mobTabActive(this)"><span class="ti">⌘</span><span>Commands</span></button>
       </div>
     </div>
 
   </main>
 
+  <div class="rail-grip" id="grip-left" role="separator" aria-orientation="vertical"
+       aria-label="Resize conversation sidebar"></div>
+  <div class="rail-grip" id="grip-right" role="separator" aria-orientation="vertical"
+       aria-label="Resize file explorer"></div>
+
   <!-- ═══════════ FILE EXPLORER ═══════════ -->
   <aside id="file-explorer" role="complementary" aria-label="File explorer">
     <div id="fe-header">
-      <div id="fe-title">📁 File Explorer</div>
+      <div id="fe-title">
+        <span>📁 File Explorer</span>
+        <button class="panel-collapse" id="fe-collapse" title="Collapse files (Ctrl+.)"
+                aria-label="Collapse file explorer" aria-controls="file-explorer" aria-expanded="true">››</button>
+      </div>
       <div id="fe-breadcrumb">
-        <!-- Handler attached in setupStaticHandlers(); an inline onclick here
-             would double-fire alongside it. -->
-        <span class="bc-item">C:</span>
+        <!-- Populated by updateBreadcrumb() once the API reports which root it
+             opened at. It is no longer hardcoded to C: — the server-side jail
+             refuses the drive root, so the client must not assume it. -->
       </div>
     </div>
     <div id="fe-tree" role="tree" aria-label="Directory tree">
@@ -1641,6 +2293,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 </div>
 
+<!-- ── Edge handles ──
+     Siblings of #app rather than children, because a collapsed grid column is
+     0 wide and would clip anything inside it. -->
+<button class="edge-handle" id="edge-left" aria-label="Reopen conversation sidebar"
+        title="Reopen conversations (Ctrl+B)">››</button>
+<button class="edge-handle" id="edge-right" aria-label="Reopen file explorer"
+        title="Reopen files (Ctrl+.)">‹‹</button>
+
 <!-- ── File Viewer Modal ── -->
 <div id="file-viewer" role="dialog" aria-modal="true" aria-label="File viewer">
   <div id="fv-content">
@@ -1652,13 +2312,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   </div>
 </div>
 
-<!-- ── Command Palette ── -->
-<div id="cmd-palette" role="dialog" aria-modal="true" aria-label="Command palette">
-  <div id="cmd-box">
-    <input type="text" id="cmd-input" placeholder="Type a command…" aria-label="Command search" autocomplete="off">
-    <div id="cmd-results"></div>
-  </div>
-</div>
+<!-- The command-palette modal is gone: the omnibox in the top bar IS the
+     palette, promoted to an always-visible control (Part 3). -->
 
 <!-- ── Toast Container ── -->
 <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
@@ -1666,17 +2321,58 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 <script>
 'use strict';
 
+// v32 — evict any stale PWA. An older cockpit build (v17-boot.js/council.js)
+// registered a service worker that kept serving itself from cache, overriding
+// this page. This dashboard uses no service worker, so on load we unregister
+// every SW and drop every cache — once this runs, the cached app is gone.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations()
+    .then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+  if (window.caches && caches.keys) {
+    caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
+  }
+}
+
 // ═══════════ STATE ═══════════
-const API = 'http://localhost:8091';
+// Sentinel Desktop API.
+//
+// Same-origin whenever this page is actually served, which it now is: the
+// Desktop API mounts the sentinel-override web/ directory at /prime. That
+// matters for more than tidiness — a hardcoded localhost:8091 breaks the moment
+// the dashboard is opened from another node over Tailscale, and it makes every
+// call cross-origin so the bearer token rides on a CORS preflight for no reason.
+//
+// The file:// fallback is kept because this page must stay openable straight
+// from the repo, but note that the WebSocket cannot work there (location.host is
+// empty on a file:// page, so the socket URL has no host) — which is exactly why
+// the chat had never once displayed a reply.
+const API = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? location.origin
+  : 'http://localhost:8091';
 // Neuralis brain API. Must be 8001: port 8000 only ever answered via an
 // undocumented `netsh interface portproxy` rule, so it is not a dependable
 // endpoint and must never be hardcoded here.
-const BRAIN_API = 'http://localhost:8001';
+//
+// 2026-08-04: this read `location.origin + '/__brain'`, which contradicted the
+// comment above it and was broken two ways. There is no `/__brain` route
+// anywhere in this repo, so every brain call 404'd against a path that does not
+// exist; and on a file:// page `location.origin` is the STRING "null", making
+// BRAIN_API "null/__brain" - an unparseable URL that threw TypeError out of
+// anything doing `new URL(...)` on it. Resolve the brain on the page's own host
+// at its real port, falling back to localhost when there is no host to borrow
+// (file://), which mirrors how API above is resolved.
+const BRAIN_API = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? `${location.protocol}//${location.hostname}:8001`
+  : 'http://localhost:8001';
 let abort = null;
 let streaming = false;
 let convId = null;
 let allModels = [];
-let currentPath = 'C:\\';
+// Empty, not 'C:\'. The server-side jail refuses the drive root, and which
+// roots are browsable is the server's call — the client asks for "wherever you
+// open" and renders the path it gets back.
+let currentPath = '';
+let convCache = [];
 let sidebarCollapsed = false;
 let rightCollapsed = false;
 
@@ -1684,6 +2380,25 @@ let rightCollapsed = false;
 // funnel through appendMsg, and neither used to bound #msgs, so a long-running
 // or chatty agent session grew the DOM until the tab crawled.
 const MAX_MESSAGES = 300;
+
+// localStorage keys. Declared up here with the rest of the state, NOT beside the
+// functions that use them: init() runs before the panel-toggle section is
+// reached, and a `const` read from above its own declaration throws a
+// ReferenceError from the temporal dead zone. That is exactly what happened —
+// loadPanelState() threw on every boot and its catch block swallowed it, so the
+// collapse state silently never restored.
+const PANEL_KEY = 'dash11-panels';
+const GROUP_KEY = 'dash8-groups';
+const THEME_KEY = 'dash8-theme';
+const WIDTH_KEY = 'dash12-widths';
+
+// Fleet actuators. Declared here because renderActuators() runs during init().
+const ACTUATORS = [
+  { id: 'sense',   label: 'Re-sense the fleet', endpoint: '/fleet/sense', method: 'POST',
+    describe: () => 'Probe every node and refresh its heartbeat row.', destructive: false },
+  { id: 'briefing', label: 'Generate briefing', endpoint: '/comm/briefing', method: 'POST',
+    describe: () => 'Ask the brain to write a fleet briefing.', destructive: false },
+];
 
 // ═══════════ ESCAPING (mirrored from web/lib/dash-escape.js) ═══════════
 // This dashboard has to stay a single self-contained file that works from
@@ -1774,6 +2489,13 @@ function apiError(kind, status, message) {
 const TOKEN_KEY = 'sentinel-api-token';
 
 function getApiToken({ prompt: doPrompt = false } = {}) {
+  // 2026-08-04: a HARDCODED_TOKEN literal was added here to skip the prompt when
+  // the page is served through the Cloudflare Tunnel. That is a committed
+  // credential in a version-controlled file - exactly what the comment above
+  // forbids, and what tests/web-dashboard-prime-auth.test.js failed on. Removed;
+  // the token lives in localStorage only. If the prompt is unavailable behind the
+  // tunnel, seed it once from a console or a bookmarklet:
+  //   localStorage.setItem(TOKEN_KEY, '<token>')
   let tok = '';
   try { tok = localStorage.getItem(TOKEN_KEY) || ''; } catch { /* storage blocked */ }
   if (!tok && doPrompt && typeof window.prompt === 'function') {
@@ -1788,9 +2510,19 @@ function getApiToken({ prompt: doPrompt = false } = {}) {
   }
   return tok;
 }
-
 function clearApiToken() {
   try { localStorage.removeItem(TOKEN_KEY); } catch { /* storage blocked */ }
+}
+
+/** True only if `url` resolves to exactly the Desktop API's origin. */
+function isApiOrigin(url) {
+  try {
+    const base = (typeof location !== 'undefined' && location.href) ? location.href : undefined;
+    return new URL(url, base).origin === new URL(API, base).origin;
+  } catch {
+    // Fail closed. An unparseable URL never gets the credential.
+    return false;
+  }
 }
 
 async function apiFetch(url, opts) {
@@ -1799,9 +2531,17 @@ async function apiFetch(url, opts) {
   const init = Object.assign({}, o);
   delete init.timeoutMs;
 
-  // Attach the bearer token to API requests. Only same-origin-as-API URLs get
-  // it, so the credential is never sent to some other host.
-  if (typeof url === 'string' && url.startsWith(API)) {
+  // Attach the bearer token only to requests genuinely bound for the Desktop
+  // API's ORIGIN.
+  //
+  // This was `url.startsWith(API)`, which was safe only while API was the
+  // literal 'http://localhost:8091'. In v11 API became same-origin, so it can
+  // be a bare 'http://localhost' — and that is a string prefix of
+  // 'http://localhost:8001', the BRAIN. Prefix-matching would have shipped the
+  // Desktop API's credential to a different service on the same host (and to
+  // 'http://localhost.evil.test' besides). Compare parsed origins instead —
+  // the same lesson as path containment: components, never prefixes.
+  if (typeof url === 'string' && isApiOrigin(url)) {
     const tok = getApiToken({ prompt: !apiFetch._promptedOnce });
     apiFetch._promptedOnce = true;
     if (tok) {
@@ -1885,36 +2625,159 @@ function formatDuration(seconds) {
 }
 
 // ═══════════ WEBSOCKET ═══════════
+// v12 rewrite. Serving the page (v11) made `location.host` real, which was
+// necessary but NOT sufficient — the socket still could not stay open, and even
+// if it had, nothing would have been rendered. Two further defects:
+//
+//   1. The server requires an auth handshake as the FIRST message:
+//      {"type":"auth","token":"…"}. v10 never sent one, so the server waited
+//      10 s, closed the connection, and the client reconnected forever.
+//   2. v10 listened for `{"type":"message"}`, which the server has never
+//      emitted. What it actually broadcasts is `step` (per agent step), `done`
+//      (with a finish summary) and `error`. So the one message type the
+//      dashboard understood was the one that never arrives, and the summary
+//      carrying the actual answer was discarded.
+//
+// Together those are the whole reason the chat had never displayed a reply.
 let ws = null;
 let wsRetryDelay = 1000;
+let wsPingTimer = null;
+let liveMsgEl = null;      // the assistant bubble currently being streamed into
+let liveMsgText = '';
+
+function wsUrl() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  // Derive from API rather than location so a file:// page still targets the
+  // right host. It still cannot connect from file:// — there is no origin to
+  // borrow — but it fails honestly instead of building `ws:///ws`.
+  try {
+    const u = new URL(API, location.href);
+    return (u.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + u.host + '/ws';
+  } catch {
+    return proto + '//' + location.host + '/ws';
+  }
+}
 
 function connectWS() {
+  if (location.protocol === 'file:') {
+    // Be explicit rather than retrying forever against an unbuildable URL.
+    appendMsg('s', 'Live agent output needs the dashboard served over HTTP — open /prime/ on the Sentinel API.');
+    return;
+  }
   try {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${proto}//${location.host}/ws`);
-    ws.onopen = () => { wsRetryDelay = 1000; };
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'message' && msg.message) {
-          const m = msg.message;
-          if (m.role === 'assistant') appendMsg('a', m.content);
-        } else if (msg.type === 'done') {
-          streaming = false;
-          setDot('ok');
-          document.getElementById('stop-btn').style.display = 'none';
-          document.getElementById('run-btn').style.display = '';
-        }
-      } catch {}
+    ws = new WebSocket(wsUrl());
+
+    ws.onopen = () => {
+      wsRetryDelay = 1000;
+      // The handshake the server has always required and the client never sent.
+      ws.send(JSON.stringify({ type: 'auth', token: getApiToken() }));
+      clearInterval(wsPingTimer);
+      wsPingTimer = setInterval(() => {
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'ping' }));
+      }, 25000);
     };
+
+    ws.onmessage = (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch { return; }
+      handleAgentEvent(msg);
+    };
+
     ws.onclose = () => {
+      clearInterval(wsPingTimer);
       setTimeout(connectWS, wsRetryDelay);
       wsRetryDelay = Math.min(wsRetryDelay * 2, 30000);
     };
-    ws.onerror = () => { ws.close(); };
+    ws.onerror = () => { try { ws.close(); } catch {} };
   } catch {
     setTimeout(connectWS, wsRetryDelay);
   }
+}
+
+/** Render one broadcast from the agent loop. */
+function handleAgentEvent(msg) {
+  switch (msg.type) {
+    case 'auth_error':
+      // A rejected socket token is the same failure as a rejected HTTP token.
+      clearApiToken();
+      appendMsg('e', 'Live connection rejected the API token — reload and re-enter it.');
+      break;
+
+    case 'pong':
+      break;
+
+    case 'step': {
+      // Agent steps are the closest thing this backend has to token streaming:
+      // one event per action, with whatever the model said about it.
+      const line = msg.thought || msg.action || msg.description || msg.summary || '';
+      if (!line) break;
+      setDot('act');
+      streamInto('· ' + line);
+      break;
+    }
+
+    case 'done': {
+      const summary = (msg.result && msg.result.summary) || '';
+      const steps = (msg.result && msg.result.steps) || 0;
+      finishStream(summary, steps);
+      break;
+    }
+
+    case 'error':
+      finishStream('', 0);
+      appendMsg('e', msg.message || 'Agent error');
+      break;
+
+    default:
+      break;
+  }
+}
+
+/** Append to the in-flight assistant bubble, creating it on first use. */
+function streamInto(chunk) {
+  if (!liveMsgEl) {
+    liveMsgEl = appendMsg('a', '', { live: true });
+    liveMsgText = '';
+  }
+  liveMsgText += (liveMsgText ? '\n' : '') + chunk;
+  const body = liveMsgEl.querySelector('.mb');
+  if (body) renderMessageBody(body, liveMsgText);
+  const msgs = document.getElementById('msgs');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+/** Close out a run: render the summary, persist it, reset the composer. */
+function finishStream(summary, steps) {
+  if (summary) {
+    // The summary IS the answer. v10 threw it away.
+    if (liveMsgEl) {
+      liveMsgText = summary;
+      const body = liveMsgEl.querySelector('.mb');
+      if (body) renderMessageBody(body, summary);
+      liveMsgEl.classList.remove('live');
+      stampMessage(liveMsgEl, steps);
+    } else {
+      const el = appendMsg('a', summary);
+      stampMessage(el, steps);
+    }
+    // Persist so the transcript survives a reload.
+    if (convId) {
+      apiFetch(API + '/api/conversations/' + encodeURIComponent(convId) + '/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'assistant', content: summary }),
+      }).then(() => loadConvs()).catch(() => { /* transcript row is best-effort */ });
+    }
+  } else if (liveMsgEl) {
+    liveMsgEl.classList.remove('live');
+    stampMessage(liveMsgEl, steps);
+  }
+  liveMsgEl = null;
+  liveMsgText = '';
+  streaming = false;
+  setDot('ok');
+  document.getElementById('stop-btn').style.display = 'none';
+  document.getElementById('sbtn').disabled = false;
 }
 
 // ═══════════ INIT ═══════════
@@ -1923,9 +2786,16 @@ function connectWS() {
   setupKeyboard();
   setupStaticHandlers();
   loadGroupState();
+  loadPanelState();
+  loadRailWidths();
+  setupRailResize();
   // allSettled, not all: one dead subsystem must not abort the others.
-  await Promise.allSettled([loadModels(), loadConvs(), loadBrainStats(), loadFiles(currentPath)]);
+  await Promise.allSettled([loadModels(), loadConvs(), loadBrainStats(), loadFiles(currentPath),
+                            loadCockpit()]);
+  setupOmni();
   ping();
+  brainPing();
+  fleetPing();
   connectWS();
 })();
 
@@ -1933,19 +2803,89 @@ function connectWS() {
 // onclick= attributes so the page stays compatible with a strict CSP.
 function setupStaticHandlers() {
   const refreshBtn = document.getElementById('brain-refresh');
-  if (refreshBtn) refreshBtn.addEventListener('click', () => loadBrainStats());
-  document.querySelectorAll('#fe-breadcrumb .bc-item').forEach(el => {
-    el.addEventListener('click', () => navigateTo('C:\\'));
-  });
+  if (refreshBtn) refreshBtn.addEventListener('click', () => { loadBrainStats(); loadCockpit(); });
+
+  // Kept out of inline onclick= so the page stays CSP-strict (see comment above).
+  const askBtn = document.getElementById('ask-go');
+  if (askBtn) askBtn.addEventListener('click', () => askBrain());
+  const askInput = document.getElementById('ask-q');
+  if (askInput) {
+    askInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); askBrain(); } });
+  }
+  // Collapse chevrons and edge handles (v11). Kept out of inline onclick= so
+  // the page stays CSP-strict, same as every other control here.
+  const bind = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', fn);
+  };
+  bind('sb-collapse', toggleSidebar);
+  bind('fe-collapse', toggleRight);
+  bind('edge-left', toggleSidebar);
+  bind('edge-right', toggleRight);
+  bind('mob-overlay', closeMobilePanels);
+  bind('fleet-refresh', loadFleetPage);
+  bind('mind-refresh', loadMindPage);
+  bind('mind-fill-all', fillAllGaps);
+  bind('mind-go', askReason);
+  const mq = document.getElementById('mind-q');
+  if (mq) mq.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); askReason(); } });
+  renderActuators();
+
+  // Crossing the mobile breakpoint has to re-assert state, or the desktop grid
+  // classes and the mobile overlay classes both linger and fight each other.
+  //
+  // Feature-detected: this function must never throw. It runs inside init()
+  // before any data loads, so anything that raises here takes the whole page
+  // down — and it is also executed by the CI load test against a minimal DOM
+  // that has no window.addEventListener.
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    let wasMobile = isMobile();
+    window.addEventListener('resize', () => {
+      const now = isMobile();
+      if (now === wasMobile) return;
+      wasMobile = now;
+      closeMobilePanels();
+      if (now) {
+        document.getElementById('app').classList.remove(
+          'sidebar-collapsed', 'right-collapsed', 'both-collapsed');
+      } else {
+        applyPanelState();
+      }
+    });
+  }
 }
 
-// ═══════════ CONNECTIVITY ═══════════
+// ═══════════ CONNECTIVITY — one pill per service (Part 3) ═══════════
+// "degraded" = the service answered and called itself unhealthy (503), which
+// is a different situation from not answering at all.
+const PILL_STATE = {
+  brain:   { cls: '', detail: 'not checked yet', rows: [] },
+  desktop: { cls: '', detail: 'not checked yet', rows: [] },
+  fleet:   { cls: '', detail: 'not checked yet', rows: [] },
+};
+
+function setPill(name, cls, detail, rows) {
+  const st = PILL_STATE[name];
+  st.cls = cls;
+  st.detail = detail || '';
+  st.rows = rows || [];
+  const el = document.getElementById('pill-' + name);
+  if (!el) return;
+  el.className = 'pill ' + cls;
+  const labels = { err: 'offline', warn: 'degraded', act: 'working', ok: 'ok' };
+  el.title = name + ': ' + (labels[cls] || 'unknown') + (st.detail ? ' — ' + st.detail : '');
+  if (pillPopFor === name) renderPillPop(name); // live-update an open popover
+}
+
+// Kept name and signature: every pre-Part-3 call site (`setDot('act')` during
+// a run, the stream-end 'ok') still works and now drives the desktop pill.
+function setDot(s, detail) { setPill('desktop', s, detail); }
+
 async function ping() {
   try {
     await apiFetch(API + '/status', { timeoutMs: 4000 });
     setDot('ok', 'Desktop API reachable');
   } catch (exc) {
-    // Distinguish "answered 503, so it is up but sick" from "no answer at all".
     if (exc.kind === 'degraded') {
       setDot('warn', 'Desktop API degraded: ' + exc.message);
     } else {
@@ -1957,53 +2897,307 @@ async function ping() {
   setTimeout(ping, 30000);
 }
 
-function setDot(s, detail) {
-  const d = document.getElementById('sdot');
-  d.className = s === 'err' ? 'err' : s === 'warn' ? 'warn' : s === 'act' ? 'act' : '';
-  const labels = { err: 'Offline', warn: 'Degraded', act: 'Working', ok: 'Connected' };
-  d.title = 'Status: ' + (labels[s] || 'Connected') + (detail ? ' — ' + detail : '');
+async function brainPing() {
+  try {
+    const h = await apiJson(BRAIN_API + '/health', { timeoutMs: 6000 });
+    const rows = [
+      { k: 'version', v: String(h.version || '?') },
+      { k: 'storage', v: String(h.storage || '?') },
+    ];
+    if (h.probe) {
+      rows.push({
+        k: 'embed probe',
+        v: h.probe.ok ? 'ok, ' + Math.round(h.probe.time_ms || 0) + ' ms'
+                      : String(h.probe.error || 'failing'),
+        bad: !h.probe.ok,
+      });
+    }
+    if (h.probe && h.probe.ok === false) setPill('brain', 'warn', 'embedder cannot infer', rows);
+    else setPill('brain', 'ok', 'v' + (h.version || '?'), rows);
+  } catch (exc) {
+    // Post-Part-1 the brain /health fails CLOSED when inference is broken — a
+    // 503 here is the embedder saying so (§1.2), not a transport blip.
+    if (exc.kind === 'degraded') setPill('brain', 'warn', 'brain degraded: ' + exc.message, []);
+    else setPill('brain', 'err', 'brain ' + errLabel(exc), []);
+  }
+  setTimeout(brainPing, 30000);
+}
+
+async function fleetPing() {
+  try {
+    const d = await apiJson(BRAIN_API + '/fleet/issues', { timeoutMs: 10000 });
+    const issues = Array.isArray(d.issues) ? d.issues : [];
+    if (!issues.length) {
+      setPill('fleet', 'ok', 'no issues reported', []);
+    } else {
+      const critical = issues.some(i => i.severity === 'critical');
+      setPill('fleet', critical ? 'err' : 'warn',
+        issues.length + ' issue' + (issues.length === 1 ? '' : 's'),
+        issues.map(i => ({
+          k: String(i.severity || '?'),
+          v: String(i.detail || i.type || ''),
+          bad: i.severity === 'critical',
+          warn: i.severity !== 'critical',
+        })));
+    }
+  } catch (exc) {
+    // An unreachable detector is an unknown, never a green light (§1.1).
+    setPill('fleet', exc.kind === 'degraded' ? 'warn' : 'err', 'issue feed ' + errLabel(exc), []);
+  }
+  setTimeout(fleetPing, 60000);
 }
 
 // ═══════════ PANEL TOGGLES ═══════════
-function toggleSidebar() {
-  sidebarCollapsed = !sidebarCollapsed;
+// Rewritten in v11. The v10 pair had three defects:
+//
+//   1. Both flipped `sidebarCollapsed` / `rightCollapsed` on the MOBILE branch
+//      too, where those booleans drive nothing — so after a resize the desktop
+//      state was inverted from what was on screen.
+//   2. Both toggled #mob-overlay. Opening one panel and then the other toggled
+//      the overlay twice, leaving it off with a panel still open.
+//   3. Neither state was persisted, while the theme and the conversation-group
+//      state both were.
+// PANEL_KEY is declared with the other storage keys at the top of this script —
+// see the note there about the temporal dead zone.
+
+function isMobile() { return window.innerWidth <= 767; }
+
+/** Single writer for every panel-related class and ARIA attribute. */
+function applyPanelState() {
   const app = document.getElementById('app');
-  if (window.innerWidth <= 767) {
-    document.getElementById('sidebar').classList.toggle('mob-open');
-    document.getElementById('mob-overlay').classList.toggle('open');
-  } else {
-    app.classList.toggle('sidebar-collapsed', sidebarCollapsed);
-    app.classList.toggle('both-collapsed', sidebarCollapsed && rightCollapsed);
+  app.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+  app.classList.toggle('right-collapsed', rightCollapsed);
+  app.classList.toggle('both-collapsed', sidebarCollapsed && rightCollapsed);
+
+  const sb = document.getElementById('sb-collapse');
+  if (sb) sb.setAttribute('aria-expanded', String(!sidebarCollapsed));
+  const fe = document.getElementById('fe-collapse');
+  if (fe) fe.setAttribute('aria-expanded', String(!rightCollapsed));
+}
+
+function savePanelState() {
+  try {
+    localStorage.setItem(PANEL_KEY, JSON.stringify({ sidebar: sidebarCollapsed, right: rightCollapsed }));
+  } catch { /* storage blocked */ }
+}
+
+function loadPanelState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(PANEL_KEY) || '{}');
+    sidebarCollapsed = s.sidebar === true;
+    rightCollapsed = s.right === true;
+  } catch (exc) {
+    // Narrow on purpose. A blanket `catch {}` here hid a ReferenceError for the
+    // whole of this feature's first implementation: the state saved correctly
+    // and silently never restored. A corrupt entry is expected and survivable;
+    // anything else is a bug and should be visible in the console.
+    if (!(exc instanceof SyntaxError)) console.error('loadPanelState:', exc);
   }
+  // Mobile uses overlays, not grid columns; a restored collapse there would
+  // hide a panel the user cannot see a handle for.
+  if (isMobile()) { sidebarCollapsed = false; rightCollapsed = false; }
+  applyPanelState();
+}
+
+/** Close any open mobile overlay and sync the backdrop to reality. */
+function syncMobileOverlay() {
+  const open = document.getElementById('sidebar').classList.contains('mob-open')
+    || document.getElementById('file-explorer').classList.contains('mob-open');
+  document.getElementById('mob-overlay').classList.toggle('open', open);
+}
+
+function toggleSidebar() {
+  if (isMobile()) {
+    const sb = document.getElementById('sidebar');
+    const willOpen = !sb.classList.contains('mob-open');
+    sb.classList.toggle('mob-open', willOpen);
+    // Only one overlay panel at a time, or the backdrop bookkeeping desyncs.
+    if (willOpen) document.getElementById('file-explorer').classList.remove('mob-open');
+    syncMobileOverlay();
+    return;
+  }
+  sidebarCollapsed = !sidebarCollapsed;
+  applyPanelState();
+  savePanelState();
 }
 
 function toggleRight() {
+  if (isMobile()) {
+    const fe = document.getElementById('file-explorer');
+    const willOpen = !fe.classList.contains('mob-open');
+    fe.classList.toggle('mob-open', willOpen);
+    if (willOpen) document.getElementById('sidebar').classList.remove('mob-open');
+    syncMobileOverlay();
+    return;
+  }
   rightCollapsed = !rightCollapsed;
-  const app = document.getElementById('app');
-  if (window.innerWidth <= 767) {
-    document.getElementById('file-explorer').classList.toggle('mob-open');
-    document.getElementById('mob-overlay').classList.toggle('open');
-  } else {
-    app.classList.toggle('right-collapsed', rightCollapsed);
-    app.classList.toggle('both-collapsed', sidebarCollapsed && rightCollapsed);
+  applyPanelState();
+  savePanelState();
+}
+
+function closeMobilePanels() {
+  document.getElementById('sidebar').classList.remove('mob-open');
+  document.getElementById('file-explorer').classList.remove('mob-open');
+  syncMobileOverlay();
+}
+
+// ── Rail resizing (v12) ──
+// WIDTH_KEY lives with the other storage keys at the top of this script. It was
+// declared here first and reproduced the exact TDZ bug PANEL_KEY had: the width
+// saved on drag and silently never restored, because init() read the const from
+// above its own declaration. Two for two — hence the rule that every storage
+// key is declared in one place, before init().
+const RAIL_MIN = 180, RAIL_MAX = 620;
+
+function applyRailWidths(w) {
+  const root = document.documentElement;
+  if (w.sidebar) root.style.setProperty('--sidebar-w', w.sidebar + 'px');
+  if (w.right) root.style.setProperty('--right-w', w.right + 'px');
+}
+
+function loadRailWidths() {
+  try {
+    const w = JSON.parse(localStorage.getItem(WIDTH_KEY) || '{}');
+    applyRailWidths(w);
+  } catch (exc) {
+    if (!(exc instanceof SyntaxError)) console.error('loadRailWidths:', exc);
   }
 }
 
-// ═══════════ TOP BAR OVERFLOW ═══════════
-function toggleOverflow() {
-  const menu = document.getElementById('top-overflow-menu');
-  menu.classList.toggle('open');
-  if (menu.classList.contains('open')) {
-    document.addEventListener('click', closeOverflow, { once: true });
-  }
+function setupRailResize() {
+  if (typeof document.addEventListener !== 'function') return;
+
+  const drag = (grip, side) => {
+    if (!grip) return;
+    grip.addEventListener('mousedown', e => {
+      e.preventDefault();
+      grip.classList.add('dragging');
+      document.body.classList.add('resizing');
+
+      const move = ev => {
+        // Left rail grows rightwards from x=0; right rail grows leftwards from
+        // the viewport edge.
+        const raw = side === 'sidebar' ? ev.clientX : (window.innerWidth - ev.clientX);
+        const px = Math.max(RAIL_MIN, Math.min(RAIL_MAX, Math.round(raw)));
+        document.documentElement.style.setProperty(
+          side === 'sidebar' ? '--sidebar-w' : '--right-w', px + 'px');
+      };
+      const up = () => {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        grip.classList.remove('dragging');
+        document.body.classList.remove('resizing');
+        const cs = getComputedStyle(document.documentElement);
+        try {
+          localStorage.setItem(WIDTH_KEY, JSON.stringify({
+            sidebar: parseInt(cs.getPropertyValue('--sidebar-w'), 10) || undefined,
+            right: parseInt(cs.getPropertyValue('--right-w'), 10) || undefined,
+          }));
+        } catch { /* storage blocked */ }
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+  };
+
+  drag(document.getElementById('grip-left'), 'sidebar');
+  drag(document.getElementById('grip-right'), 'right');
 }
 
-function closeOverflow(e) {
-  const menu = document.getElementById('top-overflow-menu');
-  const btn = document.getElementById('top-overflow');
-  if (!btn.contains(e.target)) {
-    menu.classList.remove('open');
+// ═══════════ TOP-BAR POPOVERS — health-pill detail + ⚙ settings (Part 3) ═══
+let pillPopFor = null;
+let settingsBuilt = false;
+
+function closePops() {
+  document.getElementById('pill-pop').classList.remove('open');
+  document.getElementById('settings-pop').classList.remove('open');
+  pillPopFor = null;
+}
+
+function togglePillPop(name) {
+  const pop = document.getElementById('pill-pop');
+  const wasOpen = pillPopFor === name;
+  closePops();
+  if (wasOpen) return;
+  pillPopFor = name;
+  renderPillPop(name);
+  pop.classList.add('open');
+}
+
+/** DOM-built, textContent only — issue details are API strings. */
+function renderPillPop(name) {
+  const pop = document.getElementById('pill-pop');
+  const st = PILL_STATE[name];
+  pop.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'pop-title';
+  const labels = { ok: 'ok', warn: 'degraded', err: 'offline', act: 'working' };
+  title.textContent = name + ' — ' + (labels[st.cls] || 'unknown');
+  pop.appendChild(title);
+  if (st.detail) {
+    const d = document.createElement('div');
+    d.className = 'pop-row' + (st.cls === 'err' ? ' bad' : st.cls === 'warn' ? ' warn' : '');
+    d.textContent = st.detail;
+    pop.appendChild(d);
   }
+  st.rows.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'pop-row' + (r.bad ? ' bad' : r.warn ? ' warn' : '');
+    const k = document.createElement('span');
+    k.className = 'pop-k';
+    k.textContent = r.k;
+    const v = document.createElement('span');
+    v.textContent = r.v;
+    row.appendChild(k);
+    row.appendChild(v);
+    pop.appendChild(row);
+  });
+}
+
+function toggleSettings() {
+  const pop = document.getElementById('settings-pop');
+  const wasOpen = pop.classList.contains('open');
+  closePops();
+  if (wasOpen) return;
+  if (!settingsBuilt) {
+    buildThemeGrid();
+    wireSettingsSync();
+    settingsBuilt = true;
+  }
+  markActiveTheme();
+  pop.classList.add('open');
+}
+
+function buildThemeGrid() {
+  const grid = document.getElementById('theme-grid');
+  grid.textContent = '';
+  THEMES.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'theme-opt';
+    b.dataset.theme = t;
+    b.textContent = t;
+    b.addEventListener('click', () => { applyTheme(t); markActiveTheme(); });
+    grid.appendChild(b);
+  });
+}
+
+function markActiveTheme() {
+  document.querySelectorAll('.theme-opt').forEach(b =>
+    b.classList.toggle('on', b.dataset.theme === currentTheme));
+}
+
+// The sidebar-footer picker and the ⚙ copy must never disagree.
+function wireSettingsSync() {
+  const a = document.getElementById('ar-tog');
+  const b = document.getElementById('ar-tog-top');
+  a.addEventListener('change', () => { b.checked = a.checked; });
+  b.addEventListener('change', () => { a.checked = b.checked; });
+}
+
+function resetApiToken() {
+  clearApiToken();
+  closePops();
+  toast('API token cleared — you will be prompted on the next request', 'ok');
 }
 
 // ═══════════ PAGE NAVIGATION ═══════════
@@ -2011,8 +3205,24 @@ function goPage(page, btn) {
   document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
   document.getElementById('pg-' + page).classList.add('on');
   document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
-  if (btn) btn.classList.add('on');
-  document.getElementById('top-ctx').textContent = page === 'chat' ? 'Chat' : 'Brain Lab';
+  // Callers that don't hold the nav button (omnibox, mobile tabs) pass null;
+  // resolve it so the nav highlight stays the single source of "where am I" —
+  // the old #top-ctx label that duplicated it is gone.
+  const navBtn = btn || document.querySelector('.nb[data-page="' + page + '"]');
+  if (navBtn) navBtn.classList.add('on');
+
+  // Fleet data is fetched on demand rather than at init: it is a page nobody is
+  // looking at most of the time, and /fleet/* is three more requests on a load
+  // path that already has plenty.
+  if (page === 'fleet') loadFleetPage();
+  if (page === 'mind') loadMindPage();
+
+  // The Brain Lab is display:none at init, so the canvas measures 0x0 and the
+  // first paint goes into a 1x1 buffer. It has to be re-measured the moment the
+  // page is actually visible — this is why the map looked empty.
+  if (page === 'brain') {
+    requestAnimationFrame(() => { mapResize(); mapDraw(); });
+  }
   if (window.innerWidth <= 767) {
     document.getElementById('sidebar').classList.remove('mob-open');
     document.getElementById('mob-overlay').classList.remove('open');
@@ -2037,12 +3247,12 @@ function saveGroupState() {
   document.querySelectorAll('.conv-group').forEach(g => {
     state[g.dataset.group] = g.classList.contains('collapsed');
   });
-  localStorage.setItem('dash8-groups', JSON.stringify(state));
+  localStorage.setItem(GROUP_KEY, JSON.stringify(state));
 }
 
 function loadGroupState() {
   try {
-    const state = JSON.parse(localStorage.getItem('dash8-groups') || '{}');
+    const state = JSON.parse(localStorage.getItem(GROUP_KEY) || '{}');
     document.querySelectorAll('.conv-group').forEach(g => {
       const collapsed = state[g.dataset.group];
       if (collapsed === true) {
@@ -2053,43 +3263,71 @@ function loadGroupState() {
   } catch {}
 }
 
+// Search now runs server-side over message BODIES. v10 matched titles only with
+// a client-side includes(), so a phrase from three days ago was unfindable —
+// and it hid rows without updating the group counts, which then disagreed with
+// what was on screen.
+let convSearchTimer = null;
 function filterConvs(query) {
-  const q = query.toLowerCase();
-  document.querySelectorAll('.conv-item').forEach(item => {
-    const title = item.querySelector('.conv-item-title')?.textContent?.toLowerCase() || '';
-    item.style.display = (!q || title.includes(q)) ? '' : 'none';
-  });
+  clearTimeout(convSearchTimer);
+  convSearchTimer = setTimeout(() => { loadConvs((query || '').trim()); }, 200);
 }
 
 // ═══════════ MODELS ═══════════
 async function loadModels() {
-  const sel = document.getElementById('model-sel');
+  // Two selects since Part 3: the sidebar footer (hidden in the tablet rail)
+  // and the ⚙ settings copy — which is exactly the sub-1200px surface the
+  // model picker lacked. Both are fed here so they can never disagree.
+  const sels = ['model-sel', 'model-sel-top']
+    .map(id => document.getElementById(id)).filter(Boolean);
+  const setOption = (value, label, title) => sels.forEach(sel => {
+    // Built through the DOM rather than innerHTML: cfg.model is API-supplied
+    // and was interpolated raw into value="..." here once, which is
+    // attribute-breakout territory the same way the file list was.
+    sel.textContent = '';
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    sel.appendChild(opt);
+    if (title) sel.title = title;
+  });
   try {
     const cfg = await apiJson(API + '/config');
-    // Built through the DOM rather than innerHTML: cfg.model is API-supplied and
-    // was interpolated raw into value="..." here, which is attribute-breakout
-    // territory the same way the file list was.
-    sel.textContent = '';
-    const opt = document.createElement('option');
-    opt.value = cfg.model || '';
-    opt.textContent = cfg.model || 'No model';
-    sel.appendChild(opt);
+    setOption(cfg.model || '', cfg.model || 'No model');
     document.getElementById('ar-tog').checked = !!cfg.auto_route;
+    const top = document.getElementById('ar-tog-top');
+    if (top) top.checked = !!cfg.auto_route;
   } catch (exc) {
-    sel.textContent = '';
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = exc.kind === 'degraded' ? 'Degraded' : 'Unavailable';
-    sel.appendChild(opt);
-    sel.title = 'Model list ' + errLabel(exc);
+    setOption('', exc.kind === 'degraded' ? 'Degraded' : 'Unavailable',
+      'Model list ' + errLabel(exc));
   }
 }
 
-// ═══════════ CONVERSATIONS (Phase 3 placeholder) ═══════════
-async function loadConvs() {
-  // Phase 3: Will fetch from /api/conversations and group by date
-  // For now, show placeholder
-  renderConvs([]);
+// ═══════════ CONVERSATIONS ═══════════
+// v10 shipped four date groups, a search box and a delete button over a store
+// that did not exist: loadConvs() was `renderConvs([])` with a `// Phase 3:`
+// comment, and POST /api/conversations answered 404. The endpoints are real as
+// of v11 (core/conversations.py), so these are now wired for real.
+async function loadConvs(query) {
+  const url = API + '/api/conversations' + (query ? '?q=' + encodeURIComponent(query) : '');
+  try {
+    const data = await apiJson(url, { timeoutMs: 10000 });
+    convCache = Array.isArray(data.conversations) ? data.conversations : [];
+    renderConvs(convCache);
+  } catch (exc) {
+    convCache = [];
+    renderConvs([]);
+    // Say so in the sidebar rather than showing an empty list that looks like
+    // "you have no conversations".
+    const first = document.querySelector('.conv-group-body');
+    if (first) {
+      first.textContent = '';
+      const msg = document.createElement('div');
+      msg.style.cssText = 'padding:4px 8px;font-size:.72rem;color:var(--err)';
+      msg.textContent = 'History unavailable (' + errLabel(exc) + ')';
+      first.appendChild(msg);
+    }
+  }
 }
 
 function renderConvs(convs) {
@@ -2166,13 +3404,46 @@ async function openConv(id, el) {
   convId = id;
   document.querySelectorAll('.conv-item').forEach(i => i.classList.remove('on'));
   if (el) el.classList.add('on');
-  // Phase 5: Load messages from API
+
+  const msgs = document.getElementById('msgs');
+  msgs.textContent = '';
   appendMsg('s', 'Loading conversation…');
+
+  try {
+    const data = await apiJson(API + '/api/conversations/' + encodeURIComponent(id) + '/messages',
+                               { timeoutMs: 15000 });
+    msgs.textContent = '';
+    const list = Array.isArray(data.messages) ? data.messages : [];
+    if (!list.length) {
+      appendMsg('s', 'No messages in this conversation yet.');
+      return;
+    }
+    // Roles are stored as the API's words; MSG_CLASS keys are single letters.
+    const ROLE = { user: 'u', assistant: 'a', system: 's', error: 'e' };
+    list.forEach(m => appendMsg(ROLE[m.role] || 'a', m.content));
+  } catch (exc) {
+    msgs.textContent = '';
+    appendMsg('e', 'Could not load conversation (' + errLabel(exc) + ')');
+  }
+  if (isMobile()) closeMobilePanels();
 }
 
 async function delConv(id) {
   if (!confirm('Delete this conversation?')) return;
-  // Phase 5: API delete
+  try {
+    await apiJson(API + '/api/conversations/' + encodeURIComponent(id),
+                  { method: 'DELETE', timeoutMs: 10000 });
+  } catch (exc) {
+    // v10 toasted success unconditionally and deleted nothing. A failed delete
+    // must not look like a successful one.
+    toast('Delete failed (' + errLabel(exc) + ')', 'err');
+    return;
+  }
+  if (convId === id) {
+    convId = null;
+    document.getElementById('msgs').textContent = '';
+    appendMsg('s', 'Conversation deleted.');
+  }
   toast('Conversation deleted', 'ok');
   loadConvs();
 }
@@ -2192,6 +3463,1248 @@ async function delConv(id) {
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
+}
+
+// ═══════════ COCKPIT (v10) ═══════════
+// v9 read two brain endpoints. These panels reach eleven more, and every one of
+// them renders through the DOM: neuron content is arbitrary stored text, and it
+// is the least trustworthy string on this page.
+
+/** A small labelled chip. Text goes in via textContent, never markup. */
+function chip(text, fg, bg) {
+  const s = document.createElement('span');
+  s.textContent = text;
+  s.style.cssText = 'border-radius:5px;padding:1px 6px;font-size:.62rem;white-space:nowrap;'
+    + 'color:' + fg + ';background:' + bg;
+  return s;
+}
+
+function setList(id, items, empty) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = '';
+  if (!items || !items.length) { el.textContent = empty || '—'; return; }
+  items.forEach(t => {
+    const d = document.createElement('div');
+    d.textContent = '· ' + t;
+    el.appendChild(d);
+  });
+}
+
+// ── ASK ───────────────────────────────────────────────────────────────────────
+let askQuery = '';
+let askGraded = 0;
+
+async function askBrain() {
+  const q = (document.getElementById('ask-q').value || '').trim();
+  if (!q) return;
+  askQuery = q;
+  const box = document.getElementById('ask-results');
+  box.textContent = 'recalling…';
+
+  let data;
+  try {
+    // rerank off: measured ~14x latency for no ranking gain, and it currently
+    // times out. feedback stays ON — this is real use. Benchmarks, and only
+    // benchmarks, pass feedback=false.
+    data = await apiJson(BRAIN_API + '/recall?context=' + encodeURIComponent(q)
+                         + '&rerank=false', { timeoutMs: 30000 });
+  } catch (exc) {
+    box.textContent = 'recall failed: ' + errLabel(exc);
+    return;
+  }
+
+  const hits = Array.isArray(data.direct) ? data.direct : [];
+  box.textContent = '';
+  if (!hits.length) {
+    box.textContent = 'nothing recalled — that is itself a knowledge gap';
+    mapHighlightRecall([]);
+    return;
+  }
+
+  // Replay the recall on the map. Watching which parts of the brain a question
+  // actually touched is the point of having a map at all.
+  mapHighlightRecall(hits.map(n => n.id));
+
+  hits.slice(0, 8).forEach(n => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:8px 0;display:flex;gap:10px;align-items:flex-start';
+
+    const left = document.createElement('div');
+    left.style.cssText = 'flex:1;min-width:0';
+
+    const meta = document.createElement('div');
+    meta.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:3px;flex-wrap:wrap';
+    meta.appendChild(chip('#' + n.id, 'var(--muted)', 'transparent'));
+    meta.appendChild(chip(Number(n.confidence || 0).toFixed(3), '#9dc4ff', 'rgba(90,140,255,.16)'));
+    if (n.usefulness_boost > 0) {
+      // Shown deliberately: a rank that moved because of a past human verdict
+      // must be visible, or the loop is unauditable.
+      meta.appendChild(chip('↑ feedback +' + Number(n.usefulness_boost).toFixed(3),
+                            '#5ce39a', '#12351f'));
+    }
+    if (n.region) meta.appendChild(chip(n.region, 'var(--muted)', 'transparent'));
+    left.appendChild(meta);
+
+    const body = document.createElement('div');
+    body.style.cssText = 'font-size:.72rem;opacity:.9;word-break:break-word';
+    // 8 of 8 live hits exceed 260 chars (up to 1,993). Clipping silently and
+    // still offering ✓/✗ let a verdict that moves live ranking (±0.18) be
+    // cast on 13% of the memory (§2.4). Clip visibly, expand on click, and
+    // gate grading on having expanded.
+    const full = String(n.content || '');
+    const clipped = full.length > 260;
+    body.textContent = clipped ? full.slice(0, 260) + '…' : full;
+    left.appendChild(body);
+
+    const state = { expanded: !clipped };
+    if (clipped) {
+      const more = document.createElement('button');
+      more.textContent = 'show all ' + full.length.toLocaleString() + ' chars';
+      more.style.cssText = 'cursor:pointer;background:none;border:none;padding:2px 0;'
+        + 'color:#8fb4e8;font-size:.66rem;text-decoration:underline';
+      more.addEventListener('click', () => {
+        state.expanded = true;
+        body.textContent = full;
+        more.remove();
+      });
+      left.appendChild(more);
+    }
+
+    row.appendChild(left);
+    row.appendChild(verdictControl(n.id, state));
+    box.appendChild(row);
+  });
+}
+
+/**
+ * Useful / not-useful buttons for one recalled neuron.
+ * `state.expanded` gates the verdict: grading moves live ranking, so it must
+ * not be castable on a 13% excerpt.
+ */
+function verdictControl(neuronId, state) {
+  const wrap = document.createElement('span');
+  wrap.style.cssText = 'display:flex;gap:5px';
+
+  const mk = (label, useful, title) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.title = title;
+    b.style.cssText = 'cursor:pointer;background:transparent;color:#8fb4e8;'
+      + 'border:1px solid var(--border);border-radius:5px;font-size:.68rem;padding:1px 7px';
+    b.addEventListener('click', async () => {
+      if (state && !state.expanded) {
+        toast('Expand the memory first — a verdict moves live ranking and should cover all of it, not 13%', '');
+        return;
+      }
+      wrap.textContent = '…';
+      try {
+        // Two distinct signals. useful_ids is query-conditional and is what
+        // actually moves ranking for this question; /brain/outcome records the
+        // credit-assignment row used for calibration.
+        if (useful) {
+          await apiJson(BRAIN_API + '/brain/recall/useful', {
+            method: 'POST', timeoutMs: 15000,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ neuron_ids: [neuronId], context: askQuery }),
+          });
+        }
+        await apiJson(BRAIN_API + '/brain/outcome', {
+          method: 'POST', timeoutMs: 15000,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            neuron_ids: [neuronId],
+            outcome: useful ? 'good' : 'bad',
+            note: askQuery.slice(0, 200),
+          }),
+        });
+        wrap.textContent = '';
+        wrap.appendChild(useful ? chip('✓ useful', '#5ce39a', '#12351f')
+                                : chip('✗ not', '#ffb870', '#3a2410'));
+        askGraded += 1;
+        setText('ask-graded', askGraded + ' graded this session');
+      } catch (exc) {
+        wrap.textContent = '';
+        wrap.appendChild(chip('failed', '#ff8ba0', '#5a1520'));
+      }
+    });
+    return b;
+  };
+
+  wrap.appendChild(mk('✓', true, 'this answered my question'));
+  wrap.appendChild(mk('✗', false, 'this did not help'));
+  return wrap;
+}
+
+// ── SELF MODEL ────────────────────────────────────────────────────────────────
+async function loadSelfModel() {
+  try {
+    const sm = await apiJson(BRAIN_API + '/agi/self_model', { timeoutMs: 10000 });
+    setText('sm-identity', sm.identity);
+    setText('sm-focus', sm.current_focus);
+    if (sm.knowledge) {
+      setText('sm-quality', sm.knowledge.avg_quality);
+      setText('sm-domains', (sm.knowledge.domains || 0) + ' / ' + (sm.knowledge.sources || 0));
+    }
+    setList('sm-limits', sm.limitations);
+    setText('self-badge', sm.state || 'ok');
+  } catch (exc) {
+    ['sm-identity', 'sm-focus', 'sm-quality', 'sm-domains'].forEach(id => setText(id, '—'));
+    setText('self-badge', errLabel(exc));
+  }
+
+  try {
+    const aw = await apiJson(BRAIN_API + '/self/awareness', { timeoutMs: 10000 });
+    const fmt = r => r.region + ' (' + (r.cnt || 0) + ', q=' + Number(r.avg_q || 0).toFixed(2) + ')';
+    setList('sm-strong', (aw.strong_areas || []).slice(0, 5).map(fmt));
+    setList('sm-weak', (aw.weak_areas || []).slice(0, 5).map(fmt));
+  } catch {
+    setList('sm-strong', null); setList('sm-weak', null);
+  }
+}
+
+// ── LEARNING LOOP ─────────────────────────────────────────────────────────────
+async function loadLearningLoop() {
+  try {
+    const t = await apiJson(BRAIN_API + '/brain/quality/trend', { timeoutMs: 10000 });
+    const series = Array.isArray(t.series) ? t.series : [];
+    const last = series.length ? series[series.length - 1] : null;
+    setText('ll-points', t.days);
+    if (last) {
+      setText('ll-graded', (last.graded_recalls || 0).toLocaleString()
+        + ' / ' + (last.total_recalls || 0).toLocaleString());
+      setText('ll-outcomes', (last.outcomes || 0).toLocaleString());
+      setText('ll-eval', last.golden_eval === null || last.golden_eval === undefined
+        ? 'not recorded' : (last.golden_eval * 100).toFixed(0) + '%');
+      setText('ll-density', last.edges_per_neuron);
+      setText('ll-good', (last.good_neurons || 0).toLocaleString());
+      setText('ll-hitrate', last.predict_hit_rate === null || last.predict_hit_rate === undefined
+        ? 'not recorded'
+        : (last.predict_hit_rate * 100).toFixed(0) + '% of '
+          + (last.predictions_scored || 0).toLocaleString());
+      // Shown as a ratio, not two totals: 449 up against 1 down is the shape
+      // that says weight can rise but effectively never falls.
+      const up = last.learn_strengthens, down = last.learn_weakens;
+      setText('ll-learn', (up === null || up === undefined)
+        ? '—'
+        : up.toLocaleString() + ' ↑ / ' + (down || 0).toLocaleString() + ' ↓'
+          + (down === 0 || up / Math.max(down || 1, 1) > 20 ? '  ⚠ one-way' : ''));
+    }
+    // Stamp WHICH snapshot these eight figures are — they are a daily 05:30
+    // reading, not live, and by evening they visibly disagree with the live
+    // header. An unstamped stale number reads as a current one (§2.2).
+    if (last) {
+      const when = String(last.day || last.date || last.ts || '').slice(0, 16);
+      setText('ll-asof', (when || 'unknown time') + ' (daily snapshot, not live)');
+    }
+    // One point is a reading, not a trend. Say which one this is.
+    setText('loop-badge', series.length < 2 ? 'no trend yet (needs 2+ days)' : 'trending');
+  } catch (exc) {
+    setText('loop-badge', errLabel(exc));
+  }
+
+  try {
+    const w = await apiJson(BRAIN_API + '/brain/write-stats', { timeoutMs: 10000 });
+    const rows = Object.entries(w.sources || {})
+      .map(([src, v]) => {
+        const refused = Object.values(v.rejected || {}).reduce((a, b) => a + (b || 0), 0);
+        return { src, acc: v.accepted || 0, ref: refused };
+      })
+      .sort((a, b) => (b.acc + b.ref) - (a.acc + a.ref))
+      .slice(0, 8)
+      .map(r => r.src + ': ' + r.acc + ' accepted, ' + r.ref + ' refused');
+    setList('ll-writes', rows, 'no writes recorded today');
+  } catch {
+    setList('ll-writes', null);
+  }
+}
+
+// ── KNOWLEDGE GAPS ────────────────────────────────────────────────────────────
+async function loadGaps() {
+  const list = document.getElementById('gap-list');
+  if (!list) return;
+  list.textContent = '';
+  try {
+    const g = await apiJson(BRAIN_API + '/brain/curiosity/gaps', { timeoutMs: 10000 });
+    const gaps = Array.isArray(g.gaps) ? g.gaps : [];
+    setText('gap-badge', gaps.length + ' open');
+    if (!gaps.length) { list.textContent = 'no open gaps'; return; }
+    gaps.slice(0, 12).forEach(gp => {
+      const row = document.createElement('div');
+      row.style.cssText = 'border-top:1px solid var(--border);padding:6px 0;display:flex;gap:8px;align-items:center';
+      const q = document.createElement('span');
+      q.style.cssText = 'flex:1;min-width:0;word-break:break-word';
+      q.textContent = String(gp.query || '');
+      row.appendChild(q);
+      if (gp.created) row.appendChild(chip(String(gp.created).slice(0, 10), 'var(--muted)', 'transparent'));
+      list.appendChild(row);
+    });
+  } catch (exc) {
+    setText('gap-badge', errLabel(exc));
+    list.textContent = '—';
+  }
+}
+
+// ═══════════ BRAIN MAP (v13) ═══════════
+// Same data and the same layout rule as the 3D view: each neuron sits near its
+// REGION's anchor (/graph returns position_x/y/z and radius per region) with
+// deterministic per-id jitter, so the picture is stable between sessions and
+// two neurons in the same region are actually near each other.
+//
+// 2D on purpose. Prime is one self-contained file that must also open from
+// file://, so it cannot import three.js — and a canvas map is the WebGL
+// fallback the plan wanted anyway.
+
+const MAP = {
+  nodes: [], edges: [], regions: [], byId: new Map(),
+  hidden: new Set(),     // region names filtered out
+  flashes: new Map(),    // id -> 0..1, decaying
+  highlight: new Set(),  // ids from the last recall
+  es: null, raf: null, dpr: 1, w: 0, h: 0,
+};
+
+function mapHash01(n) {
+  const s = Math.sin(n * 12.9898) * 43758.5453123;
+  return s - Math.floor(s);
+}
+
+/** Project region anchors + jitter into canvas space. */
+function mapLayout() {
+  const regions = new Map();
+  MAP.regions.forEach(r => regions.set(r.name, r));
+  MAP.byId.clear();
+
+  MAP.nodes.forEach(n => {
+    const r = regions.get(n.region);
+    const ax = r ? r.position_x : 0;
+    const ay = r ? r.position_y : 0;
+    const rad = (r ? r.radius : 0.4) * 0.95;
+    const u = mapHash01(n.id) * Math.PI * 2;
+    const v = Math.sqrt(mapHash01(n.id + 101.7)) * rad;
+    // z nudges x a little so the two hemispheres do not perfectly overlap.
+    const az = r ? r.position_z : 0;
+    n._x = ax + Math.cos(u) * v + az * 0.25;
+    n._y = ay + Math.sin(u) * v;
+    n._r = 1.4 + 3.6 * Math.min(1, Math.log1p(n.fire_count || 0) / Math.log(500));
+    n._c = (r && r.color) || '#00d4ff';
+    n._life = 0.35 + 0.65 * Math.min(1, Math.max(0, n.decay_state == null ? 1 : n.decay_state));
+    MAP.byId.set(n.id, n);
+  });
+}
+
+/**
+ * Measure the canvas.
+ *
+ * Returns false when the element has no layout — which is the normal case at
+ * init, because the Brain Lab page is display:none until it is selected. The
+ * caller must not draw into a zero-sized buffer and call it a picture.
+ */
+function mapResize() {
+  const c = document.getElementById('brain-map');
+  if (!c || typeof c.getBoundingClientRect !== 'function') return false;
+  const rect = c.getBoundingClientRect();
+  if (!rect.width || !rect.height) return false;
+  MAP.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  MAP.w = Math.round(rect.width);
+  MAP.h = Math.round(rect.height);
+  c.width = Math.round(MAP.w * MAP.dpr);
+  c.height = Math.round(MAP.h * MAP.dpr);
+  return true;
+}
+
+/** World (-1..1-ish) -> canvas pixels. */
+function mapProject(x, y) {
+  const s = Math.min(MAP.w, MAP.h) * 0.42;
+  return [MAP.w / 2 + x * s, MAP.h / 2 - y * s];
+}
+
+function mapDraw() {
+  const c = document.getElementById('brain-map');
+  if (!c || !c.getContext) return;
+  // Never paint into a zero-sized buffer — see mapResize().
+  if (!MAP.w || !MAP.h) { if (!mapResize()) return; }
+  const ctx = c.getContext('2d');
+  if (!ctx) return;
+  ctx.setTransform(MAP.dpr, 0, 0, MAP.dpr, 0, 0);
+  ctx.clearRect(0, 0, MAP.w, MAP.h);
+
+  // Chips normalise a missing region to '(unlabeled)'; match that here or
+  // those nodes become unfilterable again the moment their chip is toggled.
+  const visible = n => !MAP.hidden.has(n.region || '(unlabeled)');
+
+  // Edges first, underneath.
+  ctx.lineWidth = 0.5;
+  MAP.edges.forEach(e => {
+    const a = MAP.byId.get(e.source);
+    const b = MAP.byId.get(e.target);
+    if (!a || !b || !visible(a) || !visible(b)) return;
+    const [ax, ay] = mapProject(a._x, a._y);
+    const [bx, by] = mapProject(b._x, b._y);
+    ctx.strokeStyle = 'rgba(0,212,255,' + (0.05 + 0.16 * Math.min(1, e.strength == null ? 0.5 : e.strength)).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+  });
+
+  // Neurons.
+  MAP.nodes.forEach(n => {
+    if (!visible(n)) return;
+    const [x, y] = mapProject(n._x, n._y);
+    const flash = MAP.flashes.get(n.id) || 0;
+    const lit = MAP.highlight.has(n.id);
+    ctx.globalAlpha = lit ? 1 : n._life;
+    ctx.fillStyle = flash > 0 ? '#ffffff' : n._c;
+    ctx.beginPath();
+    ctx.arc(x, y, n._r * (1 + flash * 1.6) * (lit ? 1.5 : 1), 0, Math.PI * 2);
+    ctx.fill();
+    if (lit) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+  });
+  ctx.globalAlpha = 1;
+}
+
+/** Decay flashes; only runs while something is actually animating. */
+function mapTick() {
+  if (MAP.flashes.size) {
+    MAP.flashes.forEach((v, k) => {
+      const next = v - 0.035;
+      if (next <= 0) MAP.flashes.delete(k); else MAP.flashes.set(k, next);
+    });
+    mapDraw();
+    MAP.raf = requestAnimationFrame(mapTick);
+  } else {
+    MAP.raf = null;
+    mapDraw();
+  }
+}
+
+function mapFlash(id) {
+  if (!MAP.byId.has(id)) return;
+  MAP.flashes.set(id, 1);
+  if (!MAP.raf) MAP.raf = requestAnimationFrame(mapTick);
+}
+
+// ═══════════ BRAIN 3D EMBED (Phase 5) ═══════════
+function loadBrain3D() {
+  const box = document.getElementById('brain3d-box');
+  if (box.querySelector('iframe')) return;
+  box.textContent = '';
+  const frame = document.createElement('iframe');
+  frame.src = BRAIN_API + '/viz/';
+  frame.title = 'Neuralis 3D brain';
+  frame.style.cssText = 'width:100%;height:480px;border:0;border-radius:8px;background:#020208';
+  frame.setAttribute('loading', 'lazy');
+  box.appendChild(frame);
+  document.getElementById('brain3d-load').textContent = 'Loaded';
+}
+
+function mapRenderRegionChips() {
+  const box = document.getElementById('map-regions');
+  if (!box) return;
+  box.textContent = '';
+  // Chips are built from the NODES' regions, not the 12-row anchor table.
+  // Built from the table they summed to 589 while the header said 1,200, and
+  // turning all 12 off left 611 neurons visible and unfilterable (§2.1).
+  const counts = new Map();
+  MAP.nodes.forEach(n => counts.set(n.region || '(unlabeled)', (counts.get(n.region || '(unlabeled)') || 0) + 1));
+  const colorOf = new Map();
+  MAP.regions.forEach(r => colorOf.set(r.name, r.color));
+  [...counts.entries()].sort((a, b) => b[1] - a[1])
+    .forEach(([name, n]) => {
+      const color = colorOf.get(name) || '#8fb4e8';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = name + ' ' + n;
+      const paint = () => {
+        const off = MAP.hidden.has(name);
+        b.style.cssText = 'cursor:pointer;border-radius:99px;padding:2px 8px;font-size:.6rem;'
+          + 'border:1px solid ' + (off ? 'var(--border)' : color) + ';'
+          + 'background:' + (off ? 'transparent' : color + '22') + ';'
+          + 'color:' + (off ? 'var(--muted)' : color);
+      };
+      paint();
+      b.addEventListener('click', () => {
+        if (MAP.hidden.has(name)) MAP.hidden.delete(name); else MAP.hidden.add(name);
+        paint();
+        mapDraw();
+      });
+      box.appendChild(b);
+    });
+}
+
+/** Nearest neuron to a click, within a few pixels. */
+function mapPick(px, py) {
+  let best = null, bestD = 14 * 14;
+  MAP.nodes.forEach(n => {
+    if (MAP.hidden.has(n.region || '(unlabeled)')) return;
+    const [x, y] = mapProject(n._x, n._y);
+    const d = (x - px) * (x - px) + (y - py) * (y - py);
+    if (d < bestD) { bestD = d; best = n; }
+  });
+  return best;
+}
+
+function mapShowDetail(n) {
+  const el = document.getElementById('map-detail');
+  if (!el) return;
+  el.textContent = '';
+  if (!n) { el.textContent = 'click a neuron to inspect it'; return; }
+  const meta = document.createElement('div');
+  meta.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:3px';
+  meta.appendChild(chip('#' + n.id, 'var(--muted)', 'transparent'));
+  meta.appendChild(chip(n.region, n._c, 'transparent'));
+  meta.appendChild(chip((n.fire_count || 0) + ' fires', '#9dc4ff', 'rgba(90,140,255,.16)'));
+  if (n.source) meta.appendChild(chip(n.source, 'var(--muted)', 'transparent'));
+  el.appendChild(meta);
+  const body = document.createElement('div');
+  body.style.cssText = 'color:var(--text);opacity:.9;word-break:break-word';
+  body.textContent = String(n.content || '').slice(0, 400);
+  el.appendChild(body);
+}
+
+async function loadBrainMap() {
+  const badge = document.getElementById('map-live');
+  const canvas = document.getElementById('brain-map');
+  if (!canvas) return;
+
+  try {
+    // Bounded deliberately. The unbounded /graph was 15.4 MB / ~14 s; this slice
+    // measured 1.20 MB / 0.95 s and is what the 3D view uses too.
+    const g = await apiJson(BRAIN_API + '/graph?limit=1200&min_strength=0.35', { timeoutMs: 30000 });
+    MAP.nodes = Array.isArray(g.nodes) ? g.nodes : [];
+    MAP.edges = Array.isArray(g.edges) ? g.edges : [];
+    MAP.regions = Array.isArray(g.regions) ? g.regions : [];
+    mapLayout();
+    mapRenderRegionChips();
+    mapResize();
+    mapDraw();
+    const m = g.meta || {};
+    setText('map-meta', (m.returned_nodes || MAP.nodes.length).toLocaleString() + ' of '
+      + (m.total_nodes || 0).toLocaleString() + ' neurons · '
+      + (m.returned_edges || MAP.edges.length).toLocaleString() + ' of '
+      + (m.total_edges || 0).toLocaleString() + ' synapses');
+  } catch (exc) {
+    setText('map-meta', 'graph unavailable: ' + errLabel(exc));
+    if (badge) { badge.textContent = 'offline'; badge.className = 'err'; }
+    return;
+  }
+
+  if (!canvas._wired) {
+    canvas._wired = true;
+    canvas.addEventListener('click', e => {
+      const r = canvas.getBoundingClientRect();
+      mapShowDetail(mapPick(e.clientX - r.left, e.clientY - r.top));
+    });
+    if (typeof window.addEventListener === 'function') {
+      window.addEventListener('resize', () => { mapResize(); mapDraw(); });
+    }
+  }
+  connectBrainEvents();
+}
+
+/**
+ * Subscribe to the brain's SSE bus.
+ *
+ * events.py has said since it was written that the viz should subscribe here
+ * "instead of polling /graph every 5s". It works — it simply never had a
+ * subscriber from Prime. `subscribers: 0` in every reading until now.
+ */
+function connectBrainEvents() {
+  if (typeof EventSource === 'undefined') return;
+  if (MAP.es) return;
+  const badge = document.getElementById('map-live');
+  let es;
+  try { es = new EventSource(BRAIN_API + '/events'); } catch { return; }
+  MAP.es = es;
+
+  const setBadge = (cls, txt) => { if (badge) { badge.className = cls; badge.textContent = txt; } };
+  es.addEventListener('connected', () => setBadge('ok', 'live'));
+  es.onopen = () => setBadge('ok', 'live');
+  es.onerror = () => setBadge('warn', 'reconnecting');
+
+  es.addEventListener('neuron_fired', e => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    mapFlash(d.id);
+  });
+  es.addEventListener('neuron_created', e => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    if (MAP.byId.has(d.id)) return;
+    MAP.nodes.push(Object.assign({ fire_count: 0, decay_state: 1 }, d));
+    mapLayout();
+    mapDraw();
+  });
+  es.addEventListener('synapse_formed', e => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    if (!MAP.byId.has(d.source) || !MAP.byId.has(d.target)) return;
+    MAP.edges.push(d);
+    mapDraw();
+  });
+}
+
+/** Light up the neurons the last recall returned — the loop, made visible. */
+function mapHighlightRecall(ids) {
+  MAP.highlight = new Set(ids || []);
+  ids.forEach(id => mapFlash(id));
+  mapDraw();
+}
+
+// ═══════════ FLEET (v14) ═══════════
+// The nervous system got senses on 2026-07-31: /fleet/sense upserts one
+// heartbeat row per node every 5 minutes. Nothing has ever rendered them, so
+// hackbox has been `offline` with agent-zero down, continuously, on no screen.
+
+const NODE_STATUS = {
+  online:   { color: 'var(--ok)',   bg: 'rgba(0,255,136,.10)' },
+  degraded: { color: 'var(--warn)', bg: 'rgba(255,204,68,.10)' },
+  stale:    { color: 'var(--warn)', bg: 'rgba(255,204,68,.10)' },
+  offline:  { color: 'var(--err)',  bg: 'rgba(255,68,102,.10)' },
+  unknown:  { color: 'var(--muted)', bg: 'transparent' },
+};
+
+/** How long ago, from an ISO timestamp. Staleness is the point here. */
+function sinceLabel(iso) {
+  if (!iso) return 'never';
+  const secs = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (!isFinite(secs)) return 'unknown';
+  return formatDuration(Math.max(0, secs)) + ' ago';
+}
+
+function renderFleetNode(node) {
+  const status = String(node.status || 'unknown').toLowerCase();
+  const look = NODE_STATUS[status] || NODE_STATUS.unknown;
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--surface);border:1px solid var(--border);'
+    + 'border-left:3px solid ' + look.color + ';border-radius:var(--r);padding:12px';
+
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px';
+  const name = document.createElement('span');
+  name.style.cssText = 'font-size:.86rem;font-weight:700';
+  name.textContent = node.name || 'unnamed';
+  head.appendChild(name);
+  head.appendChild(chip(status, look.color, look.bg));
+  card.appendChild(head);
+
+  const meta = document.createElement('div');
+  meta.style.cssText = 'font-size:.66rem;color:var(--muted);margin-bottom:8px';
+  meta.textContent = (node.role || '—') + ' · ' + (node.ip || '—')
+    + ' · ' + (node.beats || 0) + ' beats · seen ' + sinceLabel(node.last_seen);
+  card.appendChild(meta);
+
+  // Per-service state. A node whose services are down is not "online", and this
+  // is where that becomes impossible to miss.
+  const svcMap = node.service_status && typeof node.service_status === 'object'
+    ? node.service_status : {};
+  const names = Object.keys(svcMap);
+  const svcRow = document.createElement('div');
+  svcRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px';
+  if (!names.length) {
+    svcRow.appendChild(chip('no service probes', 'var(--muted)', 'transparent'));
+  } else {
+    names.forEach(s => {
+      const up = String(svcMap[s]).toLowerCase() === 'up';
+      svcRow.appendChild(chip(
+        (up ? '● ' : '✕ ') + s,
+        up ? 'var(--ok)' : 'var(--err)',
+        up ? 'rgba(0,255,136,.10)' : 'rgba(255,68,102,.12)'));
+    });
+  }
+  // A node also DECLARES services; only some are probed. nuke declares
+  // hermes/docker/webui but only composio/sentinel are probed — the declared
+  // three simply never appeared, which read as "healthy" (§2.10). A grey
+  // "not probed" chip is the honest rendering of "we do not know".
+  const declared = Array.isArray(node.services) ? node.services : [];
+  declared.filter(s => !(s in svcMap)).forEach(s => {
+    svcRow.appendChild(chip('? ' + s + ' — not probed', 'var(--muted)', 'transparent'));
+  });
+  card.appendChild(svcRow);
+  return card;
+}
+
+async function loadFleet() {
+  const box = document.getElementById('fleet-nodes');
+  if (!box) return;
+  box.textContent = '';
+
+  let state;
+  try {
+    state = await apiJson(BRAIN_API + '/fleet/state', { timeoutMs: 10000 });
+  } catch (exc) {
+    setText('fleet-meta', 'fleet state ' + errLabel(exc));
+    return;
+  }
+
+  const nodes = Array.isArray(state.nodes) ? state.nodes : [];
+  const down = nodes.filter(n => String(n.status).toLowerCase() !== 'online').length;
+  // "sensed" comes from the newest node heartbeat, NOT state.topology_time —
+  // that field is datetime.now() stamped at request time, so it would read
+  // "0s ago" three days after the sensing loop died (§2.3).
+  const newest = Math.max(0, ...nodes.map(n => Date.parse(n.last_seen) || 0));
+  setText('fleet-meta', nodes.length + ' nodes · ' + (down ? down + ' not online' : 'all online')
+    + ' · sensed ' + (newest ? sinceLabel(new Date(newest).toISOString()) : 'never'));
+  nodes.forEach(n => box.appendChild(renderFleetNode(n)));
+  if (!nodes.length) box.textContent = 'no nodes reported';
+}
+
+async function loadFleetIssues() {
+  const list = document.getElementById('fleet-issues');
+  if (!list) return;
+  list.textContent = '';
+
+  const rows = [];
+  // Two independent endpoints; one being down must not blank the other.
+  const [issues, preds] = await Promise.allSettled([
+    apiJson(BRAIN_API + '/fleet/issues', { timeoutMs: 10000 }),
+    apiJson(BRAIN_API + '/fleet/predictions', { timeoutMs: 10000 }),
+  ]);
+
+  const pull = (settled, key, label) => {
+    if (settled.status !== 'fulfilled') return;
+    const v = settled.value;
+    const arr = Array.isArray(v) ? v : (Array.isArray(v[key]) ? v[key] : []);
+    arr.forEach(item => rows.push({
+      label,
+      text: typeof item === 'string' ? item
+        : (item.issue || item.prediction || item.message || item.detail || JSON.stringify(item)),
+    }));
+  };
+  pull(issues, 'issues', 'now');
+  pull(preds, 'predictions', 'predicted');
+
+  setText('fleet-issue-badge', rows.length ? rows.length + ' open' : 'nothing reported');
+  if (!rows.length) { list.textContent = 'no issues or predictions reported'; return; }
+
+  rows.slice(0, 20).forEach(r => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:6px 0;display:flex;gap:8px;align-items:flex-start';
+    row.appendChild(chip(r.label, r.label === 'now' ? 'var(--err)' : 'var(--warn)', 'transparent'));
+    const t = document.createElement('span');
+    t.style.cssText = 'flex:1;min-width:0;word-break:break-word';
+    t.textContent = String(r.text);
+    row.appendChild(t);
+    list.appendChild(row);
+  });
+}
+
+// ── Actuators, behind an explicit two-step confirm ──
+// Nothing here fires on a single click, nothing pre-selects a destructive
+// option, and the confirmation names the node, the command and the endpoint.
+// ACTUATORS is declared with the other init-time constants at the top of this
+// script. Declared here it was the THIRD temporal-dead-zone bug in this file:
+// renderActuators() runs from setupStaticHandlers() inside init(), read the
+// const from above its own declaration, threw ReferenceError, and took the
+// whole of init() down with it — silently, because the fleet page is wired by
+// inline onclick and kept working.
+
+function renderActuators() {
+  const box = document.getElementById('fleet-actuators');
+  if (!box) return;
+  box.textContent = '';
+  ACTUATORS.forEach(a => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'top-btn' + (a.destructive ? ' danger' : '');
+    b.textContent = a.label;
+    b.addEventListener('click', () => promptActuator(a));
+    box.appendChild(b);
+  });
+}
+
+/** Step one: state exactly what is about to happen and demand a second click. */
+function promptActuator(a) {
+  const box = document.getElementById('fleet-confirm');
+  if (!box) return;
+  box.textContent = '';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--surface2);border:1px solid var(--border-active);'
+    + 'border-radius:8px;padding:10px';
+
+  const what = document.createElement('div');
+  what.style.cssText = 'font-size:.72rem;margin-bottom:6px';
+  what.textContent = a.describe();
+  card.appendChild(what);
+
+  const target = document.createElement('div');
+  target.style.cssText = 'font-size:.66rem;color:var(--muted);margin-bottom:8px';
+  // The exact call, spelled out. No "are you sure?" without a subject.
+  target.textContent = a.method + ' ' + BRAIN_API + a.endpoint + '  ·  node: homeserver  ·  as: dashboard';
+  card.appendChild(target);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;align-items:center';
+
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.className = 'top-btn' + (a.destructive ? ' danger' : ' primary');
+  go.textContent = 'Confirm — run it';
+  go.addEventListener('click', () => fireActuator(a, card));
+  row.appendChild(go);
+
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'top-btn';
+  cancel.textContent = 'Cancel';
+  cancel.addEventListener('click', () => { box.textContent = ''; });
+  row.appendChild(cancel);
+
+  card.appendChild(row);
+  box.appendChild(card);
+}
+
+async function fireActuator(a, card) {
+  card.textContent = 'running ' + a.label + '…';
+  try {
+    const res = await apiJson(BRAIN_API + a.endpoint, { method: a.method, timeoutMs: 60000 });
+    card.textContent = '';
+    card.appendChild(chip('✓ ' + a.label, '#5ce39a', '#12351f'));
+    const out = document.createElement('div');
+    out.style.cssText = 'margin-top:6px;font-size:.66rem;color:var(--muted);word-break:break-word';
+    out.textContent = JSON.stringify(res).slice(0, 400);
+    card.appendChild(out);
+    toast(a.label + ' completed', 'ok');
+    loadFleet();
+  } catch (exc) {
+    card.textContent = '';
+    card.appendChild(chip('✕ failed: ' + errLabel(exc), '#ff8ba0', '#5a1520'));
+    toast(a.label + ' failed', 'err');
+  }
+}
+
+function loadFleetPage() {
+  return Promise.allSettled([loadFleet(), loadFleetIssues()]);
+}
+
+// ═══════════ COGNITION (v15) ═══════════
+// Endpoint reach was 13 of 148. The entire cognitive layer — what the brain
+// believes about itself, what it predicts, what it does not know, what it
+// remembers happening — had no surface at all.
+
+/** v17 — the brain's goal stack (/agi/goals). */
+async function loadMindGoals() {
+  const list = document.getElementById('mind-goals');
+  if (!list) return;
+  list.textContent = '';
+  let d;
+  try { d = await apiJson(BRAIN_API + '/agi/goals', { timeoutMs: 12000 }); }
+  catch (exc) { setText('mind-goal-badge', errLabel(exc)); return; }
+  const goals = Array.isArray(d.goals) ? d.goals : [];
+  setText('mind-goal-badge', goals.length + ' held');
+  if (!goals.length) { list.textContent = 'no goals set'; return; }
+  goals.slice(0, 12).forEach(g => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    const txt = document.createElement('span');
+    txt.style.cssText = 'flex:1;min-width:180px;word-break:break-word';
+    // content carries "[goal] … | priority=high | deadline=none" (sometimes the
+    // [goal] tag doubled); strip the tags for reading, keep the priority text.
+    txt.textContent = String(g.content || '').replace(/\[goal\]\s*/gi, '').trim();
+    row.appendChild(txt);
+    const w = Number(g.amygdala_weight);
+    if (!Number.isNaN(w)) row.appendChild(chip('importance ' + w.toFixed(2),
+      w >= 0.8 ? '#ffb870' : 'var(--muted)', 'transparent'));
+    if (g.created) {
+      const c = document.createElement('span');
+      c.style.cssText = 'font-size:.62rem;color:var(--muted)';
+      c.textContent = String(g.created).slice(0, 10);
+      row.appendChild(c);
+    }
+    list.appendChild(row);
+  });
+}
+
+/** v17 — what the brain believes about the operator (/v6/tom/*). */
+async function loadMindToM() {
+  const box = document.getElementById('mind-tom');
+  if (!box) return;
+  box.textContent = '';
+  let beliefs = 0;
+  try {
+    const m = await apiJson(BRAIN_API + '/v6/tom/model', { timeoutMs: 12000 });
+    const um = Array.isArray(m.user_model) ? m.user_model : [];
+    const latest = new Map();  // list is newest-first; keep the first per field
+    um.forEach(e => { if (e && e.field && !latest.has(e.field)) latest.set(e.field, e); });
+    latest.forEach((e, field) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'border-top:1px solid var(--border);padding:6px 0;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap';
+      const k = document.createElement('span');
+      k.style.cssText = 'color:var(--muted);min-width:90px;font-size:.66rem;text-transform:uppercase;letter-spacing:.4px';
+      k.textContent = String(field);
+      const v = document.createElement('span');
+      v.style.cssText = 'flex:1;min-width:160px;word-break:break-word';
+      v.textContent = String(e.value == null ? '—' : e.value);
+      row.appendChild(k); row.appendChild(v);
+      if (e.confidence != null) row.appendChild(chip('conf ' + Number(e.confidence).toFixed(2),
+        '#9dc4ff', 'rgba(90,140,255,.16)'));
+      box.appendChild(row);
+      beliefs++;
+    });
+  } catch (exc) { setText('mind-tom-badge', errLabel(exc)); return; }
+  try {
+    const p = await apiJson(BRAIN_API + '/v6/tom/predict', { timeoutMs: 12000 });
+    const bits = [];
+    if (p.current_focus) bits.push('focus: ' + p.current_focus);
+    if (p.active_goals) bits.push('active: ' + p.active_goals);
+    if (bits.length) {
+      const pred = document.createElement('div');
+      pred.style.cssText = 'border-top:1px solid var(--border);margin-top:6px;padding-top:8px;font-size:.7rem';
+      pred.textContent = bits.join(' · ');
+      box.appendChild(pred);
+    }
+    if (p.frustration_level != null) {
+      const f = Number(p.frustration_level);
+      box.appendChild(chip('frustration ' + f.toFixed(2),
+        f >= 0.6 ? '#ff8ba0' : 'var(--muted)', f >= 0.6 ? '#5a1520' : 'transparent'));
+    }
+    (Array.isArray(p.predictions) ? p.predictions : []).slice(0, 5).forEach(pr => {
+      const r = document.createElement('div');
+      r.style.cssText = 'font-size:.66rem;color:var(--muted);padding-top:4px';
+      r.textContent = '→ ' + String(pr);
+      box.appendChild(r);
+    });
+  } catch { /* predictions are an optional second layer */ }
+  if (!box.childNodes.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'color:var(--muted)';
+    empty.textContent = 'no model yet';
+    box.appendChild(empty);
+  }
+  // v18 — let the operator correct a belief. A human write is the highest-trust
+  // signal the ToM model gets (/v6/tom/update), and it closes the read-only
+  // loop on this panel.
+  const ctl = document.createElement('div');
+  ctl.style.cssText = 'border-top:1px solid var(--border);margin-top:8px;padding-top:8px';
+  const correct = document.createElement('button');
+  correct.type = 'button';
+  correct.className = 'top-btn';
+  correct.style.cssText = 'font-size:.64rem;padding:2px 8px';
+  correct.textContent = '✎ Correct a belief';
+  correct.title = 'Tell the brain what it should believe about you';
+  correct.addEventListener('click', async () => {
+    const field = window.prompt('Belief field (e.g. focus, goals, frustration):');
+    if (!field || !field.trim()) return;
+    const value = window.prompt('Value for "' + field.trim() + '":');
+    if (value == null) return;
+    try {
+      await apiJson(BRAIN_API + '/v6/tom/update', {
+        method: 'POST', timeoutMs: 15000,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: field.trim(), value: value, confidence: 1.0, source: 'operator' }),
+      });
+      toast('Belief updated: ' + field.trim(), 'ok');
+      loadMindToM();
+    } catch (exc) { toast('Update failed: ' + errLabel(exc), 'err'); }
+  });
+  ctl.appendChild(correct);
+  box.appendChild(ctl);
+  setText('mind-tom-badge', beliefs + ' beliefs');
+}
+
+/** v17 — the macro-concepts the brain has abstracted (/agi/concepts). */
+async function loadMindConcepts() {
+  const list = document.getElementById('mind-concepts');
+  if (!list) return;
+  list.textContent = '';
+  let d;
+  try { d = await apiJson(BRAIN_API + '/agi/concepts', { timeoutMs: 12000 }); }
+  catch (exc) { setText('mind-concept-badge', errLabel(exc)); return; }
+  const cs = Array.isArray(d.concept_hierarchy) ? d.concept_hierarchy : [];
+  setText('mind-concept-badge', cs.length + ' concepts');
+  if (!cs.length) { list.textContent = 'no concepts'; return; }
+  cs.slice(0, 12).forEach(c => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:6px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    const name = document.createElement('span');
+    name.style.cssText = 'flex:1;min-width:120px;font-weight:600';
+    name.textContent = String(c.concept || '(unnamed)');
+    row.appendChild(name);
+    row.appendChild(chip((c.instances || 0).toLocaleString() + ' instances', 'var(--muted)', 'transparent'));
+    if (c.avg_quality != null) row.appendChild(chip('q ' + Number(c.avg_quality).toFixed(2),
+      '#9dc4ff', 'rgba(90,140,255,.16)'));
+    list.appendChild(row);
+  });
+}
+
+/** v17 — the brain's own account of what it is (/agi/self). */
+async function loadMindSelf() {
+  const box = document.getElementById('mind-self');
+  if (!box) return;
+  box.textContent = '';
+  let d;
+  try { d = await apiJson(BRAIN_API + '/agi/self', { timeoutMs: 12000 }); }
+  catch (exc) { setText('mind-self-badge', errLabel(exc)); return; }
+  const id = document.createElement('div');
+  id.style.cssText = 'font-weight:600;margin-bottom:6px';
+  id.textContent = String(d.identity || 'unknown');
+  box.appendChild(id);
+  const k = d.knowledge || {};
+  const stats = document.createElement('div');
+  stats.style.cssText = 'font-size:.66rem;color:var(--muted);margin-bottom:8px';
+  stats.textContent = [
+    (k.total_neurons != null ? Number(k.total_neurons).toLocaleString() + ' neurons' : null),
+    (k.avg_quality != null ? 'avg q ' + Number(k.avg_quality).toFixed(2) : null),
+    (k.domains != null ? k.domains + ' domains' : null),
+    (k.sources != null ? k.sources + ' sources' : null),
+  ].filter(Boolean).join(' · ');
+  box.appendChild(stats);
+  (Array.isArray(d.capabilities) ? d.capabilities : []).slice(0, 8).forEach(cap => {
+    const r = document.createElement('div');
+    r.style.cssText = 'padding:3px 0;font-size:.7rem';
+    r.textContent = '• ' + String(cap);
+    box.appendChild(r);
+  });
+  setText('mind-self-badge', (Array.isArray(d.capabilities) ? d.capabilities.length : 0) + ' capabilities');
+}
+
+async function loadMindVitals() {
+  const grab = async (url, fn) => {
+    try { fn(await apiJson(BRAIN_API + url, { timeoutMs: 12000 })); }
+    catch { /* one dead vital must not blank the rest */ }
+  };
+  await Promise.allSettled([
+    grab('/self/confidence', d => setText('mind-conf',
+      d.overall_confidence == null ? '—' : (d.overall_confidence * 100).toFixed(0) + '%')),
+    grab('/v6/emotion/status', d => {
+      // valence and arousal are column DEFAULTS (0.0 / 0.5) for every neuron
+      // in the store — nothing has ever written them, so "exploratory" was a
+      // constant and the "stressed" branch unreachable (§2.5). Defaults are
+      // rendered as the absence of data, not as a mood.
+      const v = Number(d.avg_valence != null ? d.avg_valence : (d.valence != null ? d.valence : 0));
+      const a = Number(d.avg_arousal != null ? d.avg_arousal : (d.arousal != null ? d.arousal : 0));
+      const scored = Number(d.scored != null ? d.scored : (d.scored_count != null ? d.scored_count : 0));
+      if (scored === 0 || (v === 0 && a === 0.5)) {
+        setText('mind-mood', 'n/a (' + scored.toLocaleString() + ' neurons scored — values are column defaults)');
+      } else {
+        setText('mind-mood', (d.mode || '—') + ' · arousal ' + a.toFixed(2));
+      }
+    }),
+    grab('/brain/predict/stats', d => {
+      setText('mind-hit', d.hit_rate == null ? '—'
+        : (d.hit_rate * 100).toFixed(1) + '% of ' + (d.predictions_scored || 0).toLocaleString());
+      setText('mind-trans', (d.transition_edges || 0).toLocaleString());
+    }),
+    grab('/evolution/status', d => setText('mind-selfmod', (d.self_modifications || 0).toLocaleString())),
+    grab('/wm/sessions', d => setText('mind-wm', (d.count || 0) + ' active')),
+  ]);
+  setText('mind-meta', 'live from :8001');
+}
+
+/** Multi-hop reasoning with its citations rendered as clickable neurons. */
+async function askReason() {
+  const q = (document.getElementById('mind-q').value || '').trim();
+  if (!q) return;
+  const box = document.getElementById('mind-answer');
+  box.textContent = 'reasoning… (this can take ~18 s — local inference is down, so it falls back to remote)';
+
+  let d;
+  try {
+    d = await apiJson(BRAIN_API + '/brain/reason?query=' + encodeURIComponent(q), { timeoutMs: 90000 });
+  } catch (exc) {
+    box.textContent = 'reasoning failed: ' + errLabel(exc);
+    return;
+  }
+
+  box.textContent = '';
+  const answer = document.createElement('div');
+  answer.style.cssText = 'margin-bottom:8px';
+  renderMessageBody(answer, d.answer || d.conclusion || d.result || '(no answer returned)');
+  box.appendChild(answer);
+
+  const meta = document.createElement('div');
+  meta.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px';
+  if (d.confidence != null) {
+    meta.appendChild(chip('confidence ' + Number(d.confidence).toFixed(2), '#9dc4ff', 'rgba(90,140,255,.16)'));
+  }
+  const hops = d.hops || d.chain || d.steps;
+  if (Array.isArray(hops)) meta.appendChild(chip(hops.length + ' hops', 'var(--muted)', 'transparent'));
+  const contradictions = d.contradictions;
+  if (Array.isArray(contradictions) && contradictions.length) {
+    // A contradiction is the most interesting thing this endpoint can return.
+    meta.appendChild(chip('⚠ ' + contradictions.length + ' contradictions', '#ffb870', '#3a2410'));
+  }
+  box.appendChild(meta);
+
+  // Citations light up on the brain map, so a chain of reasoning is something
+  // you can watch traverse the store.
+  const cited = Array.isArray(d.citations) ? d.citations
+    : (Array.isArray(d.neuron_ids) ? d.neuron_ids : []);
+  const ids = cited.map(c => (typeof c === 'object' ? c.id : c)).filter(v => v != null);
+  if (ids.length) {
+    mapHighlightRecall(ids);
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:.66rem;color:var(--muted)';
+    note.textContent = ids.length + ' cited neurons highlighted on the Brain Map';
+    box.appendChild(note);
+  }
+}
+
+/** v18 — batch-research the top open gaps (/brain/curiosity/fill-all). */
+async function fillAllGaps() {
+  const btn = document.getElementById('mind-fill-all');
+  if (btn) { btn.disabled = true; btn.textContent = 'filling…'; }
+  try {
+    const d = await apiJson(BRAIN_API + '/brain/curiosity/fill-all', {
+      method: 'POST', timeoutMs: 120000,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limit: 5 }),
+    });
+    const n = Number(d.filled != null ? d.filled
+      : (Array.isArray(d.results) ? d.results.length : 0));
+    toast('Filled ' + n + ' gap' + (n === 1 ? '' : 's'), 'ok');
+  } catch (exc) {
+    toast('Fill-all failed: ' + errLabel(exc), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Fill top 5'; }
+    loadMindGaps();
+  }
+}
+
+/** The curiosity queue, with something to actually do about each gap. */
+async function loadMindGaps() {
+  const list = document.getElementById('mind-gaps');
+  if (!list) return;
+  list.textContent = '';
+  let g;
+  try {
+    g = await apiJson(BRAIN_API + '/brain/curiosity/gaps', { timeoutMs: 12000 });
+  } catch (exc) {
+    setText('mind-gap-badge', errLabel(exc));
+    return;
+  }
+  const gaps = Array.isArray(g.gaps) ? g.gaps : [];
+  setText('mind-gap-badge', gaps.length + ' open');
+  if (!gaps.length) { list.textContent = 'no open gaps'; return; }
+
+  gaps.slice(0, 15).forEach(gp => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+
+    const q = document.createElement('span');
+    q.style.cssText = 'flex:1;min-width:180px;word-break:break-word';
+    q.textContent = String(gp.query || '');
+    row.appendChild(q);
+
+    const status = document.createElement('span');
+    status.style.cssText = 'font-size:.66rem;color:var(--muted)';
+
+    const act = (label, title, run) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'top-btn';
+      b.style.cssText = 'font-size:.64rem;padding:2px 8px';
+      b.textContent = label;
+      b.title = title;
+      b.addEventListener('click', async () => {
+        status.textContent = '…';
+        try {
+          await run();
+          status.textContent = '';
+          row.appendChild(chip('✓ ' + label, '#5ce39a', '#12351f'));
+          loadMindGaps();
+        } catch (exc) {
+          status.textContent = '';
+          row.appendChild(chip('failed: ' + errLabel(exc), '#ff8ba0', '#5a1520'));
+        }
+      });
+      return b;
+    };
+
+    // Let it go and find out for itself. The route keys on gap_neuron_id, not
+    // the query text — sending {query} was a silent 422 (v18 fix).
+    row.appendChild(act('Auto-fill', 'Let the brain research this gap', () =>
+      apiJson(BRAIN_API + '/brain/curiosity/fill', {
+        method: 'POST', timeoutMs: 60000,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gap_neuron_id: gp.id, max_results: 3 }),
+      })));
+
+    // Or answer it yourself — a human verdict is source weight 1.0, the
+    // highest-trust signal the system has. The route keys on gap_id (not the
+    // query text); sending {query} silently wrote nothing (v18 fix).
+    row.appendChild(act('Answer', 'Answer it yourself (source weight 1.0)', () => {
+      const a = window.prompt('Answer for: ' + gp.query);
+      if (!a) throw new Error('cancelled');
+      return apiJson(BRAIN_API + '/brain/curiosity/answer', {
+        method: 'POST', timeoutMs: 30000,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gap_id: gp.id, answer: a }),
+      });
+    }));
+
+    row.appendChild(status);
+    list.appendChild(row);
+  });
+}
+
+async function loadMindEpisodes() {
+  const list = document.getElementById('mind-episodes');
+  if (!list) return;
+  list.textContent = '';
+  let d;
+  try {
+    d = await apiJson(BRAIN_API + '/brain/timeline', { timeoutMs: 15000 });
+  } catch (exc) {
+    setText('mind-ep-badge', errLabel(exc));
+    return;
+  }
+  const eps = Array.isArray(d.episodes) ? d.episodes : [];
+  setText('mind-ep-badge', eps.length + ' over ' + (d.days || 0) + ' days');
+  if (!eps.length) { list.textContent = 'no episodes recorded'; return; }
+
+  eps.slice(0, 20).forEach(ep => {
+    const row = document.createElement('div');
+    row.style.cssText = 'border-top:1px solid var(--border);padding:8px 0';
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;gap:6px;margin-bottom:3px;flex-wrap:wrap';
+    if (ep.chain_id) head.appendChild(chip(String(ep.chain_id), 'var(--muted)', 'transparent'));
+    if (ep.when || ep.created) {
+      head.appendChild(chip(String(ep.when || ep.created).slice(0, 10), 'var(--muted)', 'transparent'));
+    } else {
+      // /brain/timeline has never returned a date field — so this chip had
+      // never rendered (§2.6). Until the server ships `created`, say the
+      // date is missing rather than silently omitting the chip.
+      head.appendChild(chip('no date', 'var(--muted)', 'transparent'));
+    }
+    row.appendChild(head);
+    const body = document.createElement('div');
+    body.style.cssText = 'color:var(--text);opacity:.9;word-break:break-word';
+    // Clamp at a word boundary with a visible expander — 10 of 10 live
+    // episodes were cut mid-word at 400 chars with no way to read the rest.
+    const full = String(ep.summary || ep.text || '');
+    if (full.length > 400) {
+      const cut = full.lastIndexOf(' ', 400);
+      body.textContent = full.slice(0, cut > 200 ? cut : 400) + '…';
+      const more = document.createElement('button');
+      more.textContent = 'show all';
+      more.style.cssText = 'cursor:pointer;background:none;border:none;padding:2px 0;'
+        + 'color:#8fb4e8;font-size:.66rem;text-decoration:underline;display:block';
+      more.addEventListener('click', () => { body.textContent = full; more.remove(); });
+      row.appendChild(body);
+      row.appendChild(more);
+    } else {
+      body.textContent = full;
+      row.appendChild(body);
+    }
+    list.appendChild(row);
+  });
+}
+
+function loadMindPage() {
+  return Promise.allSettled([
+    loadMindVitals(), loadMindGaps(), loadMindEpisodes(),
+    loadMindGoals(), loadMindToM(), loadMindConcepts(), loadMindSelf(),
+  ]);
+}
+
+function loadCockpit() {
+  // allSettled: one dead panel must not blank the others.
+  return Promise.allSettled([loadSelfModel(), loadLearningLoop(), loadGaps(), loadBrainMap()]);
 }
 
 function setBrainBadge(state, text) {
@@ -2294,7 +4807,7 @@ function setupKeyboard() {
   document.addEventListener('keydown', e => {
     if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      openCmdPalette();
+      omniFocus();
     }
     if (e.key === 'b' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
@@ -2310,8 +4823,8 @@ function setupKeyboard() {
     }
     if (e.key === 'Escape') {
       closeFileViewer();
-      closeCmdPalette();
-      document.getElementById('top-overflow-menu').classList.remove('open');
+      omniClose();
+      closePops();
     }
   });
 }
@@ -2326,8 +4839,8 @@ async function sendMsg() {
   inp.style.height = 'auto';
   setDot('act');
   streaming = true;
+  let launched = false;
   document.getElementById('stop-btn').style.display = '';
-  document.getElementById('run-btn').style.display = 'none';
   document.getElementById('sbtn').disabled = true;
 
   // Everything from here on is wrapped, and the UI reset lives in `finally`.
@@ -2353,6 +4866,10 @@ async function sendMsg() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role: 'user', content: text }),
         });
+        // The sidebar is now backed by a real store, so a new conversation (and
+        // the title derived from this first message) has to show up without a
+        // reload.
+        loadConvs();
       } catch (exc) {
         appendMsg('e', 'Could not save message to history (' + errLabel(exc) + ')');
       }
@@ -2368,19 +4885,236 @@ async function sendMsg() {
         signal: abort.signal,
         timeoutMs: 30000,
       });
-      appendMsg('a', 'Agent is working on your request…');
+      // The run has STARTED. Output arrives asynchronously over the WebSocket
+      // as `step` events and a final `done` summary, so the composer stays
+      // locked until finishStream() releases it. v10 unlocked here and printed
+      // "Agent is working on your request…" as if that were the answer.
+      if (!ws || ws.readyState !== 1) {
+        appendMsg('s', 'Agent started, but the live connection is down — output will not stream here.');
+        return;   // finally-block below resets the UI
+      }
+      launched = true;
+      streamInto('working…');
     } catch (exc) {
       if (exc.name !== 'AbortError' && !(abort && abort.signal.aborted)) {
         appendMsg('e', 'Failed to start agent: ' + errLabel(exc));
       }
     }
   } finally {
-    streaming = false;
-    setDot('ok');
-    document.getElementById('stop-btn').style.display = 'none';
-    document.getElementById('run-btn').style.display = '';
-    document.getElementById('sbtn').disabled = false;
+    // Only reset if the run never got off the ground. A live run is reset by
+    // finishStream() when `done` or `error` arrives.
+    if (!launched) {
+      streaming = false;
+      setDot('ok');
+      document.getElementById('stop-btn').style.display = 'none';
+      document.getElementById('sbtn').disabled = false;
+    }
   }
+}
+
+// ═══════════ MARKDOWN ═══════════
+// v10 rendered every message as one escaped blob: `<div class="mb">${escHtml(text)}</div>`.
+// No code blocks, no copy button, no structure.
+//
+// This renderer is built ENTIRELY through the DOM. There is no HTML string
+// anywhere in it, so there is no parser to trick and no allow-list to get
+// subtly wrong — the same reasoning the v10 cockpit panels used for neuron
+// text. Model output is untrusted input; it is the second least trustworthy
+// string on this page after a Windows filename.
+
+/** Schemes permitted in a link. Everything else renders as plain text. */
+const SAFE_LINK_SCHEME = /^(https?:|mailto:)/i;
+
+function isSafeLink(href) {
+  const h = String(href || '').trim();
+  // Relative links are fine; absolute ones must use a known-safe scheme.
+  // `javascript:` and `data:` are the ones this exists to stop.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(h)) return SAFE_LINK_SCHEME.test(h);
+  return !h.startsWith('//');
+}
+
+/** Inline spans: `code`, **bold**, *italic*, [text](url). */
+function renderInline(target, text) {
+  const pattern = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(\[[^\]\n]*\]\([^)\s]*\))/g;
+  let last = 0;
+  let m;
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > last) target.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const tok = m[0];
+    if (tok.startsWith('`')) {
+      const c = document.createElement('code');
+      c.className = 'md-inline-code';
+      c.textContent = tok.slice(1, -1);
+      target.appendChild(c);
+    } else if (tok.startsWith('**')) {
+      const b = document.createElement('strong');
+      b.textContent = tok.slice(2, -2);
+      target.appendChild(b);
+    } else if (tok.startsWith('[')) {
+      const close = tok.indexOf('](');
+      const label = tok.slice(1, close);
+      const href = tok.slice(close + 2, -1);
+      if (isSafeLink(href)) {
+        const a = document.createElement('a');
+        a.href = href;
+        a.textContent = label || href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        target.appendChild(a);
+      } else {
+        // Refused schemes render as literal text rather than vanishing, so a
+        // hostile link is visible rather than silently dropped.
+        target.appendChild(document.createTextNode(tok));
+      }
+    } else {
+      const i = document.createElement('em');
+      i.textContent = tok.slice(1, -1);
+      target.appendChild(i);
+    }
+    last = pattern.lastIndex;
+  }
+  if (last < text.length) target.appendChild(document.createTextNode(text.slice(last)));
+}
+
+/** A fenced code block, with its own copy button. */
+function codeBlock(code, lang) {
+  const wrap = document.createElement('div');
+  wrap.className = 'md-code';
+
+  const bar = document.createElement('div');
+  bar.className = 'md-code-bar';
+  const label = document.createElement('span');
+  label.className = 'md-code-lang';
+  label.textContent = lang || 'text';
+  bar.appendChild(label);
+
+  const copy = document.createElement('button');
+  copy.className = 'md-copy';
+  copy.type = 'button';
+  copy.textContent = 'Copy';
+  copy.title = 'Copy this block';
+  copy.addEventListener('click', () => {
+    copyText(code).then(ok => {
+      copy.textContent = ok ? 'Copied' : 'Failed';
+      setTimeout(() => { copy.textContent = 'Copy'; }, 1400);
+    });
+  });
+  bar.appendChild(copy);
+  wrap.appendChild(bar);
+
+  const pre = document.createElement('pre');
+  const c = document.createElement('code');
+  c.textContent = code;          // textContent: code is never parsed as markup
+  pre.appendChild(c);
+  wrap.appendChild(pre);
+  return wrap;
+}
+
+/**
+ * Render markdown into `target`, replacing its contents.
+ *
+ * Deliberately a small subset: fenced code, headings, lists, blockquotes, rules,
+ * paragraphs, and the inline spans above. Anything unrecognised stays literal
+ * text, which is the safe direction to fail in.
+ */
+function renderMessageBody(target, text) {
+  target.textContent = '';
+  const lines = String(text == null ? '' : text).split('\n');
+  let i = 0;
+  let list = null;
+
+  const closeList = () => { list = null; };
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    const fence = /^```(\w+)?\s*$/.exec(line);
+    if (fence) {
+      closeList();
+      const lang = fence[1] || '';
+      const buf = [];
+      i += 1;
+      while (i < lines.length && !/^```\s*$/.test(lines[i])) { buf.push(lines[i]); i += 1; }
+      i += 1;  // consume the closing fence (or fall off the end unterminated)
+      target.appendChild(codeBlock(buf.join('\n'), lang));
+      continue;
+    }
+
+    const heading = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (heading) {
+      closeList();
+      const h = document.createElement('div');
+      h.className = 'md-h md-h' + heading[1].length;
+      renderInline(h, heading[2]);
+      target.appendChild(h);
+      i += 1;
+      continue;
+    }
+
+    if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(line)) {
+      closeList();
+      target.appendChild(document.createElement('hr'));
+      i += 1;
+      continue;
+    }
+
+    const bullet = /^\s*[-*+]\s+(.*)$/.exec(line);
+    const numbered = /^\s*(\d+)[.)]\s+(.*)$/.exec(line);
+    if (bullet || numbered) {
+      const wanted = bullet ? 'ul' : 'ol';
+      if (!list || list.tagName.toLowerCase() !== wanted) {
+        list = document.createElement(wanted);
+        list.className = 'md-list';
+        target.appendChild(list);
+      }
+      const li = document.createElement('li');
+      renderInline(li, bullet ? bullet[1] : numbered[2]);
+      list.appendChild(li);
+      i += 1;
+      continue;
+    }
+
+    const quote = /^>\s?(.*)$/.exec(line);
+    if (quote) {
+      closeList();
+      const q = document.createElement('blockquote');
+      q.className = 'md-quote';
+      renderInline(q, quote[1]);
+      target.appendChild(q);
+      i += 1;
+      continue;
+    }
+
+    if (!line.trim()) { closeList(); i += 1; continue; }
+
+    closeList();
+    const para = document.createElement('div');
+    para.className = 'md-p';
+    // Consecutive non-blank lines join into one paragraph with soft breaks.
+    const buf = [];
+    while (i < lines.length && lines[i].trim()
+           && !/^```/.test(lines[i]) && !/^#{1,4}\s/.test(lines[i])
+           && !/^\s*[-*+]\s/.test(lines[i]) && !/^\s*\d+[.)]\s/.test(lines[i])
+           && !/^>/.test(lines[i])) {
+      buf.push(lines[i]);
+      i += 1;
+    }
+    buf.forEach((l, idx) => {
+      if (idx) para.appendChild(document.createElement('br'));
+      renderInline(para, l);
+    });
+    target.appendChild(para);
+  }
+}
+
+/** Clipboard write that reports success rather than assuming it. */
+function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(() => true, () => false);
+    }
+  } catch { /* fall through */ }
+  return Promise.resolve(false);
 }
 
 // Roles: 'u' user, 'a' assistant, 's' system notice, 'e' error.
@@ -2389,11 +5123,32 @@ async function sendMsg() {
 const MSG_CLASS = { u: 'u', a: 'a', s: 's', e: 'e' };
 const MSG_AVATAR = { u: '👤', a: '🤖', s: '⚙', e: '⚠' };
 
-function appendMsg(role, text) {
+function appendMsg(role, text, opts) {
+  const o = opts || {};
   const msgs = document.getElementById('msgs');
   const div = document.createElement('div');
-  div.className = 'msg ' + (MSG_CLASS[role] || 'a');
-  div.innerHTML = `<div class="mav">${MSG_AVATAR[role] || '🤖'}</div><div class="mb">${escHtml(text)}</div>`;
+  div.className = 'msg ' + (MSG_CLASS[role] || 'a') + (o.live ? ' live' : '');
+
+  // Built through the DOM. v10 used innerHTML with escHtml(), which was safe
+  // but flat — no code blocks, no per-block copy, no actions.
+  const avatar = document.createElement('div');
+  avatar.className = 'mav';
+  avatar.textContent = MSG_AVATAR[role] || '🤖';
+  div.appendChild(avatar);
+
+  const col = document.createElement('div');
+  col.className = 'mcol';
+
+  const body = document.createElement('div');
+  body.className = 'mb';
+  // User text is shown verbatim — markdown in what *you* typed should not be
+  // silently reinterpreted. Everything else gets rendered.
+  if (role === 'u') body.textContent = String(text == null ? '' : text);
+  else renderMessageBody(body, text);
+  col.appendChild(body);
+
+  col.appendChild(messageActions(div, role));
+  div.appendChild(col);
   msgs.appendChild(div);
 
   // Bound the transcript. Without this, #msgs grew without limit — every
@@ -2404,14 +5159,91 @@ function appendMsg(role, text) {
   }
 
   msgs.scrollTop = msgs.scrollHeight;
+  return div;
 }
 
-function stopStream() {
+/** Raw source of a message, for copy and for resend. */
+function messageText(msgEl) {
+  const body = msgEl.querySelector('.mb');
+  if (!body) return '';
+  if (msgEl.classList.contains('u')) return body.textContent;
+  // Rebuild from the rendered tree so a copy round-trips code blocks as code.
+  const parts = [];
+  body.childNodes.forEach(node => {
+    if (node.classList && node.classList.contains('md-code')) {
+      const code = node.querySelector('pre code');
+      const lang = node.querySelector('.md-code-lang');
+      parts.push('```' + (lang && lang.textContent !== 'text' ? lang.textContent : '')
+                 + '\n' + (code ? code.textContent : '') + '\n```');
+    } else {
+      parts.push(node.textContent);
+    }
+  });
+  return parts.join('\n').trim();
+}
+
+/** Hover actions for one message. */
+function messageActions(msgEl, role) {
+  const bar = document.createElement('div');
+  bar.className = 'msg-actions';
+
+  const add = (label, title, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'msg-act';
+    b.textContent = label;
+    b.title = title;
+    b.addEventListener('click', fn);
+    bar.appendChild(b);
+    return b;
+  };
+
+  add('⧉', 'Copy message', function () {
+    const self = this;
+    copyText(messageText(msgEl)).then(ok => {
+      self.textContent = ok ? '✓' : '✕';
+      setTimeout(() => { self.textContent = '⧉'; }, 1200);
+    });
+  });
+
+  if (role === 'u') {
+    add('↻', 'Send this again', () => {
+      const inp = document.getElementById('msginp');
+      inp.value = messageText(msgEl);
+      inp.focus();
+    });
+  }
+
+  add('✕', 'Remove from view', () => msgEl.remove());
+
+  const stamp = document.createElement('span');
+  stamp.className = 'msg-stamp';
+  stamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  bar.appendChild(stamp);
+
+  return bar;
+}
+
+/** Add the step count to a finished assistant message. */
+function stampMessage(msgEl, steps) {
+  if (!msgEl || !steps) return;
+  const stamp = msgEl.querySelector('.msg-stamp');
+  if (stamp) stamp.textContent = steps + ' steps · ' + stamp.textContent;
+}
+
+// v10's Stop aborted the client's fetch. That fetch had already returned — the
+// agent runs on a worker thread server-side — so Stop cancelled nothing and the
+// agent kept going with the UI claiming it had stopped. POST /stop is the
+// endpoint that actually halts it.
+async function stopStream() {
   if (abort) abort.abort();
-  streaming = false;
-  setDot('ok');
-  document.getElementById('stop-btn').style.display = 'none';
-  document.getElementById('run-btn').style.display = '';
+  try {
+    await apiFetch(API + '/stop', { method: 'POST', timeoutMs: 8000 });
+    appendMsg('s', 'Stop requested.');
+  } catch (exc) {
+    appendMsg('e', 'Could not stop the agent (' + errLabel(exc) + ')');
+  }
+  finishStream('', 0);
 }
 
 function newConv() {
@@ -2441,13 +5273,34 @@ function getFileIcon(name, isDir) {
 // formatSize() was folded into the null-safe formatBytes() above; there is now
 // one byte formatter for the whole dashboard.
 
+// Last successful listing, kept for the omnibox's file source. Scoped to the
+// current folder on purpose: /api/files has no recursive name search, and
+// pretending otherwise would be another control that lies.
+let fileCache = { path: '', entries: [] };
+
 async function loadFiles(path) {
   const tree = document.getElementById('fe-tree');
   tree.innerHTML = '<div class="fe-entry" style="color:var(--muted)"><span class="fe-entry-icon">⏳</span><span class="fe-entry-name">Loading…</span></div>';
 
   try {
-    const data = await apiJson(API + '/api/files?path=' + encodeURIComponent(path));
+    // An empty path asks the server to open at its first configured root. The
+    // client no longer assumes C:\ — the jail refuses the drive root, and which
+    // roots exist is the server's business.
+    const q = path ? '?path=' + encodeURIComponent(path) : '';
+    const data = await apiJson(API + '/api/files' + q, { timeoutMs: 15000 });
+    if (data.path) {
+      currentPath = data.path;
+      updateBreadcrumb(data.path);
+    }
+    fileCache = { path: data.path || currentPath, entries: data.entries || [] };
     renderFileTree(data.entries || [], tree);
+    if (data.truncated) {
+      const note = document.createElement('div');
+      note.className = 'fe-entry';
+      note.style.cssText = 'color:var(--warn);font-style:italic';
+      note.textContent = '… listing truncated';
+      tree.appendChild(note);
+    }
   } catch (exc) {
     // Say which kind of failure it was, rather than a blank or generic panel.
     tree.textContent = '';
@@ -2496,6 +5349,7 @@ function renderFileTree(entries, container) {
           ${entry.type !== 'dir' ? `
             <button class="fe-action-btn" data-act="view" title="View">👁</button>
             <button class="fe-action-btn" data-act="copy" title="Copy path">📋</button>
+            <button class="fe-action-btn" data-act="contents" title="Copy contents">📄</button>
             <button class="fe-action-btn" data-act="download" title="Download">⬇</button>
           ` : ''}
         </div>
@@ -2506,7 +5360,10 @@ function renderFileTree(entries, container) {
     const entryEl = div.querySelector('.fe-entry');
     const childrenEl = div.querySelector('.fe-dir-children');
 
-    const actions = { view: viewFile, copy: copyPath, download: downloadFile };
+    // copyFileContent() existed since v9 and had no button anywhere — the whole
+    // function was unreachable. It is the "copy this file" action the Hermes
+    // rail has, so it gets one.
+    const actions = { view: viewFile, copy: copyPath, contents: copyFileContent, download: downloadFile };
     div.querySelectorAll('.fe-action-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -2585,17 +5442,23 @@ async function viewFile(path) {
 }
 
 function copyPath(path) {
-  navigator.clipboard.writeText(path).then(() => toast('Path copied', 'ok'));
+  // Reports failure instead of assuming success: navigator.clipboard rejects
+  // outside a secure context, and v10 swallowed that into a success toast.
+  copyText(path).then(ok => toast(ok ? 'Path copied' : 'Clipboard unavailable', ok ? 'ok' : 'err'));
 }
 
 async function copyFileContent(path) {
+  let data;
   try {
-    const data = await apiJson(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576', { timeoutMs: 15000 });
-    await navigator.clipboard.writeText(data.content);
-    toast('Content copied to clipboard', 'ok');
+    data = await apiJson(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576', { timeoutMs: 15000 });
   } catch (exc) {
-    toast('Failed to copy content (' + errLabel(exc) + ')', 'err');
+    toast('Failed to read file (' + errLabel(exc) + ')', 'err');
+    return;
   }
+  if (data.is_image) { toast('That is an image — use Download', 'warn'); return; }
+  const ok = await copyText(data.content);
+  toast(ok ? (data.truncated ? 'Copied (truncated)' : 'Content copied') : 'Clipboard unavailable',
+        ok ? 'ok' : 'err');
 }
 
 function downloadFile(path) {
@@ -2611,9 +5474,14 @@ function navigateTo(path) {
 // Built through the DOM with listeners. v8 interpolated each accumulated path
 // into onclick="navigateTo('...')" via esc(), which left `'` intact — and the
 // path segments here derive from directory names, so they are untrusted too.
+// v11: no longer rooted at a hardcoded C:. The crumb chain is built from
+// whatever absolute path the server reported, and the drive crumb navigates to
+// the drive only in the sense of "ask the server" — if that is outside the jail
+// the server refuses it and the panel says so, which is the honest behaviour.
 function updateBreadcrumb(path) {
   const bc = document.getElementById('fe-breadcrumb');
   bc.textContent = '';
+  if (!path) return;
 
   const addCrumb = (label, target) => {
     const span = document.createElement('span');
@@ -2629,14 +5497,13 @@ function updateBreadcrumb(path) {
     bc.appendChild(sep);
   };
 
-  addCrumb('C:', 'C:\\');
-  let buildPath = 'C:';
-  path.split('\\').filter(Boolean).forEach((p, i) => {
-    // The first segment is the drive letter already rendered as the root crumb.
-    if (i === 0 && /^[A-Za-z]:$/.test(p)) return;
-    buildPath += '\\' + p;
-    addSep();
-    addCrumb(p, buildPath);
+  const parts = String(path).split('\\').filter(Boolean);
+  let buildPath = '';
+  parts.forEach((p, i) => {
+    buildPath = i === 0 ? p : buildPath + '\\' + p;
+    if (i > 0) addSep();
+    // A bare drive letter needs its trailing separator to be a valid path.
+    addCrumb(p, /^[A-Za-z]:$/.test(buildPath) ? buildPath + '\\' : buildPath);
   });
 }
 
@@ -2644,62 +5511,204 @@ function closeFileViewer() {
   document.getElementById('file-viewer').classList.remove('open');
 }
 
-// ═══════════ COMMAND PALETTE ═══════════
-function openCmdPalette() {
-  const palette = document.getElementById('cmd-palette');
-  palette.classList.add('open');
-  const input = document.getElementById('cmd-input');
-  input.value = '';
-  input.focus();
-  renderCmdResults('');
-  input.oninput = () => renderCmdResults(input.value);
+// ═══════════ OMNIBOX (Part 3) ═══════════
+// The command palette promoted to an always-visible control. Local sources
+// (pages, commands, themes, current-folder files) render instantly; server
+// sources (conversations — full-text over message bodies — and neurons)
+// join at 2+ chars, newest-keystroke-wins via a sequence counter.
+//
+// The neuron search passes feedback=false. Without it, every keystroke would
+// write usefulness verdicts into recall_log and move live ranking (§2.8 made
+// two doc-comment probe queries permanent this way). Grading belongs to the
+// Brain Lab panel, where a human has actually read the hits.
+let omniTimer = null;
+let omniSeq = 0;
+let omniRows = [];
+let omniSel = -1;
+
+function omniFocus() {
+  if (isMobile()) closeMobilePanels(); // a drawer may be covering the bar
+  const inp = document.getElementById('omni');
+  inp.focus();
+  inp.select();
+  omniInput();
 }
 
-function closeCmdPalette() {
-  document.getElementById('cmd-palette').classList.remove('open');
+function omniClose() {
+  document.getElementById('omni-results').classList.remove('open');
+  omniRows = [];
+  omniSel = -1;
 }
 
-function renderCmdResults(query) {
-  const cmds = [
-    { name: 'New Chat', key: 'Ctrl+N', action: () => { closeCmdPalette(); newConv(); } },
-    { name: 'Toggle Sidebar', key: 'Ctrl+B', action: () => { closeCmdPalette(); toggleSidebar(); } },
-    { name: 'Toggle Files', key: 'Ctrl+.', action: () => { closeCmdPalette(); toggleRight(); } },
-    { name: 'Switch Theme', key: '', action: () => { closeCmdPalette(); toggleTheme(); } },
-    { name: 'Export Log', key: '', action: () => { closeCmdPalette(); exportLog(); } },
-    { name: 'Screenshot', key: '', action: () => { closeCmdPalette(); takeScreenshot(); } },
+function omniInput() {
+  clearTimeout(omniTimer);
+  omniTimer = setTimeout(omniRun, 180);
+}
+
+const OMNI_PAGES = [
+  { label: 'Chat', page: 'chat' },
+  { label: 'Brain Lab', page: 'brain' },
+  { label: 'Fleet', page: 'fleet' },
+  { label: 'Cognition', page: 'mind' },
+];
+
+function omniCommands() {
+  return [
+    { text: 'New Chat', key: 'Ctrl+N', run: () => newConv() },
+    { text: 'Toggle Sidebar', key: 'Ctrl+B', run: () => toggleSidebar() },
+    { text: 'Toggle Files', key: 'Ctrl+.', run: () => toggleRight() },
+    { text: 'Settings', key: '', run: () => toggleSettings() },
   ];
-  const q = query.toLowerCase();
-  const filtered = cmds.filter(c => c.name.toLowerCase().includes(q));
-  const results = document.getElementById('cmd-results');
+}
 
-  // v8 stringified each action function into an inline onclick and re-parsed it
-  // as code on every keystroke. The commands are hardcoded so it was not
-  // directly exploitable, but it made the whole page require 'unsafe-inline'
-  // script for no benefit. Bind the real function objects instead.
-  results.textContent = '';
-  filtered.forEach(c => {
-    const item = document.createElement('div');
-    item.className = 'cmd-item';
+async function omniRun() {
+  const q = document.getElementById('omni').value.trim();
+  const ql = q.toLowerCase();
+  const seq = ++omniSeq;
+  const groups = [];
 
-    const name = document.createElement('span');
-    name.textContent = c.name;
-    item.appendChild(name);
+  const pages = OMNI_PAGES.filter(p => !ql || p.label.toLowerCase().includes(ql));
+  if (pages.length) {
+    groups.push({ title: 'Pages', items: pages.map(p => ({
+      text: p.label,
+      run: () => goPage(p.page, null),
+    })) });
+  }
 
-    if (c.key) {
-      const key = document.createElement('span');
-      key.className = 'cmd-item-key';
-      key.textContent = c.key;
-      item.appendChild(key);
+  const cmds = omniCommands().filter(c => !ql || c.text.toLowerCase().includes(ql));
+  if (cmds.length) groups.push({ title: 'Commands', items: cmds });
+
+  if (ql) {
+    // 13 themes, reachable by name — "mat" finds matrix, "theme" lists all.
+    const themes = THEMES.filter(t => t.includes(ql) || ql === 'theme' || ql.startsWith('theme '));
+    if (themes.length) {
+      groups.push({ title: 'Themes', items: themes.map(t => ({
+        text: 'Theme: ' + t,
+        run: () => { applyTheme(t); toast('Theme: ' + t, 'ok'); },
+      })) });
     }
 
-    item.addEventListener('click', c.action);
-    results.appendChild(item);
+    const files = fileCache.entries
+      .filter(en => en.name.toLowerCase().includes(ql)).slice(0, 5);
+    if (files.length) {
+      groups.push({ title: 'Files (current folder)', items: files.map(en => {
+        const full = en.path || (currentPath + '\\' + en.name);
+        return {
+          text: (en.type === 'dir' ? '📁 ' : '📄 ') + en.name,
+          run: () => { if (en.type === 'dir') loadFiles(full); else viewFile(full); },
+        };
+      }) });
+    }
+  }
+
+  omniRender(groups, q.length >= 2);
+  if (q.length < 2) return;
+
+  const [convRes, neuronRes] = await Promise.allSettled([
+    apiJson(API + '/api/conversations?q=' + encodeURIComponent(q), { timeoutMs: 8000 }),
+    apiJson(BRAIN_API + '/recall?context=' + encodeURIComponent(q)
+            + '&rerank=false&feedback=false', { timeoutMs: 12000 }),
+  ]);
+  if (seq !== omniSeq) return; // a newer keystroke owns the box now
+
+  if (convRes.status === 'fulfilled') {
+    const convs = (convRes.value.conversations || []).slice(0, 5);
+    if (convs.length) {
+      groups.push({ title: 'Conversations', items: convs.map(c => ({
+        text: c.title || ('Conversation ' + c.id),
+        run: () => { goPage('chat', null); openConv(c.id, null); },
+      })) });
+    }
+  }
+  if (neuronRes.status === 'fulfilled') {
+    const hits = Array.isArray(neuronRes.value.direct) ? neuronRes.value.direct.slice(0, 5) : [];
+    if (hits.length) {
+      groups.push({ title: 'Neurons', items: hits.map(h => ({
+        text: String(h.content || '').slice(0, 90),
+        // Picking a hit is deliberate use: hand the query to the Brain Lab
+        // panel, whose recall keeps feedback ON and offers grading.
+        run: () => {
+          goPage('brain', null);
+          const ask = document.getElementById('ask-q');
+          if (ask) { ask.value = q; askBrain(); }
+        },
+      })) });
+    }
+  }
+  omniRender(groups, false);
+}
+
+function omniRender(groups, searching) {
+  const box = document.getElementById('omni-results');
+  box.textContent = '';
+  omniRows = [];
+  omniSel = -1;
+  groups.forEach(g => {
+    if (!g.items.length) return;
+    const h = document.createElement('div');
+    h.className = 'omni-group';
+    h.textContent = g.title;
+    box.appendChild(h);
+    g.items.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'cmd-item';
+      row.setAttribute('role', 'option');
+      const name = document.createElement('span');
+      name.textContent = it.text; // API strings render inert — DOM, never HTML
+      row.appendChild(name);
+      if (it.key) {
+        const k = document.createElement('span');
+        k.className = 'cmd-item-key';
+        k.textContent = it.key;
+        row.appendChild(k);
+      }
+      row.addEventListener('click', () => {
+        omniClose();
+        document.getElementById('omni').blur();
+        it.run();
+      });
+      box.appendChild(row);
+      omniRows.push(row);
+    });
+  });
+  if (!omniRows.length) {
+    const empty = document.createElement('div');
+    empty.className = 'omni-group';
+    empty.textContent = searching ? 'Searching…' : 'No matches';
+    box.appendChild(empty);
+  }
+  box.classList.add('open');
+}
+
+function omniMove(delta) {
+  if (!omniRows.length) return;
+  if (omniSel >= 0) omniRows[omniSel].classList.remove('on');
+  omniSel = (omniSel + delta + omniRows.length) % omniRows.length;
+  omniRows[omniSel].classList.add('on');
+  if (omniRows[omniSel].scrollIntoView) omniRows[omniSel].scrollIntoView({ block: 'nearest' });
+}
+
+function setupOmni() {
+  const inp = document.getElementById('omni');
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); omniMove(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); omniMove(-1); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const row = omniRows[omniSel >= 0 ? omniSel : 0];
+      if (row) row.click();
+    } else if (e.key === 'Escape') { omniClose(); inp.blur(); }
+  });
+  // One delegated closer for everything that floats off the top bar.
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#omni-wrap')) omniClose();
+    if (!e.target.closest('#top-right')) closePops();
   });
 }
 
 // ═══════════ THEMES ═══════════
 const THEMES = ['sentinel', 'matrix', 'tron', 'blood', 'ember', 'frost', 'phantom', 'neon', 'terminal', 'midnight', 'cyberpunk', 'solar', 'arctic'];
-let currentTheme = localStorage.getItem('dash8-theme') || 'sentinel';
+let currentTheme = localStorage.getItem(THEME_KEY) || 'sentinel';
 
 function applyTheme(theme) {
   currentTheme = theme;
@@ -2708,15 +5717,12 @@ function applyTheme(theme) {
   } else {
     document.documentElement.setAttribute('data-theme', theme);
   }
-  localStorage.setItem('dash8-theme', theme);
+  localStorage.setItem(THEME_KEY, theme);
 }
 
-function toggleTheme() {
-  const idx = THEMES.indexOf(currentTheme);
-  const next = THEMES[(idx + 1) % THEMES.length];
-  applyTheme(next);
-  toast(`Theme: ${next}`, 'ok');
-}
+// toggleTheme() — the blind cycle-once-per-click — is gone with its menu
+// item. All 13 themes are now directly pickable: ⚙ → theme grid, or type a
+// theme's name into the omnibox.
 
 applyTheme(currentTheme);
 
@@ -2739,17 +5745,10 @@ function toast(msg, type = '') {
   setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
 }
 
-function exportLog() {
-  toast('Log exported (Phase 5)', 'ok');
-}
-
-function takeScreenshot() {
-  toast('Screenshot captured (Phase 5)', 'ok');
-}
-
-function onFileInput(input) {
-  toast(`${input.files.length} file(s) attached (Phase 5)`, 'ok');
-}
+// exportLog(), takeScreenshot() and onFileInput() are deleted, not hidden.
+// All three were toast-only stubs ("… (Phase 5)") wired to visible controls —
+// controls that lied about what happened when clicked. Reintroduce them only
+// together with a real implementation.
 </script>
 </body>
 </html>
