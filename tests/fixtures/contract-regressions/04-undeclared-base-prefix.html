@@ -1,0 +1,30 @@
+<!--
+  REGRESSION FIXTURE 04 — a base that invents a path prefix.
+
+  The generalisation of 01 and 02. `/__brain` works only because
+  sentinel-desktop declares `@app.api_route("/__brain/{path:path}")`. Nothing
+  stops someone writing `/__neuralis` instead, and every symptom would be
+  identical to fixture 02: the base parses, it is same-origin, every path on it
+  is a real brain route — and every call 404s, because the prefix that would
+  route them there is not declared by any server in the fleet.
+
+  This is the check that makes the multi-repo hop provable rather than assumed:
+  it can only pass by finding the prefix in a route table extracted from
+  another repository.
+
+  Expected: check (c) reports kind `base-prefix` for BRAIN_API.
+-->
+<!doctype html>
+<title>regression 04</title>
+<div id="panel"></div>
+<script>
+const API = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? location.origin
+  : 'http://localhost:8091';
+const BRAIN_API = API + '/__neuralis';
+
+async function loadStats() {
+  await fetch(BRAIN_API + '/brain/stats');
+}
+loadStats();
+</script>

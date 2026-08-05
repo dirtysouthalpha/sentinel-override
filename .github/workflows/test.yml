@@ -110,6 +110,23 @@ jobs:
       - name: Web Dashboard Load Gate
         run: npm run test:web
 
+      # ━━━ Step 2c: Client↔Server Contract Gate ━━━
+      # The dashboards call servers that live in OTHER repos. On 2026-08-04 a
+      # base constant was repointed at :8001 because a grep for `/__brain` in
+      # THIS repo found nothing — the route is declared in sentinel-desktop.
+      # Proving a route absent in one repo proves nothing.
+      #
+      # Route tables for sentinel-desktop, sentinel-prime-premium and neuralis
+      # are frozen in contract/server-routes.json (CI cannot clone them; one is
+      # private). `routes:check` is a no-op here and re-verifies freshness
+      # wherever the siblings ARE checked out. `test:contract` is the real gate
+      # and runs everywhere. Full assertions live in
+      # tests/web-client-server-contract.test.js, run by Step 3.
+      - name: Route Manifest Freshness
+        run: npm run routes:check
+      - name: Client-Server Contract Gate
+        run: npm run test:contract
+
       # ━━━ Step 3: Test Suite ━━━
       - name: Test Suite
         run: npm test

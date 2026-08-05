@@ -1,0 +1,34 @@
+<!--
+  REGRESSION FIXTURE 01 — the "null/__brain" defect.
+
+  Shipped in web/dashboard-prime.html until commit 91a5c98 (2026-08-04).
+  Verify the base below is verbatim:
+
+      git show 91a5c98^:web/dashboard-prime.html | grep -n "const BRAIN_API"
+
+  On a file:// page `location.origin` is the ASCII STRING "null", not the null
+  value — so it is truthy, it concatenates happily, and BRAIN_API becomes
+  "null/__brain". `new URL("null/__brain")` throws TypeError, which came out of
+  every panel that touched the brain.
+
+  Expected: check (b1) reports kind `base-url` for BRAIN_API under `file`.
+-->
+<!doctype html>
+<title>regression 01</title>
+<div id="panel"></div>
+<script>
+const API = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? location.origin
+  : 'http://localhost:8091';
+const BRAIN_API = location.origin + '/__brain';
+
+async function loadStats() {
+  const res = await fetch(BRAIN_API + '/brain/stats');
+  document.getElementById('panel').textContent = JSON.stringify(await res.json());
+}
+async function loadStatus() {
+  await fetch(API + '/status');
+}
+loadStats();
+loadStatus();
+</script>
