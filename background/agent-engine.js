@@ -1787,9 +1787,18 @@ import {_initRunState, _buildPageNarration, narratePageState} from './agent-run-
 // from runAgentLoop. LOOP_PHASE/LOOP_EXIT name the states and terminals the
 // loop already had; the helpers below are the same code, moved and unit-tested.
 import {
+  LOOP_PHASE, LOOP_EXIT, createLoopMachine,
   computeStepBudget, partitionElements, buildLoopDirective, escalateCircuitBreaker,
   buildPromptHistory, mapVisionAction, cleanFinishMemory,
 } from './agent-loop-machine.js';
+
+// (#45) The live state machine for the current run. Pure bookkeeping: it records
+// which phase the loop is in, which phases each step touched, and which of the
+// named terminals ended the run. It never decides anything, so instrumenting the
+// loop with it cannot change agent behaviour.
+let _loopMachine = createLoopMachine();
+/** Snapshot of the current/last run's phase trace and terminal. Diagnostics only. */
+export function getLoopMachineSnapshot() { return _loopMachine.snapshot(); }
 
 // ========== Main Agent Loop ==========
 
@@ -1885,6 +1894,8 @@ async function _extractFromIframes(tabId, topFrameText) {
 
 async function runAgentLoop(goal, workingTabId) {
   _runAbortController = new AbortController();  // (v21.6.8) For instant stop
+  // (#45) Fresh state machine per run — phases, transitions and terminal reason.
+  _loopMachine = createLoopMachine();
   _lastGoal = goal || '';
   startRunRecording(workingTabId, goal);
   let finished = false;
@@ -1980,14 +1991,14 @@ async function runAgentLoop(goal, workingTabId) {
     // commands when two or more were queued simultaneously.
 
     // (v21.6.13) Nuclear stop check at top of every iteration
-    if (!agentRunning) { console.warn('[Sentinel] Stop detected at loop top — breaking'); break; }
+    if (!agentRunning) { console.warn('[Sentinel] Stop detected at loop top — breaking'); _loopMachine.exit(LOOP_EXIT.STOPPED, 'loop top'); break; }
 
     try {
       // Pause check — wait until resumed
       if (agentPaused) {
         sendSilentUpdate('⏸ Agent paused — waiting for resume', stepCount);
         while (agentPaused && agentRunning) await sleep(FIVE_HUNDRED_MS);
-        if (!agentRunning) break;
+        if (!agentRunning) { _loopMachine.exit(LOOP_EXIT.STOPPED, 'paused'); break; }
         sendSilentUpdate('▶ Agent resumed', stepCount);
       }
 
@@ -2021,6 +2032,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       _lastLoopUrl = _lastObservedUrl;
       stepCount++;
+      _loopMachine.beginStep(stepCount);   // (#45) -> LOOP_PHASE.PREFLIGHT
       // (audit) Reset per-iteration loop-scoped directives so no value leaks
       // from a previous step into this step's LLM prompt.
       _parallelTextPromise = null;
@@ -2064,6 +2076,7 @@ async function runAgentLoop(goal, workingTabId) {
         chrome.runtime.sendMessage({ action: 'agent_finished', summary: _abortMsg }).catch(() => {});
         sendReportUpdate('generating');
         finished = true;
+        _loopMachine.exit(LOOP_EXIT.NO_LLM_CALLS);
         await closeAllAgentTabs();
         break;
       }
@@ -2077,6 +2090,7 @@ async function runAgentLoop(goal, workingTabId) {
           console.error('[_hardLimitSummary] Unhandled rejection:', e);
         });
         sendReportUpdate('generating');
+        _loopMachine.exit(LOOP_EXIT.STEP_LIMIT, 'cap ' + dynamicMaxSteps);
         break;
       }
 
@@ -2102,6 +2116,7 @@ async function runAgentLoop(goal, workingTabId) {
         // normal flow to pick up the new page state.
       }
 
+      _loopMachine.enter(LOOP_PHASE.ACQUIRE_TAB);
       let tab = getActiveTabId();
       if (!tab) {
         // Try to recover from tab contexts before giving up
@@ -2119,6 +2134,7 @@ async function runAgentLoop(goal, workingTabId) {
           console.error('[tab] Unhandled rejection:', e);
         });
         sendReportUpdate('generating');
+        _loopMachine.exit(LOOP_EXIT.NO_ACTIVE_TAB);
         break;
       }
       // v21.6.51: Hide native cursor to prevent double-cursor effect
@@ -2150,6 +2166,7 @@ async function runAgentLoop(goal, workingTabId) {
             console.error('[lostTab] Unhandled rejection:', e);
           });
           sendReportUpdate('generating');
+          _loopMachine.exit(LOOP_EXIT.TAB_CLOSED);
           break;
         }
       }
@@ -2260,6 +2277,7 @@ async function runAgentLoop(goal, workingTabId) {
           chrome.runtime.sendMessage({ action: 'agent_finished', summary: _noUrlMsg }).catch(() => {});
           sendReportUpdate('generating');
           finished = true;
+          _loopMachine.exit(LOOP_EXIT.RESTRICTED_PAGE_NO_URL, _tabUrl);
           break;
         }
 
@@ -2308,6 +2326,7 @@ async function runAgentLoop(goal, workingTabId) {
             chrome.runtime.sendMessage({ action: 'agent_finished', summary: _failMsg }).catch(() => {});
             sendReportUpdate('generating');
             finished = true;
+            _loopMachine.exit(LOOP_EXIT.RESTRICTED_PAGE_NAV_FAILED, _tabUrl);
             break;
           }
         }
@@ -2373,6 +2392,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
+      _loopMachine.enter(LOOP_PHASE.OBSERVE);
       sendSilentUpdate('Observing page...', stepCount);
 
       // Send page context to popup so user can see where the agent is
@@ -2763,6 +2783,7 @@ async function runAgentLoop(goal, workingTabId) {
       // Enhance elements with visual descriptions for LLM prompt
       enhanceWithVisualProperties(trimmedElements);
 
+      _loopMachine.enter(LOOP_PHASE.INTERRUPT);
       // (3.14.1) Sign-in wall detection. Fires when we hit a login page on a
       // known auth host with a password (or username) input — BEFORE the LLM
       // gets a chance to bang on it uselessly. The runtime password-field
@@ -2811,7 +2832,7 @@ async function runAgentLoop(goal, workingTabId) {
           } catch (e) { console.warn('[Sentinel] _wallHit run log failed:', getErrorMessage(e)); }
           // Wait until user resumes (Resume button → resumeAgent message)
           while (agentPaused && agentRunning) await sleep(FIVE_HUNDRED_MS);
-          if (!agentRunning) break;
+          if (!agentRunning) { _loopMachine.exit(LOOP_EXIT.STOPPED, 'sign-in wall'); break; }
           signInWallAckUrls.add(currentUrl);
           sendSilentUpdate('▶ Resumed after sign-in', stepCount);
           continue; // re-observe — the page should be past the wall now
@@ -2845,7 +2866,7 @@ async function runAgentLoop(goal, workingTabId) {
           } catch (e) { console.warn('[Sentinel] _mfaHit handler failed:', getErrorMessage(e)); }
           // Wait until user resumes
           while (agentPaused && agentRunning) await sleep(FIVE_HUNDRED_MS);
-          if (!agentRunning) break;
+          if (!agentRunning) { _loopMachine.exit(LOOP_EXIT.STOPPED, 'mfa'); break; }
           mfaAckUrl = currentUrl;  // suppress re-pause for the SAME page
           sendSilentUpdate('▶ Resumed after MFA', stepCount);
           continue; // re-observe the page now that MFA is presumably handled
@@ -2873,13 +2894,14 @@ async function runAgentLoop(goal, workingTabId) {
               message: `Solve the CAPTCHA on ${currentUrl || 'the page'}, then click Resume.`
             });
             while (agentPaused && agentRunning) await sleep(FIVE_HUNDRED_MS);
-            if (!agentRunning) break;
+            if (!agentRunning) { _loopMachine.exit(LOOP_EXIT.STOPPED, 'captcha'); break; }
             sendSilentUpdate('▶ Resumed after CAPTCHA', stepCount);
             continue;
           }
         }
       } catch (_captchaErr) { console.error('[Sentinel/CAPTCHA] Error:', getErrorMessage(_captchaErr)); }
 
+      _loopMachine.enter(LOOP_PHASE.DIRECTIVES);
       // Rate limiting
       await enforceRateLimit();
 
@@ -2944,6 +2966,7 @@ async function runAgentLoop(goal, workingTabId) {
           console.error('[summary] Unhandled rejection:', e);
         });
         sendReportUpdate('generating');
+        _loopMachine.exit(LOOP_EXIT.HARD_STOP, _hardReason);
         break;
       }
 
@@ -2963,6 +2986,7 @@ async function runAgentLoop(goal, workingTabId) {
             chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Task force-finished by circuit breaker. Data: ${_cbSummary}` }).catch(() => {});
             sendReportUpdate('generating');
             finished = true;
+            _loopMachine.exit(LOOP_EXIT.CIRCUIT_BREAKER_FORCE_FINISH, _cbResult.reason);
             break;
           }
         }
@@ -3056,6 +3080,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
+      _loopMachine.enter(LOOP_PHASE.THINK);
       // Progress indicator
       let apiWaitSeconds = 0;
       // (3.16.0) Begin the consult-ai activity item with a spinner. The
@@ -3330,6 +3355,11 @@ async function runAgentLoop(goal, workingTabId) {
             });
           } catch (_stringifyErr) {
             console.warn('[Sentinel/v4] Vision payload serialization failed:', getErrorMessage(_stringifyErr));
+            // (#45) NOTE: the nearest enclosing loop of this `break` is the main
+            // `while`, so despite the comment it ends the whole run rather than
+            // just vision mode. Named, not changed — see
+            // LOOP_EXIT.VISION_PAYLOAD_SERIALIZATION.
+            _loopMachine.exit(LOOP_EXIT.VISION_PAYLOAD_SERIALIZATION, getErrorMessage(_stringifyErr));
             break; // Exit vision mode on serialization failure
           }
           // (v20.5) Bounded retry-with-backoff for TRANSIENT failures (network
@@ -3634,6 +3664,7 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
 
       // apiCallCount is now synced in the finally block above (handles both success and failure).
 
+      _loopMachine.enter(LOOP_PHASE.PREPROCESS);
       // Guard: callLLM returns null when no API key is configured (early return at
       // llm-client.js:904). Downstream code accesses command.type/.text/etc unconditionally,
       // so synthesize a note rather than crashing on null dereference.
@@ -3665,6 +3696,7 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
             console.error('[prose-loop abort] Unhandled rejection:', e);
           });
           sendReportUpdate('generating');
+          _loopMachine.exit(LOOP_EXIT.PROSE_LOOP, _prosePeek);
           break;
         }
       }
@@ -3761,6 +3793,7 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
         }
       }
 
+      _loopMachine.enter(LOOP_PHASE.DISPATCH);
       // Handle finish — but block premature finishes (model giving up without trying)
       // v21.6.58: Output schema enforcement for structured reports
       if (command.type === 'finish' && command.summary) {
@@ -3809,7 +3842,7 @@ Organize findings under clear headers matching the original goal sections. Use t
           await _guardedPersistHistory();
           sendSilentUpdate('Finish blocked — must extract real data first', stepCount);
           await sleep(ONE_SECOND_MS);
-          if (!agentRunning) break;
+          if (!agentRunning) { _loopMachine.exit(LOOP_EXIT.STOPPED, 'finish gate'); break; }
           continue;
         }
 
@@ -4211,6 +4244,7 @@ finished = true;
         });
         sendReportUpdate('generating');
         saveLearnedPattern(goal, history, true);
+        _loopMachine.exit(LOOP_EXIT.FINISH);
         break;
       }
 
@@ -4552,6 +4586,7 @@ finished = true;
       }
 
 
+      _loopMachine.enter(LOOP_PHASE.ACT);
       sendAgentStatus('executing', describeAction(command));
       emitAgentStatus(workingTabId, 'executing', describeAction(command));
       // (3.50.0) Update the in-page action HUD so the user can see what's happening
@@ -4623,7 +4658,7 @@ finished = true;
       }
 
       // (v21.6.13) Stop check before action execution
-      if (!agentRunning) break;
+      if (!agentRunning) { _loopMachine.exit(LOOP_EXIT.STOPPED, 'pre-dispatch'); break; }
 
       // Execute command
       const urlBeforeCommand = tabInfo.url;
@@ -4776,6 +4811,7 @@ finished = true;
         historyPush({ step: stepCount, action: command, result });
         await _guardedPersistHistory();
         finished = true;
+        _loopMachine.exit(LOOP_EXIT.CLICK_AT_DATA_IN_MEMORY);
         break;
       }
       if (!command._visionAction && !command._visionExecuted && (command.type === 'click_at' || (command.type === 'click' && !command.selector && !command.ref)) && (typeof command.x !== 'number' || typeof command.y !== 'number')) {
@@ -4828,6 +4864,7 @@ finished = true;
           historyPush({ step: stepCount, action: command, result });
           await _guardedPersistHistory();
           finished = true;
+          _loopMachine.exit(LOOP_EXIT.CLICK_AT_BLOCK_LIMIT, 'blocked ' + _clickAtBlockCount + 'x');
           break;
         }
         result = 'BLOCKED: click_at requires numeric x/y coordinates. Data already auto-extracted to page_content — use done() to finish.';
@@ -5234,6 +5271,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
             await _guardedPersistHistory();
             sendActionResult(stepCount, result, false);
             finished = true;
+            _loopMachine.exit(LOOP_EXIT.JS_BLOCKED, 'blocked ' + _blockedCount + 'x');
             break;
           }
           if (jsValue.includes('BLOCKED:')) {
@@ -5331,6 +5369,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
                   chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Task completed. Data collected: ${_memSummary}` }).catch(() => {});
                   sendReportUpdate('generating');
                   finished = true;
+                  _loopMachine.exit(LOOP_EXIT.DUPLICATE_JS, _dupCount + ' duplicates');
                   break;
                 }
                 result = `DUPLICATE: Same JS result as recent step. Data is already in memory under "${savedKey}". Call done() now.`;
@@ -5368,6 +5407,7 @@ Use the data you already extracted — do NOT run execute_js again. Call done() 
                     chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Task completed. Data collected: ${_memSummary}` }).catch(() => {});
                     sendReportUpdate('generating');
                     finished = true;
+                    _loopMachine.exit(LOOP_EXIT.AUTO_FINISH_DATA_READY, _memSize + ' chars');
                     break;
                   }
                 }
@@ -5866,6 +5906,7 @@ return { ok: true, value: el.value };
         } catch (e) { console.warn('[Sentinel] click handler failed:', getErrorMessage(e)); }
       }
 
+      _loopMachine.enter(LOOP_PHASE.VERIFY);
       // Track success/failure for self-healing
       if (actionFailed) {
         consecutiveFailures++;
@@ -5988,6 +6029,7 @@ return { ok: true, value: el.value };
               console.error('[stuck-loop abort] Unhandled rejection:', e);
             });
             sendReportUpdate('generating');
+            _loopMachine.exit(LOOP_EXIT.STUCK_CLICK_LOOP, _clickAtLoopFires + ' fires');
             break;
           }
         }
@@ -6065,6 +6107,7 @@ return { ok: true, value: el.value };
         sendReportUpdate('generating');
         finished = true;
         _runAbortController = null;
+        _loopMachine.exit(LOOP_EXIT.ALT_LOOP, _nonProductiveSteps + ' non-productive in 12');
         break;
       }
 
@@ -6100,6 +6143,7 @@ return { ok: true, value: el.value };
         }
       }
 
+      _loopMachine.enter(LOOP_PHASE.CHECKPOINT);
       sendActionResult(stepCount, result, actionFailed);
       // Capture post-action screenshot and broadcast agent_step with before/after
       const _afterScreenshot = await captureStepScreenshot(tab);
@@ -6350,17 +6394,25 @@ return { ok: true, value: el.value };
           } else {
             console.error('[Sentinel] No tabs available, stopping agent');
             agentRunning = false;
+            _loopMachine.exit(LOOP_EXIT.TAB_RECOVERY_FAILED, 'no tabs available');
             break;
           }
         } catch (recoveryErr) {
           console.error('[Sentinel] Recovery failed:', recoveryErr);
           agentRunning = false;
+          _loopMachine.exit(LOOP_EXIT.TAB_RECOVERY_FAILED, getErrorMessage(recoveryErr));
           break;
         }
       }
       await sleep(FIVE_HUNDRED_MS);  // SPEED: reduced from 3000ms — recover faster
     }
   }
+
+  // (#45) The loop is over: seal the state machine. An unclaimed terminal
+  // defaults to LOOP_EXIT.LOOP_CONDITION (finished/agentRunning went false
+  // without an explicit break).
+  const _loopExit = _loopMachine.finalize();
+  try { tel.info('lifecycle', 'Agent loop exited: ' + _loopExit, { exitReason: _loopExit, exitDetail: _loopMachine.exitDetail, stepCount, apiCallCount }); } catch (_e) { /* non-fatal */ }
 
   // (3.50.0) Generate report WHILE the keepalive is still running.
   // Previously, keepalive was stopped before report generation, which could

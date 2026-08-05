@@ -314,7 +314,10 @@ jest.unstable_mockModule('../background/brain-producer.js', () => ({
 }));
 
 // ── Import after mocks ──────────────────────────────────────────────────────
-const { startAgent, stopAgent, resetAgentState } = await import('../background/agent-engine.js');
+const { startAgent, stopAgent, resetAgentState, getLoopMachineSnapshot } =
+  await import('../background/agent-engine.js');
+const { LOOP_PHASE, LOOP_EXIT, isLegalTransition } =
+  await import('../background/agent-loop-machine.js');
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function makeSender(tabId = 1) {
@@ -729,5 +732,181 @@ describe('characterisation: step budget', () => {
     ];
     await runAgent(SIMPLE_GOAL);
     expect(llmStateSnapshots[0].budgetHint.length).toBeGreaterThan(0);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 9. The state machine (#45) — does the declared machine match the real loop?
+//
+// These are the tests that make the refactor worth doing. Everything above pins
+// behaviour; these check that the phase sequence and terminal alphabet declared
+// in agent-loop-machine.js are an accurate description of what runAgentLoop
+// actually does, rather than a comment that drifts out of date.
+// ═════════════════════════════════════════════════════════════════════════════
+describe('loop state machine', () => {
+  test('a real run makes no illegal phase transitions', async () => {
+    llmScript = [
+      { type: 'execute_js', code: 'return "payload data here"', key: 'k' },
+      { type: 'note', text: 'thinking about it' },
+      { type: 'scroll', direction: 'down' },
+      { type: 'finish', summary: 'done' },
+    ];
+    await runAgent(SIMPLE_GOAL);
+    expect(getLoopMachineSnapshot().illegalTransitions).toBe(0);
+  });
+
+  test('every recorded transition is legal under isLegalTransition', async () => {
+    llmScript = [
+      { type: 'read_page' },
+      { type: 'execute_js', code: 'return "payload data here"', key: 'k' },
+      { type: 'finish', summary: 'done' },
+    ];
+    await runAgent(SIMPLE_GOAL);
+    const { trace } = getLoopMachineSnapshot();
+    expect(trace.length).toBeGreaterThan(0);
+    for (const step of trace) {
+      expect(isLegalTransition(null, step.phases[0])).toBe(true);
+      for (let i = 0; i < step.phases.length - 1; i++) {
+        expect(isLegalTransition(step.phases[i], step.phases[i + 1])).toBe(true);
+      }
+    }
+  });
+
+  test('a note short-circuits at DISPATCH and never reaches ACT', async () => {
+    llmScript = [
+      { type: 'note', text: 'just observing' },
+      { type: 'execute_js', code: 'return "payload data here"', key: 'k' },
+      { type: 'finish', summary: 'done' },
+    ];
+    await runAgent(SIMPLE_GOAL);
+    const first = getLoopMachineSnapshot().trace[0].phases;
+    expect(first).toEqual([
+      LOOP_PHASE.PREFLIGHT, LOOP_PHASE.ACQUIRE_TAB, LOOP_PHASE.OBSERVE,
+      LOOP_PHASE.INTERRUPT, LOOP_PHASE.DIRECTIVES, LOOP_PHASE.THINK,
+      LOOP_PHASE.PREPROCESS, LOOP_PHASE.DISPATCH,
+    ]);
+    expect(first).not.toContain(LOOP_PHASE.ACT);
+  });
+
+  test('a page-affecting action runs the full phase sequence through CHECKPOINT', async () => {
+    llmScript = [
+      { type: 'click', selector: '#a' },
+      { type: 'execute_js', code: 'return "payload data here"', key: 'k' },
+      { type: 'finish', summary: 'done' },
+    ];
+    await runAgent(SIMPLE_GOAL);
+    const first = getLoopMachineSnapshot().trace[0].phases;
+    expect(first).toContain(LOOP_PHASE.ACT);
+    expect(first).toContain(LOOP_PHASE.VERIFY);
+    expect(first).toContain(LOOP_PHASE.CHECKPOINT);
+    expect(first[first.length - 1]).toBe(LOOP_PHASE.CHECKPOINT);
+  });
+
+  test('the machine ends in FINALIZE with the step trace intact', async () => {
+    llmScript = [
+      { type: 'execute_js', code: 'return "payload data here"', key: 'k' },
+      { type: 'finish', summary: 'done' },
+    ];
+    await runAgent(SIMPLE_GOAL);
+    const snap = getLoopMachineSnapshot();
+    expect(snap.phase).toBe(LOOP_PHASE.FINALIZE);
+    expect(snap.trace.map(t => t.step)).toEqual([1, 2]);
+  });
+
+  // One case per terminal this harness can actually reach. The remaining
+  // LOOP_EXIT values are covered by tests/agent-loop-machine.test.js.
+  const terminalCases = [
+    ['FINISH', LOOP_EXIT.FINISH, () => {
+      llmScript = [
+        { type: 'execute_js', code: 'return "payload data here"', key: 'k' },
+        { type: 'finish', summary: 'done' },
+      ];
+    }],
+    ['NO_LLM_CALLS', LOOP_EXIT.NO_LLM_CALLS, () => {
+      llmCountsApiCalls = false;
+      llmScript = [{ type: 'note', text: 'thinking' }];
+    }],
+    ['NO_ACTIVE_TAB', LOOP_EXIT.NO_ACTIVE_TAB, () => {
+      _activeTabId = null;
+      _allTabContexts = [];
+    }],
+    ['TAB_CLOSED', LOOP_EXIT.TAB_CLOSED, () => {
+      mockGetTabInfo.mockImplementation(async () => null);
+      _tabsQueryResult = [];
+    }],
+    // Stopping while the page is being observed means the run is still inside
+    // the step when it reaches the explicit pre-dispatch guard, so the terminal
+    // is named. (A `note` would short-circuit at DISPATCH before that guard, so
+    // this case needs a page-affecting action.)
+    ['STOPPED', LOOP_EXIT.STOPPED, () => {
+      llmScript = [{ type: 'click', selector: '#a' }];
+      contentScriptRouter = async (msg) => {
+        if (msg && msg.action === 'read_page') await stopAgent();
+        return undefined;
+      };
+    }],
+    // Stopping during the LLM call instead lands after the step's last
+    // `continue`, so the `while (!finished && agentRunning)` condition ends the
+    // run before any explicit guard is reached. That is a distinct terminal and
+    // the machine reports it as such rather than mislabelling it STOPPED.
+    ['LOOP_CONDITION', LOOP_EXIT.LOOP_CONDITION, () => {
+      llmScript = [async () => { await stopAgent(); return { type: 'note', text: 'late' }; }];
+    }],
+    ['PROSE_LOOP', LOOP_EXIT.PROSE_LOOP, () => {
+      llmScript = [{ type: 'note', text: 'Parse error (will retry) — captured model output: Let me update the config:' }];
+    }],
+    ['HARD_STOP', LOOP_EXIT.HARD_STOP, () => {
+      llmScript = [{ type: 'note', text: 'No endpoints found that support image input' }];
+    }],
+    ['CIRCUIT_BREAKER_FORCE_FINISH', LOOP_EXIT.CIRCUIT_BREAKER_FORCE_FINISH, () => {
+      llmScript = [(n) => ({ type: 'note', text: 'observation number ' + n })];
+    }],
+    ['CLICK_AT_BLOCK_LIMIT', LOOP_EXIT.CLICK_AT_BLOCK_LIMIT, () => {
+      _scriptingResult = 'y'.repeat(200);
+      llmScript = [{ type: 'click_at' }];
+    }],
+    ['CLICK_AT_DATA_IN_MEMORY', LOOP_EXIT.CLICK_AT_DATA_IN_MEMORY, () => {
+      llmScript = [{ type: 'extract', key: 'page_content', selector: '#a' }, { type: 'click_at' }];
+      contentScriptRouter = (msg) => {
+        if (msg && msg.action === 'execute_command' && msg.command && msg.command.type === 'extract') {
+          return JSON.stringify({ key: 'page_content', value: 'q'.repeat(900) });
+        }
+        return undefined;
+      };
+    }],
+  ];
+
+  test.each(terminalCases)('records the %s terminal', async (_name, expected, setup) => {
+    setup();
+    await runAgent(SIMPLE_GOAL);
+    expect(getLoopMachineSnapshot().exitReason).toBe(expected);
+  });
+
+  test('the step-limit terminal carries the ceiling that was hit', async () => {
+    llmScript = [(n) => (n % 2 ? { type: 'note', text: 'observation number ' + n } : { type: 'wait', ms: 1 })];
+    await runAgent(SIMPLE_GOAL);
+    const snap = getLoopMachineSnapshot();
+    expect(snap.exitReason).toBe(LOOP_EXIT.STEP_LIMIT);
+    expect(snap.exitDetail).toBe('cap 60');
+    // ...and the trace stays ring-capped even on the longest possible run.
+    expect(snap.trace.length).toBeLessThanOrEqual(200);
+  }, 120000);
+
+  test('each run starts from a clean machine', async () => {
+    llmScript = [{ type: 'note', text: 'Parse error (will retry) — captured model output: looping' }];
+    await runAgent(SIMPLE_GOAL);
+    expect(getLoopMachineSnapshot().exitReason).toBe(LOOP_EXIT.PROSE_LOOP);
+
+    sentMessages = [];
+    llmCalls = 0;
+    llmPromptSnapshots = [];
+    llmScript = [
+      { type: 'execute_js', code: 'return "payload data here"', key: 'k' },
+      { type: 'finish', summary: 'clean run' },
+    ];
+    await runAgent(SIMPLE_GOAL);
+    const snap = getLoopMachineSnapshot();
+    expect(snap.exitReason).toBe(LOOP_EXIT.FINISH);
+    expect(snap.trace.map(t => t.step)).toEqual([1, 2]);
   });
 });
