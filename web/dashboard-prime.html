@@ -2352,7 +2352,18 @@ const API = (location.protocol === 'http:' || location.protocol === 'https:')
 // Neuralis brain API. Must be 8001: port 8000 only ever answered via an
 // undocumented `netsh interface portproxy` rule, so it is not a dependable
 // endpoint and must never be hardcoded here.
-const BRAIN_API = location.origin + '/__brain';
+//
+// 2026-08-04: this read `location.origin + '/__brain'`, which contradicted the
+// comment above it and was broken two ways. There is no `/__brain` route
+// anywhere in this repo, so every brain call 404'd against a path that does not
+// exist; and on a file:// page `location.origin` is the STRING "null", making
+// BRAIN_API "null/__brain" - an unparseable URL that threw TypeError out of
+// anything doing `new URL(...)` on it. Resolve the brain on the page's own host
+// at its real port, falling back to localhost when there is no host to borrow
+// (file://), which mirrors how API above is resolved.
+const BRAIN_API = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? `${location.protocol}//${location.hostname}:8001`
+  : 'http://localhost:8001';
 let abort = null;
 let streaming = false;
 let convId = null;
@@ -2478,15 +2489,27 @@ function apiError(kind, status, message) {
 const TOKEN_KEY = 'sentinel-api-token';
 
 function getApiToken({ prompt: doPrompt = false } = {}) {
-  // Hardcoded for home server use — avoids the prompt loop when the page is
-  // served from behind the Cloudflare Tunnel and the user has no console.
-  const HARDCODED_TOKEN = 'p_VRj7dHWTPKjxo7CeTSxLp92nZgiOtwWHwSSReir4s';
+  // 2026-08-04: a HARDCODED_TOKEN literal was added here to skip the prompt when
+  // the page is served through the Cloudflare Tunnel. That is a committed
+  // credential in a version-controlled file - exactly what the comment above
+  // forbids, and what tests/web-dashboard-prime-auth.test.js failed on. Removed;
+  // the token lives in localStorage only. If the prompt is unavailable behind the
+  // tunnel, seed it once from a console or a bookmarklet:
+  //   localStorage.setItem(TOKEN_KEY, '<token>')
   let tok = '';
   try { tok = localStorage.getItem(TOKEN_KEY) || ''; } catch { /* storage blocked */ }
-  if (!tok) { tok = HARDCODED_TOKEN; try { localStorage.setItem(TOKEN_KEY, tok); } catch { /* storage blocked */ } }
+  if (!tok && doPrompt && typeof window.prompt === 'function') {
+    const entered = window.prompt(
+      'Sentinel API token required.\n\n' +
+      'On the host: echo %SENTINEL_API_TOKEN%  (or read it from the machine environment).'
+    );
+    if (entered) {
+      tok = entered.trim();
+      try { localStorage.setItem(TOKEN_KEY, tok); } catch { /* storage blocked */ }
+    }
+  }
   return tok;
 }
-
 function clearApiToken() {
   try { localStorage.removeItem(TOKEN_KEY); } catch { /* storage blocked */ }
 }
