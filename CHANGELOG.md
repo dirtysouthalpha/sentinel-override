@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased] - runAgentLoop state machine (#45)
+
+### Added
+- **`background/agent-loop-machine.js`** — the explicit state machine behind `runAgentLoop`, plus the pure per-phase decision logic lifted verbatim out of the loop body (`computeStepBudget`, `partitionElements`, `buildLoopDirective`, `escalateCircuitBreaker`, `buildPromptHistory`, `mapVisionAction`, `cleanFinishMemory`). 112 unit tests — the first direct coverage this logic has ever had; previously it was reachable only through a full multi-step integration run.
+- **`LOOP_PHASE`** names the 12 states one iteration already moved through (PREFLIGHT, ACQUIRE_TAB, OBSERVE, INTERRUPT, DIRECTIVES, THINK, PREPROCESS, DISPATCH, ACT, VERIFY, CHECKPOINT, FINALIZE). **`LOOP_EXIT`** names all 21 terminals, enumerated from every `break` in the loop plus the loop-condition exit — turning anonymous control flow into a closed, testable alphabet.
+- **Per-run phase trace + named terminal.** `getLoopMachineSnapshot()` reports which phases each step touched and which terminal ended the run; one `tel.info('lifecycle', 'Agent loop exited: <reason>')` is emitted at finalize. A run that stops early now leaves a machine-readable record of why, not just a prose summary aimed at the user.
+- **`tests/agent-loop-characterisation.test.js`** (46 tests) — the first tests to drive real iterations of `runAgentLoop`. The existing loop-path suite mocks `getActiveTabId()` to null, so the loop exited at "No active tab" before the step body ever ran, which is why `agent-engine.js` sat at 29.8% statement / 21.0% branch coverage despite 10,478 passing tests. These pin the ugly exits (step-ceiling exhaustion, the no-LLM-call abort, tab loss, stop-mid-run, the PR #61 prose announce-loop guard, circuit-breaker force-finish, `click_at` guards, the finish gates) through the loop's observable surface only, so they survive further restructuring.
+
+### Changed
+- `runAgentLoop` calls the extracted helpers instead of seven inline copies of the same logic. Behaviour-preserving by construction: each block was moved verbatim and the instrumentation is 41 pure additions (11 `enter()`, 1 `beginStep()`, 26 `exit()`, 1 `finalize()`) with no existing statement moved, reordered or removed. `runAgentLoop` 4,950 → 4,792 lines; `agent-engine.js` 6,929 → 6,778.
+
+### Notes (found, deliberately NOT changed — each is a behaviour change, not a refactor)
+- **The prose-loop guard's `nudge` branch is a no-op.** `proseLoopVerdict()` returning `nudge` pushes a corrective SYSTEM note onto `promptHistory`, but the guard runs *after* that step's LLM call and `promptHistory` is rebuilt from `history` at the top of every iteration — so the note never reaches the model. Only the third-reply abort has any effect. Pinned by test.
+- **`LOOP_EXIT.VISION_PAYLOAD_SERIALIZATION`**: the `break` commented "Exit vision mode on serialization failure" has the main `while` as its nearest enclosing loop, so it ends the whole run rather than falling through to the legacy LLM path.
+- **The Z.ai content-safety (code 1301) handler is dead code.** In `agent-engine.js` an entire `if (_vErr && /1301|.../.test(...))` block sits *inside* an unterminated `console.warn(\`...\`)` template literal, so it is part of the warning string and never executes. `_consecutiveContentSafetyErrors` is therefore never incremented by it.
+- **The `!agentRunning` check at the top of the loop body is unreachable** — the `while (!finished && agentRunning)` condition is evaluated immediately before it with no intervening await.
+
+
 ## [Unreleased] - Agent loop guard
 
 ### Fixed
