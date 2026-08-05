@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Sentinel Command Center v11</title>
+<title>Sentinel Command Center</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -227,17 +227,24 @@ body::before {
    without the keyboard. Two additions fix both halves: a chevron in each
    panel's own header, and a thin always-present handle at each screen edge. */
 
+/* The resting state used to be `background: transparent` + a transparent
+   border, which painted a 21x21 muted glyph with no chrome whatsoever. Reported
+   2026-08-05 as "there is no button to collapse the left-hand sidebar": the
+   control was present, bound and working the entire time — it simply did not
+   READ as a button until you happened to hover it. A control nobody can find is
+   a missing control. It now carries a surface and a border at rest; hover still
+   lifts it to the accent colour, so the interaction language is unchanged. */
 .panel-collapse {
   margin-left: auto;
   flex-shrink: 0;
-  background: transparent;
-  border: 1px solid transparent;
+  background: var(--surface2);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: var(--muted);
+  color: var(--text);
   cursor: pointer;
   font-size: .8rem;
   line-height: 1;
-  padding: 4px 6px;
+  padding: 5px 8px;
   transition: color var(--t), background var(--t), border-color var(--t);
 }
 .panel-collapse:hover {
@@ -303,20 +310,27 @@ body::before {
   .edge-handle { display: none !important; }
 }
 
-/* ── Rail resizers (v12) ── */
+/* ── Rail resizers (v12) ──
+   These bars sit on each panel's edge and light up on hover, so they read as
+   controls — but until 2026-08-05 they carried ONLY a mousedown drag handler.
+   A plain click did nothing at all, which is exactly how the "previous chats
+   collapse bar does not work" report described it. They now toggle the panel on
+   click and still resize on drag (see setupRailResize). 8px rather than 5px
+   because a 5px click target is a dexterity test, not an affordance; the offset
+   keeps the bar centred on the panel boundary. */
 .rail-grip {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 5px;
+  width: 8px;
   z-index: 30;
   cursor: col-resize;
   background: transparent;
   transition: background var(--t);
 }
 .rail-grip:hover, .rail-grip.dragging { background: var(--border-active); }
-#grip-left { left: calc(var(--sidebar-w) - 2px); }
-#grip-right { right: calc(var(--right-w) - 2px); }
+#grip-left { left: calc(var(--sidebar-w) - 4px); }
+#grip-right { right: calc(var(--right-w) - 4px); }
 #app.sidebar-collapsed #grip-left,
 #app.right-collapsed #grip-right,
 #app.both-collapsed .rail-grip { display: none; }
@@ -1767,7 +1781,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     <div id="sb-logo" style="display:flex;align-items:flex-start;gap:8px">
       <div style="min-width:0">
         <div class="logo-name">SENTINEL</div>
-        <div class="logo-sub">Command Center v11</div>
+        <div class="logo-sub">Command Center</div>
       </div>
       <button class="panel-collapse" id="sb-collapse" title="Collapse conversations (Ctrl+B)"
               aria-label="Collapse conversation sidebar" aria-controls="sidebar" aria-expanded="true">‹‹</button>
@@ -1898,7 +1912,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       <div class="pg on" id="pg-chat">
         <div id="chat-area">
           <div id="msgs" role="log" aria-live="polite">
-            <div class="msg s"><div class="mb">Sentinel Command Center v11 — Ready. Describe a goal and press Enter.</div></div>
+            <div class="msg s"><div class="mb">Sentinel Command Center — Ready. Describe a goal and press Enter.</div></div>
           </div>
           <div id="inp-area">
             <div class="inp-row">
@@ -2264,9 +2278,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   </main>
 
   <div class="rail-grip" id="grip-left" role="separator" aria-orientation="vertical"
-       aria-label="Resize conversation sidebar"></div>
+       title="Drag to resize · click to collapse conversations"
+       aria-label="Resize conversation sidebar; click to collapse it"></div>
   <div class="rail-grip" id="grip-right" role="separator" aria-orientation="vertical"
-       aria-label="Resize file explorer"></div>
+       title="Drag to resize · click to collapse files"
+       aria-label="Resize file explorer; click to collapse it"></div>
 
   <!-- ═══════════ FILE EXPLORER ═══════════ -->
   <aside id="file-explorer" role="complementary" aria-label="File explorer">
@@ -3057,6 +3073,8 @@ function closeMobilePanels() {
 // above its own declaration. Two for two — hence the rule that every storage
 // key is declared in one place, before init().
 const RAIL_MIN = 180, RAIL_MAX = 620;
+// Horizontal travel (px) that separates a click on a rail grip from a drag.
+const RAIL_DRAG_SLOP = 4;
 
 function applyRailWidths(w) {
   const root = document.documentElement;
@@ -3080,10 +3098,24 @@ function setupRailResize() {
     if (!grip) return;
     grip.addEventListener('mousedown', e => {
       e.preventDefault();
-      grip.classList.add('dragging');
-      document.body.classList.add('resizing');
+
+      // Press-then-release without moving is a CLICK, and a click on the bar
+      // collapses the panel it borders. Until 2026-08-05 the grip listened for
+      // mousedown only: it lit up on hover like a control and then ignored every
+      // click, which is what "the collapse bar does not work" meant. The slop
+      // threshold is what keeps the two gestures apart — .dragging / .resizing
+      // are no longer applied on mousedown, or a plain click would flash the
+      // drag styling and suppress selection for no reason.
+      const startX = e.clientX;
+      let dragging = false;
 
       const move = ev => {
+        if (!dragging) {
+          if (Math.abs(ev.clientX - startX) < RAIL_DRAG_SLOP) return;
+          dragging = true;
+          grip.classList.add('dragging');
+          document.body.classList.add('resizing');
+        }
         // Left rail grows rightwards from x=0; right rail grows leftwards from
         // the viewport edge.
         const raw = side === 'sidebar' ? ev.clientX : (window.innerWidth - ev.clientX);
@@ -3096,6 +3128,13 @@ function setupRailResize() {
         document.removeEventListener('mouseup', up);
         grip.classList.remove('dragging');
         document.body.classList.remove('resizing');
+        if (!dragging) {
+          // A click: collapse (or reopen) the panel. Goes through the same
+          // toggle as the header chevron and Ctrl+B, so the class, the ARIA
+          // state and the persisted entry can never disagree.
+          if (side === 'sidebar') toggleSidebar(); else toggleRight();
+          return;
+        }
         const cs = getComputedStyle(document.documentElement);
         try {
           localStorage.setItem(WIDTH_KEY, JSON.stringify({

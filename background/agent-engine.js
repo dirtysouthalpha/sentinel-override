@@ -3415,20 +3415,23 @@ async function runAgentLoop(goal, workingTabId) {
               const _ra = Number(_vResponse.headers.get('retry-after'));
               if (Number.isFinite(_ra) && _ra > 0 && _ra <= 10) _backoffMs = _ra * 1000;
             }
-            console.warn(`[Sentinel/v4] 
-        // v21.6.55: Detect Z.ai content safety filter (code 1301) — stop retrying immediately
-        if (_vErr && /1301|content.*unsafe|sensitive content/i.test(String(_vErr))) {
-          console.warn('[Sentinel] Z.ai content safety filter triggered — truncating page content for next attempt');
-          _consecutiveContentSafetyErrors = (_consecutiveContentSafetyErrors || 0) + 1;
-          if (_consecutiveContentSafetyErrors >= 2) {
-            // After 2 content safety errors, force execute_js path to extract minimal content
-            command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 5000)', key: 'page_content', _visionAction: true, approvalGranted: true };
-            _consecutiveContentSafetyErrors = 0;
-            sendSilentUpdate('[ADAPTIVE] Content safety triggered — switching to minimal extraction', stepCount);
-          }
-        }
-Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorMessage(_vFetchErr)}); retrying in ${_backoffMs}ms`);;
-        sendSilentUpdate('[RATE LIMIT] API rate limited — retrying with backoff. This is normal for free-tier models.', stepCount);
+            // NOTE: a "v21.6.55 Z.ai content safety filter (1301)" handler used to
+            // sit here, pasted INSIDE this template literal — so it was string
+            // content, never code. Every retry printed the handler's own source
+            // as part of the warning instead of the message below, and the
+            // feature never ran once.
+            //
+            // Removed rather than extracted, because extracting it verbatim would
+            // have been worse than the no-op: it reads `_vErr` and assigns
+            // `_consecutiveContentSafetyErrors`, and NEITHER is declared anywhere
+            // in this file. In a strict-mode service worker both are ReferenceError,
+            // so "fixing" the quoting would have crashed the vision retry loop.
+            //
+            // Implementing it for real is a separate job: Z.ai reports 1301 in the
+            // JSON body of a non-ok response, which this loop never reads — it
+            // breaks out at the non-transient check above and only logs the status.
+            console.warn(`[Sentinel/v4] Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorMessage(_vFetchErr)}); retrying in ${_backoffMs}ms`);
+            sendSilentUpdate('[RATE LIMIT] API rate limited — retrying with backoff. This is normal for free-tier models.', stepCount);
             _vResponse = null;
             await sleep(_backoffMs);
           }
@@ -3681,7 +3684,14 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
         _lastNoActionProse = _plv.prose;
         _noActionProseRepeats = _plv.repeats;
         if (_plv.verdict === 'nudge') {
-          promptHistory.push({
+          // historyPush, NOT promptHistory.push. promptHistory is rebuilt from
+          // `history` at the top of every iteration (buildPromptHistory, ~L3210)
+          // and we are already PAST this step's model call, so a push here was
+          // written to an array that no model would ever read and that the next
+          // iteration discards. The nudge never once reached the model — which
+          // is why the abort branch below was the only thing that ever ended a
+          // prose loop.
+          historyPush({
             step: stepCount,
             action: { type: 'note' },
             result: 'SYSTEM: your last two replies were IDENTICAL prose with no action JSON — you are looping. Respond now with exactly ONE action JSON object and no surrounding narration. If the goal is blocked, respond {"type":"finish","summary":"<why it is blocked>"}.'
