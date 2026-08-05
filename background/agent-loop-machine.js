@@ -321,13 +321,18 @@ export const PRIORITY_ELEMENT_TYPES = new Set(['button', 'input', 'select', 'tex
  * Order observed elements (interactive first), cap the list, and truncate long
  * label text. Moved verbatim from the observation phase.
  *
+ * Deliberately NOT hardened against a non-array input: the inline version
+ * called .reduce() straight on the value and a malformed observation therefore
+ * threw into the loop's per-step catch (log + retry). Swallowing that here
+ * would turn a retried step into a silent zero-element observation, which is a
+ * behaviour change. The caller guarantees an array.
+ *
  * @param {Array} allElements
  * @param {number} maxElements CONFIG.maxElements
  * @returns {Array} a new array — the cached observation's elements are untouched
  */
 export function partitionElements(allElements, maxElements) {
-  const list = Array.isArray(allElements) ? allElements : [];
-  const { priorityEls, otherEls } = list.reduce((acc, e) => {
+  const { priorityEls, otherEls } = allElements.reduce((acc, e) => {
     const selectorLower = e.selector?.toLowerCase() || '';
     let isPriority = false;
     for (const t of PRIORITY_ELEMENT_TYPES) {

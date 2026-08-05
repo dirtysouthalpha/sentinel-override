@@ -375,7 +375,6 @@ const ELEMENT_ERROR_TEXT_RE = /error|invalid|failed/i;
 const JS_ESCAPE_RE = /[\\'"\n\r\t]/g;
 
 // Priority element types for O(1) lookup in element sorting
-const PRIORITY_ELEMENT_TYPES = new Set(['button', 'input', 'select', 'textarea']);
 
 // Precompile regex for approval mode detection (Tier 3: pause phrases)
 const APPROVAL_PAUSE_AGENT_RE = /\b(?:agent|sentinel)\s+(?:pauses?|must\s+pause|should\s+pause|will\s+pause)\s+(?:for|before|on|to\s+wait|until)/i;
@@ -1784,6 +1783,13 @@ import {MULTI_PORTAL_RE, MODE_TIER1_RE, MODE_TIER2_RE, ARTICLE_RE, ARTICLE_KEY_R
 
 // ========== Run Setup Helpers — extracted to agent-run-setup.js ==========
 import {_initRunState, _buildPageNarration, narratePageState} from './agent-run-setup.js';
+// (#45) The explicit loop state machine + the pure per-phase logic extracted
+// from runAgentLoop. LOOP_PHASE/LOOP_EXIT name the states and terminals the
+// loop already had; the helpers below are the same code, moved and unit-tested.
+import {
+  computeStepBudget, partitionElements, buildLoopDirective, escalateCircuitBreaker,
+  buildPromptHistory, mapVisionAction, cleanFinishMemory,
+} from './agent-loop-machine.js';
 
 // ========== Main Agent Loop ==========
 
@@ -2040,21 +2046,10 @@ async function runAgentLoop(goal, workingTabId) {
       // productive action bumps `productiveSteps` and extends the cap by +25.
       // Hard cap = 300. Multi-portal investigations get a +50 head-start so
       // they don't choke on the first portal.
-      let dynamicBaseline = CONFIG.maxSteps;
-      try {
-        // Use global match to count distinct platform keywords safely (avoids ReDoS from .*  pattern)
-        if (typeof goal === 'string') {
-          const _multiPortalMatches = goal.match(MULTI_PORTAL_RE);
-          if (_multiPortalMatches && _multiPortalMatches.length >= 2) {
-            dynamicBaseline = CONFIG.maxSteps + 50;
-          }
-        }
-      } catch (_e) {
-        // Dynamic baseline calculation failed non-fatally
-      }
+      // (#45 PREFLIGHT) Step budget — see computeStepBudget in agent-loop-machine.js.
       // (v21.6.16) Lower step ceiling — 300 was way too high for browser automation
       // (audit) `let`, not `const`: the orchestrator subtask-advance path reassigns it.
-      let dynamicMaxSteps = Math.min(60, dynamicBaseline + (productiveSteps * 25));
+      let dynamicMaxSteps = computeStepBudget(goal, CONFIG.maxSteps, productiveSteps, MULTI_PORTAL_RE).dynamicMaxSteps;
       // (3.36.1) Hotfix — telemetry emit moved AFTER `const dynamicMaxSteps`
       // declaration. Previously this line was above the const and tripped a
       // temporal-dead-zone ReferenceError every step on the first iteration,
@@ -2762,24 +2757,9 @@ async function runAgentLoop(goal, workingTabId) {
       if (pageIsEmpty) {
         pageText = `[WARNING: Page content is empty or nearly empty. This site may block automation or use heavy JavaScript rendering. Try execute_js with key to extract data directly, or navigate to a different URL.]\n\n${pageText}`;
       }
-      const { priorityEls, otherEls } = allElements.reduce((acc, e) => {
-        const selectorLower = e.selector?.toLowerCase() || '';
-        let isPriority = false;
-        for (const t of PRIORITY_ELEMENT_TYPES) {
-          if (selectorLower.includes(t)) {
-            isPriority = true;
-            break;
-          }
-        }
-        (isPriority ? acc.priorityEls : acc.otherEls).push(e);
-        return acc;
-      }, { priorityEls: [], otherEls: [] });
-      let trimmedElements = [...priorityEls, ...otherEls]
-        .slice(0, CONFIG.maxElements)
-        .map(e => ({
-          ...e,
-          text: e.text && e.text.length > 80 ? e.text.substring(0, 77) + '...' : e.text
-        }));
+      // (#45 OBSERVE) Interactive-first ordering + cap + label truncation —
+      // see partitionElements in agent-loop-machine.js.
+      let trimmedElements = partitionElements(allElements, CONFIG.maxElements);
       // Enhance elements with visual descriptions for LLM prompt
       enhanceWithVisualProperties(trimmedElements);
 
@@ -2911,120 +2891,35 @@ async function runAgentLoop(goal, workingTabId) {
       // Cache history length once per iteration (perf: accessed many times below)
       const _histLen = history.length;
 
-      // (3.8.0) Tightened read_page loop guard: 2+ consecutive read_page on the
-      // same URL is a stall (page hasn't changed; rereading achieves nothing).
-      if (_histLen >= 2) {
-        const last = history[_histLen - 1] || null;
-        const prior = history[_histLen - 2] || null;
-        const isReadPage = h => h && h.action && h.action.type === 'read_page';
-        if (last && prior && isReadPage(last) && isReadPage(prior)) {
-          loopDirective = '\n⚠ READ_PAGE LOOP DETECTED — Two consecutive read_page actions returned the same content. The page state has not changed. You MUST take a different approach now: use "extract" / "extract_list" with specific selectors, "execute_js" to query the DOM directly, "scroll" to reveal more content, or "click" to interact. Do NOT call read_page again on this same page.\n';
-        }
-      }
-
-      // 1. Consecutive non-productive actions from end of history
-      // (3.13.0) URL-aware loop detection -- catches "agent did 7 navigates
-      // to 7 different pages, none extracted anything" pattern that the
-      // existing exact-action check misses.
-      if (!loopDirective) {
-        const typeLoop = _detectActionTypeLoop(history, agentMemory);
-        if (typeLoop.isLoop) {
-          loopDirective = `\n⚠ ACTION-TYPE LOOP -- ${typeLoop.count} of last 4 actions were "${typeLoop.type}" with no productive memory write. The current strategy is not yielding data. You MUST switch action types now:\n1. If you have been navigating, STOP -- run execute_js with a key on the current page to extract whatever data is visible. The retry ladder will fall back to body.innerText automatically.\n2. If you have been clicking, try a different selector or use execute_js to read the DOM directly.\n3. If you have been read_page-ing, switch to extract / extract_list with a key.\n4. If extraction has failed twice on this page, finish() with what you have and move on rather than retrying.\n`;
-        }
-      }
+      // (#45 DIRECTIVES) The six-check anti-loop ladder — read_page loop,
+      // action-type loop, execute_js-heavy / non-productive window, empty page,
+      // and the step-15 / step-20 soft caps. Logic lives in
+      // buildLoopDirective() in agent-loop-machine.js.
+      loopDirective = buildLoopDirective({
+        history,
+        agentMemory,
+        stepCount,
+        pageIsEmpty,
+        elementsEmpty,
+        detectActionTypeLoop: _detectActionTypeLoop,
+        nonProductiveReadActions: NON_PRODUCTIVE_READ_ACTIONS,
+        dataActions: DATA_ACTIONS,
+        tabActions: TAB_ACTIONS,
+      });
 
       // Cache memory count for reuse in this section (perf: multiple uses below)
       const memCount = getObjectLength(agentMemory);
 
-      //    Also check for execute_js-heavy patterns in recent window (model escaping consecutive check)
-      if (_histLen >= 3 && !loopDirective) {
-        let consecutiveNonProductive = 0;
-        for (let i = _histLen - 1; i >= 0; i--) {
-          const h = history[i];
-          if (h.action && NON_PRODUCTIVE_READ_ACTIONS.has(h.action.type)) {
-            consecutiveNonProductive++;
-          } else {
-            break;
-          }
-        }
-        // Also count execute_js in the last 8 steps — if too many without extract/note/finish, it's a loop
-        // Iterate directly over history to avoid array copy (perf)
-        const _recentCounts = { js: 0, extract: 0 };
-        const last8Start = Math.max(0, _histLen - 8);
-        for (let i = last8Start; i < _histLen; i++) {
-          const h = history[i];
-          if (!h || !h.action) continue;
-          const type = h.action.type;
-          if (type === 'execute_js') _recentCounts.js++;
-          if (DATA_ACTIONS.has(type)) _recentCounts.extract++;
-        }
-        const recentJsCount = _recentCounts.js;
-        const recentExtractCount = _recentCounts.extract;
-        const jsLoop = recentJsCount >= 4 && recentExtractCount === 0;
-
-        if (consecutiveNonProductive >= 3 || jsLoop) {
-          const reason = jsLoop
-            ? `${recentJsCount} execute_js calls in last 8 steps with no data saved`
-            : `${consecutiveNonProductive} non-productive steps in a row`;
-          loopDirective = memCount === 0
-            ? `\n⚠ LOOP DETECTED -- ${reason}. You MUST use "execute_js" with a "key" to save results, or use "note" to record findings. Do NOT run more JS without saving.\n`
-            : `\n⚠ LOOP DETECTED -- ${reason}. You have ${memCount} items in memory. You MUST use "finish" NOW with a summary of your extracted data.\n`;
-        }
-      }
-
-      // 1b. Empty page detection — page didn't render (SPA, anti-bot, loading failure)
-      if ((pageIsEmpty || elementsEmpty) && !loopDirective) {
-        // Iterate directly over history to avoid array copy (perf)
-        const emptyCount = (() => {
-          let count = 0;
-          const last4Start = Math.max(0, _histLen - 4);
-          for (let i = last4Start; i < _histLen; i++) {
-            const r = history[i].result || '';
-            if (r.includes('empty') || r.includes('no content') || (r.includes('Page Title:') && r.length < 300)) count++;
-          }
-          return count;
-        })();
-        if (emptyCount >= 2) {
-          loopDirective = '\n⚠ EMPTY PAGE -- The page content has been empty for multiple attempts. This site may block automation or use heavy JavaScript rendering. You MUST try a different approach:\n1. Use "execute_js" with key to extract data directly: return document.body.innerText\n2. Navigate to a simpler URL (e.g., the homepage instead of search results)\n3. Try a different site for the same information\nDo NOT read_page again on this empty page.\n';
-        }
-      }
-
-      // 2. Step-based soft cap: warn model to finish after 15 steps
-      //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
-      let recentTabActions = 0;
-      const recentStart = Math.max(0, _histLen - 5);
-      for (let i = recentStart; i < _histLen; i++) {
-        const h = history[i];
-        if (h.action && TAB_ACTIONS.has(h.action.type)) recentTabActions++;
-      }
-      const isMakingProgress = recentTabActions > 0 || memCount > 0;
-      if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
-        loopDirective = `\n⚠ STEP LIMIT -- You are on step ${stepCount} with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n`;
-      } else if (stepCount >= 20 && !loopDirective) {
-        loopDirective = memCount > 0
-          ? `\n⚠ STEP LIMIT -- You are on step ${stepCount}. You have ${memCount} extracted items. You MUST call "finish" NOW with a summary. No more reading or extracting.\n`
-          : `\n⚠ STEP LIMIT -- You are on step ${stepCount}. If you have not found useful data, call "finish" with what you know. Do not continue looping.\n`;
-      }
-
       // 3. (v21.3) HARD CEILING + circuit breaker: force a clean finish
       //    at ABSOLUTE_MAX_STEPS (150) regardless of dynamicMaxSteps bumps.
       //    Also inject circuit breaker directives when degenerate loops detected.
-      // (v21.6.1) Track consecutive LLM failures for early-stop
-      const _recentFailures = history.slice(-6).filter(h => h.result && typeof h.result === 'string' && (h.result.includes('API Error') || h.result.includes('non-ok response'))).length;
-      const _cbResult = checkCircuitBreaker(history, stepCount, dynamicMaxSteps);
-      if (_recentFailures >= 5 && !_cbResult.shouldHardStop) {
-        _cbResult.shouldHardStop = true;
-        _cbResult.reason = `3 consecutive LLM failures — likely model/provider incompatibility. Check model supports vision.`;
-        _cbResult.severity = 'critical';
-      }
-      // (v21.6.1) Vision 404 detection — model doesn't support image input
-      const _lastEntry = history[history.length - 1];
-      const _lastErr = _lastEntry && _lastEntry.result ? String(_lastEntry.result) : '';
-      if (_lastErr.includes('No endpoints found that support image input') || _lastErr.includes('support image input')) {
-        _cbResult.shouldHardStop = true;
-        _cbResult.reason = 'Model does not support vision (image input). Switch to a vision-capable model in Settings or Quick Switcher.';
-        _cbResult.severity = 'critical';
-      }
+      // (#45) The two escalations layered on top of checkCircuitBreaker (repeated
+      // API failures, and a model with no image-input support) live in
+      // escalateCircuitBreaker() in agent-loop-machine.js.
+      const _cbResult = escalateCircuitBreaker(
+        checkCircuitBreaker(history, stepCount, dynamicMaxSteps),
+        history
+      );
       if (_cbResult.directive) {
         loopDirective += _cbResult.directive;
       }
@@ -3285,40 +3180,9 @@ async function runAgentLoop(goal, workingTabId) {
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
-      const promptHistory = [];
-      const historyStart = Math.max(0, _histLen - CONFIG.historyWindow);
-      for (let i = historyStart; i < _histLen; i++) {
-        const h = history[i];
-        if (!h || typeof h !== 'object' || h === null) {
-          promptHistory.push(h);
-          continue;
-        }
-        const cleaned = { ...h };
-        // Strip screenshots (large) from past entries — only the most recent
-        // observation needs the image (passed separately as base64Image).
-        delete cleaned.base64Image;
-        delete cleaned.screenshot;
-        if (cleaned.action && typeof cleaned.action === 'object' && cleaned.action !== null) {
-          const a = { ...cleaned.action };
-          delete a.base64Image;
-          delete a.screenshot;
-          // (3.20.0) Cap action.text and action.code in past history to
-          // prevent the prompt from carrying 5KB of typed text or JS source
-          // forever. The current step's command is passed fresh; past
-          // versions only need a hint of what happened.
-          if (typeof a.text === 'string' && a.text.length > 200) a.text = `${a.text.slice(0, 200)}…`;
-          if (typeof a.code === 'string' && a.code.length > 300) a.code = `${a.code.slice(0, 300)}…`;
-          cleaned.action = a;
-        }
-        // (3.20.0) Cap result field — 800 chars is plenty for the LLM to
-        // remember "what came back". Article bodies, log dumps, and other
-        // large outputs would otherwise bloat every subsequent step's
-        // prompt by thousands of tokens.
-        if (typeof cleaned.result === 'string' && cleaned.result.length > 800) {
-          cleaned.result = `${cleaned.result.slice(0, 800)}… [truncated; ${cleaned.result.length - 800} more chars in memory]`;
-        }
-        promptHistory.push(cleaned);
-      }
+      // (#45 THINK) Window cap + screenshot strip + text/code/result caps —
+      // see buildPromptHistory in agent-loop-machine.js.
+      const promptHistory = buildPromptHistory(history, CONFIG.historyWindow);
       // CDP Network Interception: inject network data when goal is network/API-related
       try {
         if (shouldReportNetwork(goal)) {
@@ -3600,71 +3464,11 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
             if (!_vParsed) console.warn('[Sentinel/v4] Vision: response not parseable:', (_vRaw || '').slice(0, 200));
 
             if (_vParsed && _vParsed.action) {
-              const _va = _vParsed.action;
-              // (v20.4) Resolve + validate the element index. GLM-4V frequently
-              // hallucinates an [index] that isn't on the page, or omits it
-              // entirely. Only accept an index that actually exists in the
-              // current vision element map; otherwise fall through to a
-              // corrective note so the model re-picks from real numbers instead
-              // of dispatching a dead no-op click_at that wastes a step.
-              const _rawIdx = (typeof _va.index === 'number') ? _va.index
-                : (typeof _va.index === 'string' && /^\d+$/.test(_va.index.trim())) ? Number(_va.index)
-                : NaN;
-              const _validIdx = (Number.isInteger(_rawIdx) && _rawIdx > 0
-                && _visionElementMap && _visionElementMap.has(_rawIdx)) ? _rawIdx : null;
-              // Build a precise correction hint when the model picks a bad index.
-              // We deliberately do NOT auto-click a numeric neighbour: the index is
-              // DOM-scan order, not visual proximity, so [N±1] is often an unrelated
-              // (sometimes destructive) control. Instead we hand the model the real
-              // valid range so it re-picks correctly on the next step.
-              const _badIndexHint = (want) => {
-                const _keys = _visionElementMap
-                  ? Array.from(_visionElementMap.keys()).filter(n => Number.isInteger(n) && n > 0).sort((a, b) => a - b)
-                  : [];
-                if (!_keys.length) return 'No numbered elements are currently visible — scroll or re-observe to reveal them.';
-                const _lead = want > 0 ? `[${want}] is not on this page.` : 'No index was given.';
-                return `${_lead} Valid indices on this page: ${_keys[0]}–${_keys[_keys.length - 1]} (${_keys.length} elements). Re-read the green labels / Elements list and pick a number that actually exists.`;
-              };
-              // Map vision action types to legacy command format
-              // v21.6.73: Convert click_at to click — GLM sometimes sends click_at directly
-              if (_va.type === 'click_at') _va.type = 'click';
-              if (_va.type === 'click_at') _va.type = 'click';
-              switch (_va.type) {
-                case 'click':
-                  if (_validIdx) {
-                    command = { type: 'click_at', _visionIndex: _validIdx, _visionAction: true };
-                  } else {
-                    // v21.6.74: No valid index — auto-extract page content instead of looping
-                    command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 16000)', key: 'page_content', _visionAction: true, approvalGranted: true };
-                    console.info('[Sentinel/v4] Click with no valid index → auto-extracting page content');
-                  }
-                  break;
-                case 'input':
-                  command = _validIdx
-                    ? { type: 'type', text: _va.text || '', _visionIndex: _validIdx, _visionAction: true }
-                    : { type: 'note', text: `SYSTEM: input needs a valid [index] for the field. ${_badIndexHint(_rawIdx)} Then emit {"action":{"type":"input","index":N,"text":"…"}}.`, _visionAction: true };
-                  break;
-                case 'scroll':
-                  command = { type: 'scroll', direction: _va.direction || 'down', _visionAction: true };
-                  break;
-                case 'navigate':
-                  command = { type: 'navigate', url: _va.url, _visionAction: true };
-                  break;
-                case 'go_back':
-                  command = { type: 'navigate_back', _visionAction: true };
-                  break;
-                case 'extract':
-                  command = { type: 'execute_js', code: _va.code || 'return document.body.innerText.substring(0, 20000)', key: _va.key || 'page_content', _visionAction: true, approvalGranted: true };
-                  break;
-                case 'execute_js':
-                  command = { type: 'execute_js', code: _va.code || '', key: _va.key || 'js_result_' + Date.now(), _visionAction: true, approvalGranted: true };
-                  break;
-                case 'done':
-                  command = { type: 'finish', summary: _va.text || _vParsed.memory || 'Task complete', _visionAction: true };
-                  break;
-                default:
-                  command = { type: 'note', text: `Vision: unknown action ${_va.type}`, _visionAction: true };
-              }
+              // (#45 THINK) Vision action -> legacy command, including the
+              // [index] validation GLM-4V needs (it frequently invents an index
+              // that isn't on the page, or omits it entirely). See
+              // mapVisionAction in agent-loop-machine.js.
+              command = mapVisionAction(_vParsed, _visionElementMap);
               // Store thinking/evaluation for logging and reasoning cards
               if (_vParsed.thinking) {
                 sendSilentUpdate(`[Vision] ${_vParsed.thinking}`, stepCount);
@@ -4212,17 +4016,10 @@ finished = true;
         }
 
 
-        // Clean up memory — filter out failed/timed-out/empty entries
-        const cleanMemory = {};
-        for (const k of memKeys) {
-          const v = agentMemory[k];
-          const s = typeof v === 'string' ? v : JSON.stringify(v);
-          // Skip empty, failed, timed-out, or "Done" entries
-          if (!s || s === 'Done' || s.length < 5) continue;
-          if (s.startsWith('Execution error') || s.startsWith('Code execution timed out')) continue;
-          if (s.startsWith('JS Error:') || s.startsWith('Element not found')) continue;
-          cleanMemory[k] = v;
-        }
+        // (#45 DISPATCH) Clean up memory — filter out failed/timed-out/empty
+        // entries before they are counted as "data points collected".
+        // See cleanFinishMemory in agent-loop-machine.js.
+        const cleanMemory = cleanFinishMemory(agentMemory, memKeys);
 
         // Don't append raw memory to the summary — let the report generator handle it
         // Only include a clean reference if there's valuable data

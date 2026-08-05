@@ -360,10 +360,17 @@ describe('partitionElements', () => {
     expect(src).toEqual(snapshot);
   });
 
-  test('non-array and empty inputs return an empty list', () => {
-    expect(partitionElements(null, 80)).toEqual([]);
-    expect(partitionElements(undefined, 80)).toEqual([]);
+  test('an empty list yields an empty list', () => {
     expect(partitionElements([], 80)).toEqual([]);
+  });
+
+  // Pinned pre-existing behaviour: the inline version called .reduce() directly,
+  // so a malformed observation threw into the loop's per-step catch (log +
+  // retry). Guarding here would turn a retried step into a silent zero-element
+  // observation — a behaviour change, not a hardening.
+  test('a non-array input throws, as it did inline', () => {
+    expect(() => partitionElements(null, 80)).toThrow(TypeError);
+    expect(() => partitionElements({ 0: 'x' }, 80)).toThrow(TypeError);
   });
 
   test('elements with no selector are treated as non-priority', () => {
