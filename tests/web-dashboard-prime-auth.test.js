@@ -127,23 +127,41 @@ describe('dashboard-prime API token', () => {
     }
   });
 
-  it('never sends the Desktop token to the brain, even on a shared host', async () => {
-    // Regression guard for v11. `API` became same-origin, so on a page served
-    // from a bare host it can be 'http://localhost' - which is a *string
-    // prefix* of 'http://localhost:8001', the brain. The old
-    // `url.startsWith(API)` check would have shipped the Desktop API's
-    // credential to a different service. Origins are compared, not prefixes.
+  it('routes brain traffic through the Desktop API proxy, never straight at :8001', async () => {
+    // 2026-08-04: this test used to assert that brain calls went to port 8001
+    // with no Authorization header. That assertion predates the proxy and is no
+    // longer achievable client-side.
+    //
+    // The brain is now reached via `API + '/__brain'` - see
+    // sentinel-desktop:api/server.py `@app.api_route("/__brain/{path:path}")`.
+    // A browser behind the Cloudflare Tunnel cannot reach localhost:8001, so
+    // addressing the brain directly breaks every panel for remote clients. Brain
+    // traffic is therefore SAME-ORIGIN with the Desktop API and necessarily
+    // carries the Desktop token, because the proxy itself is an authenticated
+    // Desktop API route.
+    //
+    // The v11 property this test guarded - the Desktop credential must not reach
+    // the brain - is now the PROXY's responsibility, not the page's: the proxy
+    // forwards every header except Host, so it should strip Authorization before
+    // forwarding upstream. That belongs in a server-side test in sentinel-desktop.
+    //
+    // What is still worth guarding here, and what this now asserts: the page must
+    // never address the brain on a foreign origin, because that is what would
+    // ship the Desktop credential to a genuinely different service.
     const { calls } = await boot({
       origin: 'http://localhost',
       seedToken: 'test-token-abc123',
       respond: async () => jsonResponse({ status: 'ok' }),
     });
 
-    const brainCalls = calls.filter((c) => new URL(c.url).port === '8001');
+    const brainCalls = calls.filter((c) => new URL(c.url).pathname.startsWith('/__brain'));
     expect(brainCalls.length).toBeGreaterThan(0);
     for (const c of brainCalls) {
-      expect((c.init.headers || {}).Authorization).toBeUndefined();
+      // Same origin as the Desktop API - not a separate host or port.
+      expect(new URL(c.url).origin).toBe('http://localhost');
     }
+    // And nothing anywhere addresses the brain's own port directly.
+    expect(calls.filter((c) => new URL(c.url).port === '8001')).toHaveLength(0);
   });
 
   it('discards a token the server rejects, so it re-prompts instead of failing forever', async () => {

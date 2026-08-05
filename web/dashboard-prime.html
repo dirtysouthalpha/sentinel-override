@@ -2353,17 +2353,26 @@ const API = (location.protocol === 'http:' || location.protocol === 'https:')
 // undocumented `netsh interface portproxy` rule, so it is not a dependable
 // endpoint and must never be hardcoded here.
 //
-// 2026-08-04: this read `location.origin + '/__brain'`, which contradicted the
-// comment above it and was broken two ways. There is no `/__brain` route
-// anywhere in this repo, so every brain call 404'd against a path that does not
-// exist; and on a file:// page `location.origin` is the STRING "null", making
-// BRAIN_API "null/__brain" - an unparseable URL that threw TypeError out of
-// anything doing `new URL(...)` on it. Resolve the brain on the page's own host
-// at its real port, falling back to localhost when there is no host to borrow
-// (file://), which mirrors how API above is resolved.
-const BRAIN_API = (location.protocol === 'http:' || location.protocol === 'https:')
-  ? `${location.protocol}//${location.hostname}:8001`
-  : 'http://localhost:8001';
+// The brain is reached through the Desktop API's proxy, NOT directly. See
+// sentinel-desktop:api/server.py `@app.api_route("/__brain/{path:path}")`, whose
+// own comment states the intent: "The dashboard runs in the browser and cannot
+// reach localhost:8001 (the Neuralis brain) directly. This proxy bridges the
+// two ... Keeps the brain off the public internet while still letting the
+// dashboard panels load." A browser behind the Cloudflare Tunnel has no route to
+// localhost:8001, so addressing the brain directly breaks every panel for any
+// remote client.
+//
+// 2026-08-04: briefly changed to address the brain directly on :8001 after a
+// grep for `/__brain` in THIS repo found nothing - the route lives in the
+// sentinel-desktop repo, which is the server that actually serves this page.
+// That was wrong and is reverted here.
+//
+// The real bug in the original was the base: `location.origin + '/__brain'`. On
+// a file:// page `location.origin` is the STRING "null", so BRAIN_API became
+// "null/__brain" - an unparseable URL that threw TypeError out of anything
+// calling new URL() on it. Deriving from API instead fixes that for free,
+// because API already falls back to the Desktop API's real origin off-http.
+const BRAIN_API = API + '/__brain';
 let abort = null;
 let streaming = false;
 let convId = null;
