@@ -470,21 +470,33 @@ describe('characterisation: no-action prose loop guard', () => {
     expect(mockCallLLMWithRetry).toHaveBeenCalledTimes(3);
   });
 
-  // PRE-EXISTING BEHAVIOUR, NOT A DESIGN CHOICE:
-  // proseLoopVerdict()'s 'nudge' branch pushes the corrective SYSTEM note onto
-  // `promptHistory` — but the guard runs AFTER this step's LLM call, and
-  // `promptHistory` is rebuilt from scratch at the top of every iteration. So
-  // the nudge is written to an array nothing ever reads again and never reaches
-  // the model; only the third-reply abort has any effect. Pinned here so the
-  // refactor cannot silently change it in either direction. Compare the vision
-  // fallback note, which is pushed BEFORE callLLMWithRetry and does reach the
-  // model (see 'a null LLM response is synthesised…' below).
-  test('the nudge branch is a no-op: the corrective note never reaches the model', async () => {
+  // This test used to pin the OPPOSITE assertion, documenting the nudge as a
+  // no-op "pre-existing behaviour, not a design choice". It was a plain bug:
+  // the branch pushed the corrective SYSTEM note onto `promptHistory`, which is
+  // rebuilt from `history` at the top of every iteration and was already past
+  // this step's LLM call — so the note went to an array nothing reads again.
+  // The nudge never reached the model once, and only the third-reply abort had
+  // any effect. Fixed by pushing through historyPush() like every other durable
+  // note, so the guard now actually gets its chance to break the loop before
+  // giving up on the run.
+  test('the nudge reaches the model on the step after a repeated prose reply', async () => {
     llmScript = [{ type: 'note', text: ANNOUNCE }];
     await runAgent(SIMPLE_GOAL);
-    expect(allPromptsSeen()).not.toContain('IDENTICAL prose with no action JSON');
-    // ...and the run still aborts on the third identical reply.
+    expect(allPromptsSeen()).toContain('IDENTICAL prose with no action JSON');
+    // ...and a model that ignores the nudge still aborts on the third reply.
     expect(finishSummary()).toContain('Stopped early');
+  });
+
+  test('a model that obeys the nudge finishes instead of being aborted', async () => {
+    // The point of the fix: the nudge is now capable of changing the outcome.
+    llmScript = [
+      { type: 'note', text: ANNOUNCE },
+      { type: 'note', text: ANNOUNCE },
+      { type: 'finish', summary: 'took the hint' },
+    ];
+    await runAgent(SIMPLE_GOAL);
+    expect(finishSummary()).toContain('took the hint');
+    expect(finishSummary()).not.toContain('Stopped early');
   });
 
   test('a real action between identical prose resets the streak (no early abort)', async () => {
