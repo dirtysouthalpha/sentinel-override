@@ -1,0 +1,43 @@
+<!--
+  REGRESSION FIXTURE 02 — the mis-fix. THIS IS THE IMPORTANT ONE.
+
+  Shipped as commit 91a5c98 (merged in PR #61, reverted in PR #62, 2026-08-04).
+  Verify the base below is verbatim:
+
+      git show 91a5c98:web/dashboard-prime.html | grep -n -A2 "const BRAIN_API"
+
+  It was written because a grep for `/__brain` in the sentinel-override repo
+  found nothing, so the proxy was believed not to exist. The grep was correct.
+  The conclusion was not: the route is declared in a DIFFERENT REPO —
+  sentinel-desktop's api/server.py, `@app.api_route("/__brain/{path:path}")`.
+
+  Note what a naive check does with this. It parses. `new URL()` is happy under
+  http:, https: and file:. Every path on it is a real brain route. A URL-validity
+  test passes it, and every browser that is not on the server box still gets
+  nothing: a client behind the Cloudflare Tunnel has no route to the origin's
+  :8001, which is exactly why the proxy exists.
+
+  Expected: check (b2) reports kind `base-cross-origin` for BRAIN_API under both
+  `http` and `https` — the port alone makes the origin differ.
+-->
+<!doctype html>
+<title>regression 02</title>
+<div id="panel"></div>
+<script>
+const API = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? location.origin
+  : 'http://localhost:8091';
+const BRAIN_API = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? `${location.protocol}//${location.hostname}:8001`
+  : 'http://localhost:8001';
+
+async function loadStats() {
+  const res = await fetch(BRAIN_API + '/brain/stats');
+  document.getElementById('panel').textContent = JSON.stringify(await res.json());
+}
+async function loadStatus() {
+  await fetch(API + '/status');
+}
+loadStats();
+loadStatus();
+</script>

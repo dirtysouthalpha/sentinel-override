@@ -1,0 +1,32 @@
+<!--
+  REGRESSION FIXTURE 03 — client URLs with no server handler.
+
+  The file-browser and conversation panels of dashboard-prime.html called
+  /api/files, /api/files/content, /api/files/download and /api/conversations
+  before sentinel-desktop declared any of them (they landed in its v31.1.0).
+  Every one of those panels 404'd on every load.
+
+  The paths below are deliberately renamed to `-that-does-not-exist` so this
+  fixture keeps failing after the real routes were added — the fixture is
+  testing the CHECK, not the current state of sentinel-desktop.
+
+  Expected: check (a) reports kind `route` for each unmatched path.
+-->
+<!doctype html>
+<title>regression 03</title>
+<div id="files"></div>
+<script>
+const API = (location.protocol === 'http:' || location.protocol === 'https:')
+  ? location.origin
+  : 'http://localhost:8091';
+
+async function loadFiles() {
+  await fetch(API + '/api/files-that-does-not-exist?path=' + encodeURIComponent(''));
+  await fetch(API + '/api/files/content-that-does-not-exist?path=x');
+  await fetch(API + '/api/conversations-that-does-not-exist');
+  // This one is real and must NOT be reported, so a fixture that fails
+  // everything cannot masquerade as a working check.
+  await fetch(API + '/status');
+}
+loadFiles();
+</script>
