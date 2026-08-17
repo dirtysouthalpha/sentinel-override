@@ -16,6 +16,8 @@ import { emptyObservation } from './empty-observation.js';
 import { slowLlmCall } from './slow-llm-call.js';
 import { cspBlocked } from './csp-blocked.js';
 import { authWall } from './auth-wall.js';
+import { domStale } from './dom-stale.js';
+import { navigationFailure } from './navigation-failure.js';
 import { tel } from '../telemetry.js';
 import { getErrorMessage } from '../error-utils.js';
 
@@ -24,7 +26,9 @@ const SKILLS = [
   authWall,
   clickNoTarget,
   navigateLoop,
+  domStale,
   selectorMiss,
+  navigationFailure,
   unproductiveExtract,
   emptyObservation,
   consecutiveFailures,

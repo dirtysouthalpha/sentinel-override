@@ -11,8 +11,10 @@ import { emptyObservation } from '../background/skills/empty-observation.js';
 import { cspBlocked } from '../background/skills/csp-blocked.js';
 import { slowLlmCall } from '../background/skills/slow-llm-call.js';
 import { authWall } from '../background/skills/auth-wall.js';
+import { domStale } from '../background/skills/dom-stale.js';
+import { navigationFailure } from '../background/skills/navigation-failure.js';
 
-const allSkills = [cspBlocked, authWall, clickNoTarget, navigateLoop, selectorMiss, unproductiveExtract, emptyObservation, consecutiveFailures, slowLlmCall];
+const allSkills = [cspBlocked, authWall, clickNoTarget, navigateLoop, domStale, selectorMiss, navigationFailure, unproductiveExtract, emptyObservation, consecutiveFailures, slowLlmCall];
 
 // ========== Shared shape validation ==========
 
