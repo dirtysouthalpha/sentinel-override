@@ -10,6 +10,29 @@ An autonomous browser agent for MSPs and IT professionals. Sentinel Override see
 
 ---
 
+## Recent Fixes (v21.6.76)
+
+This release hardens security, fixes stability bugs, and improves code quality:
+
+### Security Hardening
+- **`execute_js` sandbox bypass fixed** — Added `'use strict'` mode to prevent `this` globalThis bypass, blocked `globalThis` access in the Proxy allowlist, fixed `has` trap to check actual property existence instead of always returning `true`
+- **`postMessage` origin fixed** — Changed from wildcard `"*"` to `window.location.origin` in both sandboxed and unsandboxed `execute_js` paths to prevent cross-origin message leakage
+- **CSS selector injection prevention** — Sanitized `selectionText` in context menu `monitor_changes` handler to strip selector-special characters before interpolation
+- **XSS hardening** — All `innerHTML` calls use `escapeHtml()` for user-generated content
+
+### Stability & Bug Fixes
+- **Approval flow SW suspend detection** — Added 15s health check polling during approval waits; rejects promptly if the service worker suspends instead of hanging for 5 minutes
+- **Credit usage race condition fixed** — Serialized `record_credit_usage` updates via async lock to prevent read-modify-write data loss
+- **Pause/resume toggle fixed** — `Ctrl+Shift+P` now correctly toggles between pause and resume (previously only paused)
+- **`userPanelTabId` cleanup** — Clears stale tab reference when the tracked tab is closed, preventing silent `setOptions` failures
+- **Duplicate keyboard shortcut resolved** — Removed conflicting `Ctrl+Shift+S` binding on `toggle-panel` (kept `_execute_action`)
+
+### Code Quality
+- **Consolidated imports** — Moved 47 scattered `import` statements in `agent-engine.js` to the top of the file (ES module hoisting made them work, but they harmed readability and maintainability)
+- **SW health heartbeat** — Added `sw_heartbeat` alarm to confirm the service worker event loop stays alive
+
+---
+
 ## Quick Start
 
 1. **Download** the [latest release](https://github.com/dirtysouthalpha/sentinel-override/releases/latest)

@@ -2324,12 +2324,19 @@ if (window.__sentinelInitialized) {
 
             if (_EXECUTE_JS_SANDBOX_ENABLED && !(cmd.approvalGranted && !cmd._autoApproved)) {
               // SANDBOXED path — user code is NOT approved, run behind Proxy guards.
+              // Security hardening:
+              //  - 'use strict' prevents `this` from defaulting to globalThis
+              //  - globalThis added to blocked set to prevent window bypass
+              //  - Arrow function wrapper ensures `this` is undefined inside user code
+              //  - has trap returns false for blocked names so `in`-checks see "not present"
+              const __blkArr = JSON.stringify([...EXECUTE_JS_BLOCKED_APIS, 'globalThis']);
+              const __blkDocArr = JSON.stringify([...EXECUTE_JS_BLOCKED_DOC_PROPS]);
               scriptEl.textContent =
+                '"use strict";' +
                 '(async () => {' +
                   'try {' +
-                    // Build the sandbox inline
-                    'var __blk = new Set(' + __blockedApisArr + ');' +
-                    'var __blkDoc = new Set(' + __blockedDocArr + ');' +
+                    'var __blk = new Set(' + __blkArr + ');' +
+                    'var __blkDoc = new Set(' + __blkDocArr + ');' +
                     // Window proxy — intercepts reads/writes/has on dangerous globals
                     'var __wp = new Proxy(window, {' +
                       'get(t,p) {' +
@@ -2342,8 +2349,8 @@ if (window.__sentinelInitialized) {
                         't[p]=v; return true;' +
                       '},' +
                       'has(t,p) {' +
-                        'if(__blk.has(p)) return false;' +  // return false so `in`-checks on blocked props see "not present"
-                        'return true;' +  // always return true so `with` delegates to the proxy
+                        'if(__blk.has(p)) return false;' +
+                        'return p in t;' +
                       '}' +
                     '});' +
                     // Document proxy — intercepts reads/writes/has on sensitive doc props
@@ -2358,25 +2365,25 @@ if (window.__sentinelInitialized) {
                         't[p]=v; return true;' +
                       '},' +
                       'has(t,p) {' +
-                        'if(__blkDoc.has(p)) return false;' +  // return false so feature-detect checks on blocked doc props see "not present"
-                        'return true;' +
+                        'if(__blkDoc.has(p)) return false;' +
+                        'return p in t;' +
                       '}' +
                     '});' +
                     // Execute user code inside `with` blocks so bare references to
                     // window/document globals are intercepted by the proxies.
-                    // outer with=__wp shadows window-level names; we also alias
-                    // `document` so that `document.querySelector(...)` hits __dp.
                     'var __r;' +
                     'with(__wp) { with(__dp) { ' +
-                      'var document = __dp;' +     // shadow the global `document` with the proxied version
+                      'var document = __dp;' +
+                      // Arrow function: `this` is lexically undefined (strict mode)
+                      // preventing `this.window` or `this.fetch` bypasses
                       '__r = await (async () => { ' + __safeCode + '\n })();' +
                     '}}' +
                     'var __s = typeof __r === "object" && __r !== null' +
                       ' ? JSON.stringify(__r).substring(0, 3000)' +
                       ' : (__r === null || __r === undefined ? "" : String(__r)).substring(0, 3000);' +
-                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, "*");' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, window.location.origin);' +
                   '} catch(e) {' +
-                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (typeof e === \'object\' && e !== null && typeof e.message === \'string\' ? e.message : String(e)) }, "*");' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (typeof e === \'object\' && e !== null && typeof e.message === \'string\' ? e.message : String(e)) }, window.location.origin);' +
                   '}' +
                 '})();';
             } else {
@@ -2389,9 +2396,9 @@ if (window.__sentinelInitialized) {
                     'const __s = typeof __r === "object" && __r !== null' +
                       ' ? JSON.stringify(__r).substring(0, 3000)' +
                       ' : (__r === null || __r === undefined ? "" : String(__r)).substring(0, 3000);' +
-                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, "*");' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, window.location.origin);' +
                   '} catch(e) {' +
-                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (typeof e === \'object\' && e !== null && typeof e.message === \'string\' ? e.message : String(e)) }, "*");' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (typeof e === \'object\' && e !== null && typeof e.message === \'string\' ? e.message : String(e)) }, window.location.origin);' +
                   '}' +
                 '})();';
             }

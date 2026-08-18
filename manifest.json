@@ -91,10 +91,7 @@
       "description": "Toggle Sentinel Override side panel"
     },
     "toggle-panel": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+S"
-      },
-      "description": "Toggle Sentinel Override side panel"
+      "description": "Toggle Sentinel Override side panel (alias)"
     }
   }
 }

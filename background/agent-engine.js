@@ -1,22 +1,54 @@
 // Sentinel Override v3 -- Agent Engine
-import {buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames, formatVisionHistory, buildVisionSystemPrompt, buildVisionUserContent, buildRunLogEntry, isExplicitNavigation, proseLoopVerdict} from './agent-loop-helpers.js';
 // Agent loop, planning, self-healing, state management.
-// Imports from llm-client.js, tab-manager.js, message-protocol.js.
+// All imports consolidated at the top for clarity and to avoid scattered imports.
 
-import {callLLMWithRetry, parseVisionResponse} from "./llm-client.js";
+import {buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames, formatVisionHistory, buildVisionSystemPrompt, buildVisionUserContent, buildRunLogEntry, isExplicitNavigation, proseLoopVerdict} from './agent-loop-helpers.js';
+import {callLLMWithRetry, parseVisionResponse} from './llm-client.js';
 import {getPlatformProfile} from './platforms/index.js';
 import {isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat} from './agent-ticket-format.js';
-import { diagnoseFailure, buildDiagnosticMessage, saveDomainStrategy, getDomainStrategy, extractWinningStrategy, getDomainFromUrl } from './agent-adaptive.js';
-import { isComplexGoal, buildDecompositionPrompt, parseDecomposition, buildSubTaskGoal, createOrchestratorState } from './agent-orchestrator.js';
+import {diagnoseFailure, buildDiagnosticMessage, saveDomainStrategy, getDomainStrategy, extractWinningStrategy, getDomainFromUrl} from './agent-adaptive.js';
+import {isComplexGoal, buildDecompositionPrompt, parseDecomposition, buildSubTaskGoal, createOrchestratorState} from './agent-orchestrator.js';
 import {detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop} from './agent-captcha.js';
 import {summarizeHistoryBatch, maybeRollupHistory, detectStall} from './agent-progress.js';
 import {getBrainStartupContext, resetBrainRunSignals} from './brain-client.js';
-import { detectPageType, getPageStrategyHint } from './agent-page-type.js';
+import {detectPageType, getPageStrategyHint} from './agent-page-type.js';
 import {publishRunLearning, resetBrainProducerRunSignals} from './brain-producer.js';
 import {waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests} from './tab-manager.js';
-import {CONFIG, MAX_PAGE_TEXT_LENGTH, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS} from "./constants.js";
+import {CONFIG, MAX_PAGE_TEXT_LENGTH, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS} from './constants.js';
 import {captureNetworkSnapshot, shouldReportNetwork} from './agent-network.js';
 import {startParallelAgent, stopAgent as stopPoolAgent} from './agent-pool.js';
+import {sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview, sendCostUpdate} from './message-protocol.js';
+import {generateReport, buildFallbackReport} from './report-generator.js';
+import {getActiveProvider, getTextProvider} from './provider-registry.js';
+import {isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive, emitAgentCompletion} from './shared-state.js';
+import {getActiveTabId, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, getTabCount} from './tab-context.js';
+import {getClientStartupContext, markRunCompleted} from './client-knowledge.js';
+import {generateHeuristicPlan, _generateInitialPlan, _applyAdaptivePrompts, _waitForAdaptedGoalDecision, BARE_SITE_MAP} from './agent-planning.js';
+import {appendAuditEntry, getAuditLog, auditLogToCsv} from './audit-log.js';
+import {runRecoverySkills, getSkillStats} from './skills/index.js';
+import {tel, startRun, endRun} from './telemetry.js';
+import {broadcast as uapBroadcast, setRunId as uapSetRunId} from './uap-bridge.js';
+import {computeTrustScore, suggestRetryActions} from './trust-score.js';
+import {captureReasoningStep, getReasoningSummary} from './reasoning-trace.js';
+import {analyzeActionForBias, shouldTriggerBiasWarning, logBiasDetection, getBiasStatistics} from './bias-detector.js';
+import {addKnowledgeNode, persistKnowledgeGraph} from './knowledge-graph.js';
+import {analyzeForContradictions, logContradictionDetection, getContradictionStatistics} from './contradiction-detector.js';
+import {analyzeForNovelty, storeNoveltyResult, getNoveltyStatistics} from './novelty-detector.js';
+import {synthesizeKnowledge, getSynthesisStatistics} from './knowledge-synthesizer.js';
+import {PredictiveEngine} from './predictive-engine.js';
+import {RuntimeProfiler} from './runtime-profiler.js';
+import {getErrorMessage, sleep} from './error-utils.js';
+import {_tenantsMatch, detectMfaInText, detectSignInWall, evaluateHallucinationRisk, _countSummaryClaims, _countSpecificClaims, _countSourceTags} from './agent-security.js';
+import {startRunRecording, recordStep, generateRunReplay, emitLearnedPatterns, notifyRunComplete, scoreActionConfidence, saveLearnedPattern} from './agent-reporting.js';
+import {sharedState} from './agent-shared-state.js';
+import {attachTabToSentinelGroup, detachAllSentinelTabs, closeAttachedTabsExceptPrimary, isAgentAttachedTab, isPrimaryPanelTab, setPrimaryPanelTab, _scopeSidePanelToPrimary, _enableSidePanelEverywhere, _cdpObservePage, _cdpDismissOverlays, clickAtCoordinates, _findElementBbox, enhanceWithVisualProperties, _findElementByDescription, getAttachedTabIds} from './agent-tabs.js';
+import {checkCircuitBreaker, ABSOLUTE_MAX_STEPS} from './agent-circuit-breaker.js';
+import {captureStepScreenshot, setZoomRegion, getZoomRegion, formatZoomRegion} from './agent-screenshot.js';
+import {emitAgentStatus} from './agent-narration.js';
+import {MULTI_PORTAL_RE, MODE_TIER1_RE, MODE_TIER2_RE, ARTICLE_RE, ARTICLE_KEY_RE, isConfigChangeGoal, hasRecentCommitClick, hasPostCommitVerification, MODIFYING_ACTIONS, NON_PRODUCTIVE_READ_ACTIONS, REF_DRIVEN_ACTIONS, TARGETABLE_ACTIONS, LOOP_EXCLUDE_TYPES, DATA_ACTIONS, TAB_ACTIONS, INTERACTIVE_ACTIONS, CDP_FALLBACK_BLOCKED, EXTRACT_ACTIONS, MEMORY_WRITING_ACTIONS, MODIFYING_INTERACTIVE_ACTIONS, OTHER_ACTIONS, _hostnameOf} from './agent-config-gate.js';
+import {_initRunState, _buildPageNarration, narratePageState} from './agent-run-setup.js';
+import {_describeTarget, describeAction, requestApproval as _requestApprovalImpl} from './agent-approval.js';
+import {LOOP_PHASE, LOOP_EXIT, createLoopMachine, computeStepBudget, partitionElements, buildLoopDirective, escalateCircuitBreaker, buildPromptHistory, mapVisionAction, cleanFinishMemory} from './agent-loop-machine.js';
 
 // v4.0 VISION-FIRST MODULES
 const VISION_DISCOVER = `const __sentinel_discoverElements = function() {
@@ -538,37 +570,8 @@ const textResult = await cdpExecuteJs(tab,
 }
 
 
-import {sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview, sendCostUpdate} from './message-protocol.js';
-import {generateReport, buildFallbackReport} from './report-generator.js';
-import {getActiveProvider, getTextProvider} from './provider-registry.js';
-import {isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive, emitAgentCompletion} from './shared-state.js';
-import {getActiveTabId, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, getTabCount} from './tab-context.js';
-import {getClientStartupContext, markRunCompleted} from './client-knowledge.js';
-import {generateHeuristicPlan, _generateInitialPlan, _applyAdaptivePrompts, _waitForAdaptedGoalDecision, BARE_SITE_MAP} from './agent-planning.js';
-import {appendAuditEntry, getAuditLog, auditLogToCsv} from './audit-log.js';
-import {runRecoverySkills, getSkillStats} from './skills/index.js';
-import {tel, startRun, endRun} from "./telemetry.js";
 const telStartRun = startRun;
 const telEndRun = endRun;
-// (Phase 6) UAP bridge — broadcasts agent lifecycle events to external UAP server
-import {broadcast as uapBroadcast, setRunId as uapSetRunId} from "./uap-bridge.js";
-// (3.30.0) Trust-score computation at run finalize. Pure function — no side
-// effects, no chrome.* deps. We aggregate the run's metrics here at the end
-// of the loop and stamp the result onto both the report card and the
-// run-log index entry.
-import {computeTrustScore, suggestRetryActions} from './trust-score.js';
-// v10.0 Intelligence Systems Integration
-import {captureReasoningStep, getReasoningSummary} from './reasoning-trace.js';
-import {analyzeActionForBias, shouldTriggerBiasWarning, logBiasDetection, getBiasStatistics} from "./bias-detector.js";
-import {addKnowledgeNode, persistKnowledgeGraph} from './knowledge-graph.js';
-import {analyzeForContradictions, logContradictionDetection, getContradictionStatistics} from './contradiction-detector.js';
-import {analyzeForNovelty, storeNoveltyResult, getNoveltyStatistics} from './novelty-detector.js';
-import {synthesizeKnowledge, getSynthesisStatistics} from './knowledge-synthesizer.js';
-// v10.0 Advanced Intelligence Systems Integration (Phase 5)
-import {PredictiveEngine} from './predictive-engine.js';
-import {RuntimeProfiler} from './runtime-profiler.js';
-import {getErrorMessage, sleep} from './error-utils.js';
-import {_tenantsMatch, detectMfaInText, detectSignInWall, evaluateHallucinationRisk, _countSummaryClaims, _countSpecificClaims, _countSourceTags} from './agent-security.js';
 // ========== Agent State ==========
 // (v21.6.14) Hard tab limit — prevents browser crash from tab accumulation
 const MAX_AGENT_TABS = 3;
@@ -713,10 +716,6 @@ const _correctionQueue = new Map(); // tabId -> correction text
 let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained before consulting LLM
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
 let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verification failures; strategy shift after 2
-import {startRunRecording, recordStep, generateRunReplay, emitLearnedPatterns, notifyRunComplete, scoreActionConfidence, saveLearnedPattern} from './agent-reporting.js';
-import {sharedState} from './agent-shared-state.js';
-import {attachTabToSentinelGroup, detachAllSentinelTabs, closeAttachedTabsExceptPrimary, isAgentAttachedTab, isPrimaryPanelTab, setPrimaryPanelTab, _scopeSidePanelToPrimary, _enableSidePanelEverywhere, _cdpObservePage, _cdpDismissOverlays, clickAtCoordinates, _findElementBbox, enhanceWithVisualProperties, _findElementByDescription, getAttachedTabIds} from './agent-tabs.js';
-import {checkCircuitBreaker, ABSOLUTE_MAX_STEPS} from './agent-circuit-breaker.js';
 
 // Re-export originally-public functions for backward compatibility
 export { isAgentAttachedTab, isPrimaryPanelTab, getAttachedTabIds };
@@ -1020,13 +1019,9 @@ function activityUpdate(stepNumber, key, label) {
 }
 
 // ========== Step Screenshot Capture + Zoom — extracted to agent-screenshot.js ==========
-import {captureStepScreenshot, setZoomRegion, getZoomRegion, formatZoomRegion} from './agent-screenshot.js';
 export { setZoomRegion, getZoomRegion };
 
 // ========== Configuration ==========
-
-// ========== Live Status Narration — extracted to agent-narration.js ==========
-import {emitAgentStatus} from './agent-narration.js';
 
 // ========== History Helpers ==========
 // Deduplicated from ~47 inline occurrences across the agent loop.
@@ -1779,18 +1774,11 @@ export async function fetchAuditLog(id) {
 export { auditLogToCsv };
 
 // ========== Configuration Verification Gate — extracted to agent-config-gate.js ==========
-import {MULTI_PORTAL_RE, MODE_TIER1_RE, MODE_TIER2_RE, ARTICLE_RE, ARTICLE_KEY_RE, isConfigChangeGoal, hasRecentCommitClick, hasPostCommitVerification, MODIFYING_ACTIONS, NON_PRODUCTIVE_READ_ACTIONS, REF_DRIVEN_ACTIONS, TARGETABLE_ACTIONS, LOOP_EXCLUDE_TYPES, DATA_ACTIONS, TAB_ACTIONS, INTERACTIVE_ACTIONS, CDP_FALLBACK_BLOCKED, EXTRACT_ACTIONS, MEMORY_WRITING_ACTIONS, MODIFYING_INTERACTIVE_ACTIONS, OTHER_ACTIONS, _hostnameOf, } from "./agent-config-gate.js";
 
 // ========== Run Setup Helpers — extracted to agent-run-setup.js ==========
-import {_initRunState, _buildPageNarration, narratePageState} from './agent-run-setup.js';
 // (#45) The explicit loop state machine + the pure per-phase logic extracted
 // from runAgentLoop. LOOP_PHASE/LOOP_EXIT name the states and terminals the
 // loop already had; the helpers below are the same code, moved and unit-tested.
-import {
-  LOOP_PHASE, LOOP_EXIT, createLoopMachine,
-  computeStepBudget, partitionElements, buildLoopDirective, escalateCircuitBreaker,
-  buildPromptHistory, mapVisionAction, cleanFinishMemory,
-} from './agent-loop-machine.js';
 
 // (#45) The live state machine for the current run. Pure bookkeeping: it records
 // which phase the loop is in, which phases each step touched, and which of the
@@ -6724,7 +6712,6 @@ function escapeJsString(str, quote = '"') {
 }
 
 // ========== Approval Mode — extracted to agent-approval.js ==========
-import {_describeTarget, describeAction, requestApproval as _requestApprovalImpl} from './agent-approval.js';
 
 // Wrapper to handle agentPaused mutation locally
 async function requestApproval(command, stepNumber) {

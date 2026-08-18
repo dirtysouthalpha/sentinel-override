@@ -34,6 +34,10 @@ const AGENT_STARTING_ACTIONS = new Set(['analyze', 'extract', 'fill_form', 'scre
 
 // v21.6.43: Track which tab the user opened the side panel on
 let userPanelTabId = null;
+// Serializes credit_usage read-modify-write to prevent race conditions
+let _creditUpdateLock = Promise.resolve();
+// Tracks paused state locally for toggle (agentPaused in agent-engine is module-scoped there)
+let _agentPaused = false;
 import {getErrorMessage} from './error-utils.js';
 import {federation} from './federation.js';
 import {registerLocalPeers, getLocalPeerStatus} from './federation-local-bridge.js';
@@ -163,12 +167,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (AGENT_STARTING_ACTIONS.has(action)) {
     Promise.resolve(handleRuntimeMessage(message, { tab })).catch(() => {});
   } else if (action === 'monitor_changes') {
-    // Use selected text as selector hint, prompt via side panel
+    // Use selected text as selector hint, prompt via side panel.
+    // Sanitize selectionText to prevent CSS selector injection — escape all
+    // characters that are special in CSS selectors.
+    const rawText = String(params.selectionText || '').substring(0, 50);
+    const safeText = rawText.replace(/["'\\()[\]<>{}:.,#~+|^$*]/g, '');
     Promise.resolve(handleRuntimeMessage({
       action: 'context_menu_monitor_changes',
       params: {
-        selector: params.selectionText ? `*:contains('${String(params.selectionText || '').substring(0, 50).replace(/'/g, "\\'")}')` : 'body',
-        label: params.selectionText ? `Monitor: "${String(params.selectionText || '').substring(0, 30)}"` : 'Page Monitor',
+        selector: safeText ? `*:contains('${safeText}')` : 'body',
+        label: safeText ? `Monitor: "${safeText.substring(0, 30)}"` : 'Page Monitor',
         url: params.pageUrl,
       },
     }, { tab })).catch(() => {});
@@ -453,32 +461,47 @@ const handleRuntimeMessage = async (request, sender) => {
       }
     }
     case 'record_credit_usage': {
-      // Credit protection: record token usage for daily limit tracking
+      // Credit protection: record token usage for daily limit tracking.
+      // Serialized via _creditUpdateLock to prevent read-modify-write race
+      // conditions when two concurrent messages interleave at await points.
       try {
-        const today = new Date().toISOString().split('T')[0];
-        const inputTokens = request.inputTokens || 0;
-        const outputTokens = request.outputTokens || 0;
-        const model = request.model || '';
+        const result = await new Promise((resolve, reject) => {
+          // Chain this update after any pending one
+          const doUpdate = async () => {
+            try {
+              const today = new Date().toISOString().split('T')[0];
+              const inputTokens = request.inputTokens || 0;
+              const outputTokens = request.outputTokens || 0;
+              const model = request.model || '';
 
-        const stored = await chrome.storage.local.get(['credit_usage', 'credit_limit']);
-        const usage = stored.credit_usage || {};
-        if (!usage[today]) usage[today] = { tokens: 0, cost: 0, calls: 0 };
+              const stored = await chrome.storage.local.get(['credit_usage', 'credit_limit']);
+              const usage = stored.credit_usage || {};
+              if (!usage[today]) usage[today] = { tokens: 0, cost: 0, calls: 0 };
 
-        // (v21.6) Provider-aware cost tracking — uses real per-model pricing tables
-        const addedCost = estimateCostUsd(inputTokens, outputTokens, model);
+              // (v21.6) Provider-aware cost tracking — uses real per-model pricing tables
+              const addedCost = estimateCostUsd(inputTokens, outputTokens, model);
 
-        usage[today].tokens += inputTokens + outputTokens;
-        usage[today].cost += addedCost;
-        usage[today].calls++;
+              usage[today].tokens += inputTokens + outputTokens;
+              usage[today].cost += addedCost;
+              usage[today].calls++;
 
-        // Keep only last 7 days
-        const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
-        for (const key of Object.keys(usage)) {
-          if (key < cutoff) delete usage[key];
-        }
+              // Keep only last 7 days
+              const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+              for (const key of Object.keys(usage)) {
+                if (key < cutoff) delete usage[key];
+              }
 
-        await chrome.storage.local.set({ credit_usage: usage });
-        return { ok: true };
+              await chrome.storage.local.set({ credit_usage: usage });
+              resolve({ ok: true });
+            } catch (e) {
+              reject(e);
+            }
+          };
+
+          // Serialize: chain after current lock, then set lock to this update
+          _creditUpdateLock = _creditUpdateLock.then(doUpdate, doUpdate);
+        });
+        return result;
       } catch (e) {
         return { ok: false, error: getErrorMessage(e) };
       }
@@ -562,7 +585,10 @@ const handleRuntimeMessage = async (request, sender) => {
         const codePreview = String(request.code || '').substring(0, 500);
 
         return await new Promise((resolve) => {
+          let settled = false;
           const finish = (payload) => {
+            if (settled) return; // Guard against double-resolve
+            settled = true;
             resolve(payload);
           };
 
@@ -582,7 +608,7 @@ const handleRuntimeMessage = async (request, sender) => {
             },
             requestId
           }).catch((_e) => {
-            console.error('[finish] Unhandled rejection:', getErrorMessage(_e));
+            console.warn('[Sentinel] Approval broadcast failed:', getErrorMessage(_e));
           });
 
           // Notify the user
@@ -596,12 +622,28 @@ const handleRuntimeMessage = async (request, sender) => {
           } catch (_e) { /* notification API may not be available */ }
 
           let hardRejectId = null;
+          let swHealthCheckId = null;
+
+          // SW suspend detection: if the SW suspends during approval, the Promise
+          // would hang forever. Poll a lightweight SW liveness check so we can
+          // reject promptly instead of waiting for the hard timeout.
+          const swHealthCheck = () => {
+            try {
+              chrome.runtime.sendMessage({ action: 'ping' }, (resp) => {
+                if (chrome.runtime.lastError || !resp) {
+                  // SW unresponsive — reject promptly
+                  finish({ approved: false, reason: 'sw_suspend_detected' });
+                }
+              });
+            } catch (_e) { /* ping failed — SW may be suspending */ }
+          };
 
           const listener = (message) => {
             if (message && typeof message === 'object' && message.action === 'approval_response' && message.requestId === requestId) {
               chrome.runtime.onMessage.removeListener(listener);
               clearTimeout(timeoutId);
               if (hardRejectId) clearTimeout(hardRejectId);
+              if (swHealthCheckId) clearInterval(swHealthCheckId);
               finish({
                 approved: !!message.approved,
                 reason: message.approved ? 'user_approved' : 'user_rejected'
@@ -610,13 +652,14 @@ const handleRuntimeMessage = async (request, sender) => {
           };
           chrome.runtime.onMessage.addListener(listener);
 
-          // Soft timeout: 60s — pause and notify
+          // Soft timeout: 60s — switch to a replacement listener
           const timeoutId = setTimeout(() => {
             chrome.runtime.onMessage.removeListener(listener);
 
             const replacementListener = (message) => {
               if (message && typeof message === 'object' && message.action === 'approval_response' && message.requestId === requestId) {
                 if (hardRejectId) clearTimeout(hardRejectId);
+                if (swHealthCheckId) clearInterval(swHealthCheckId);
                 chrome.runtime.onMessage.removeListener(replacementListener);
                 finish({
                   approved: !!message.approved,
@@ -628,11 +671,15 @@ const handleRuntimeMessage = async (request, sender) => {
             // Hard-reject after 5 min total — must be defined after replacementListener
             hardRejectId = setTimeout(() => {
               chrome.runtime.onMessage.removeListener(replacementListener);
+              if (swHealthCheckId) clearInterval(swHealthCheckId);
               finish({ approved: false, reason: 'approval_hard_timeout' });
             }, 240000);
 
             chrome.runtime.onMessage.addListener(replacementListener);
           }, ONE_MINUTE_MS);
+
+          // Start SW health check every 15s during approval wait
+          swHealthCheckId = setInterval(swHealthCheck, 15000);
         });
       } catch (e) {
         return { approved: false, reason: getErrorMessage(e) };
@@ -1302,6 +1349,10 @@ chrome.windows.onCreated.addListener(async (win) => {
 // Detect externally-closed tabs and clean up context
 chrome.tabs.onRemoved.addListener((tabId) => {
   handleTabRemoved(tabId);
+  // Clear userPanelTabId if the tracked tab was closed to prevent stale references
+  if (tabId === userPanelTabId) {
+    userPanelTabId = null;
+  }
 });
 
 // Track user tab switches for popup UI awareness AND side-panel visibility.
@@ -1374,9 +1425,16 @@ chrome.commands.onCommand.addListener(async (command) => {
       }
       case 'pause-agent': {
         if (agentRunning) {
-                    // Simple toggle: pause if running, resume if paused (agentPaused read from module scope won't work)
-          // Instead, just send both and let the engine decide
-          await pauseAgent(); // Will set agentPaused = true
+          // Toggle: pause if running, resume if paused
+          if (_agentPaused) {
+            await resumeAgent();
+            _agentPaused = false;
+            notifyIfEnabled({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '▶️ Agent resumed' });
+          } else {
+            await pauseAgent();
+            _agentPaused = true;
+            notifyIfEnabled({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '⏸️ Agent paused' });
+          }
         }
         break;
       }
