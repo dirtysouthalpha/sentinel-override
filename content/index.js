@@ -1112,6 +1112,13 @@ if (window.__sentinelInitialized) {
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // Defense-in-depth: verify sender is from this extension.
+    // The manifest has no `externally_connectable`, so only same-extension
+    // senders can reach this handler — but we validate anyway as a safeguard
+    // against future manifest changes or browser bugs.
+    if (!sender || sender.id !== chrome.runtime.id) {
+      return;
+    }
     handleMessage(request)
       .then(data => {
         // If handleMessage returned null the action is unrecognised — do NOT
@@ -1170,12 +1177,15 @@ if (window.__sentinelInitialized) {
     'postMessage',
     'navigator', 'location',
     'chrome',
-    'crypto'
+    'crypto',
+    // Window references that bypass the with-proxy (direct real-window access)
+    'self', 'top', 'parent', 'frames', 'globalThis', 'window'
   ]);
 
   // Document-level properties to block (beyond what EXECUTE_JS_BLOCKED_APIS covers for window)
   const EXECUTE_JS_BLOCKED_DOC_PROPS = new Set([
-    'cookie', 'domain', 'referrer', 'location', 'write', 'writeln'
+    'cookie', 'domain', 'referrer', 'location', 'write', 'writeln',
+    'defaultView' // returns the real window, bypassing the proxy
   ]);
 
   // Creates a Proxy wrapping the document that blocks sensitive properties
