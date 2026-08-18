@@ -5385,12 +5385,11 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
           const _needsAnalysis = _analysisKeywords.test(goal || '');
           if (_needsAnalysis && _memSize > 500) {
             // Don't force-finish — instead tell the model to process and call done()
-            loopDirective = `
-⚡ DATA READY — You have ${_memSize} chars of data in memory under "${savedKey}". 
-STOP extracting. You MUST now call done() with a summary that directly ANSWERS every question in the original goal. 
-Use the data you already extracted — do NOT run execute_js again. Call done() NOW.`;
+            // Push to history instead of loopDirective because `continue` jumps to
+            // the top of the loop where loopDirective is reset before the LLM sees it.
+            const dataReadyDirective = `⚡ DATA READY — You have ${_memSize} chars of data in memory under "${savedKey}". STOP extracting. You MUST now call done() with a summary that directly ANSWERS every question in the original goal. Use the data you already extracted — do NOT run execute_js again. Call done() NOW.`;
             result = `DATA READY: You have ${_memSize} chars. Process the data to answer the goal questions, then call done().`;
-            historyPush({ step: stepCount, action: command, result });
+            historyPush({ step: stepCount, action: { type: 'note', text: dataReadyDirective }, result });
             await _guardedPersistHistory();
             sendActionResult(stepCount, result, false);
             sendSilentUpdate('[ENGINE] Analysis task detected — instructing model to process data and finish', stepCount);
