@@ -141,13 +141,13 @@ function renderScheduleCard(schedule) {
   } else if (schedule.recurrence) {
     const r = schedule.recurrence;
     if (r.interval === 'daily') {
-      recurrenceText = `Daily at ${r.time || '09:00'}`;
+      recurrenceText = `Daily at ${escapeHtml(r.time || '09:00')}`;
     } else if (r.interval === 'weekly' && r.daysOfWeek && r.daysOfWeek.length) {
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const days = [...r.daysOfWeek].sort((a, b) => a - b).map(d => dayNames[d]).join(', ');
-      recurrenceText = `Weekly on ${days} at ${r.time || '09:00'}`;
+      recurrenceText = `Weekly on ${days} at ${escapeHtml(r.time || '09:00')}`;
     } else if (r.interval === 'custom') {
-      recurrenceText = `Every ${r.periodInMinutes || 60} minutes`;
+      recurrenceText = `Every ${Number(r.periodInMinutes) || 60} minutes`;
     } else {
       recurrenceText = 'Recurring';
     }
@@ -155,14 +155,14 @@ function renderScheduleCard(schedule) {
 
   // Next run countdown
   const nextRunText = isEnabled
-    ? formatCountdown(schedule.nextRunAt)
+    ? escapeHtml(formatCountdown(schedule.nextRunAt))
     : (schedule.nextRunAt ? 'Disabled' : 'Not scheduled');
 
   // Last run status badge
   let statusBadge = '';
   if (schedule.lastRunStatus) {
     const validStatuses = ['success','failed','running','pending','error','timeout','cancelled'];
-    const statusClass = validStatuses.includes(schedule.lastRunStatus) ? schedule.lastRunStatus : 'unknown';
+    const statusClass = validStatuses.includes(schedule.lastRunStatus) ? escapeHtml(schedule.lastRunStatus) : 'unknown';
     const status = schedule.lastRunStatus || '';
     const statusLabel = escapeHtml(status ? status.charAt(0).toUpperCase() + status.slice(1) : '?');
     statusBadge = `<span class="schedule-status-badge ${statusClass}">${statusLabel}</span>`;
@@ -183,7 +183,7 @@ function renderScheduleCard(schedule) {
     <div class="schedule-card-meta">
       <span>${recurrenceText}</span>
       <span>${nextRunText}</span>
-      ${schedule.lastRunAt ? `<span>Last run: ${relativeTime(schedule.lastRunAt)}</span>` : ''}
+      ${schedule.lastRunAt ? `<span>Last run: ${escapeHtml(relativeTime(schedule.lastRunAt))}</span>` : ''}
       ${statusBadge}
     </div>
     <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end;">
@@ -403,7 +403,7 @@ function renderTemplateParams(params) {
     row.style.marginTop = '8px';
     row.innerHTML = `
       <label>${escapeHtml(param.label || param.key)}</label>
-      <input type="text" data-sch-param="${param.key}" placeholder="${escapeHtml(param.defaultValue || 'Enter value...')}" value="${escapeHtml(param.defaultValue || '')}">
+      <input type="text" data-sch-param="${escapeHtml(param.key)}" placeholder="${escapeHtml(param.defaultValue || 'Enter value...')}" value="${escapeHtml(param.defaultValue || '')}">
     `;
     container.appendChild(row);
   });
@@ -625,9 +625,9 @@ async function showRunHistory(scheduleId, scheduleName) {
         item.className = 'schedule-result-item';
 
         const validStatuses = ['success','failed','running','pending','error','timeout','cancelled'];
-        const statusClass = validStatuses.includes(result.status) ? result.status : 'pending';
+        const statusClass = validStatuses.includes(result.status) ? escapeHtml(result.status) : 'pending';
         const statusLabel = escapeHtml((result.status || 'pending').charAt(0).toUpperCase() + (result.status || 'pending').slice(1));
-        const duration = formatDuration(result.startedAt, result.completedAt);
+        const duration = escapeHtml(formatDuration(result.startedAt, result.completedAt));
         const timestamp = result.completedAt
           ? new Date(result.completedAt).toLocaleString()
           : 'In progress...';
@@ -737,9 +737,9 @@ async function handleNlpParse() {
       if (altEl) {
         altEl.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px;">Did you mean?</div>' +
           response.alternatives.map(function(alt, i) {
-            return '<button type="button" class="nlp-alt-btn" data-alt-idx="' + i + '" ' +
+            return '<button type="button" class="nlp-alt-btn" data-alt-idx="' + Number(i) + '" ' +
               'style="display:block;margin:4px 0;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-primary);width:100%;text-align:left;">' +
-              formatSchedulePreviewLocal(alt) + '</button>';
+              escapeHtml(formatSchedulePreviewLocal(alt)) + '</button>';
           }).join('');
         altEl.style.display = 'block';
 

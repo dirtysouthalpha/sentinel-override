@@ -164,7 +164,7 @@ const WELCOME_MESSAGE_RE = /^\s*<div class="welcome-message"/i;
       const ageMin = Math.round((Date.now() - entry.createdAt) / 60000);
       const ageStr = ageMin < 1 ? 'just now' : ageMin < 60 ? `${ageMin} min ago` : ageMin < 1440 ? `${Math.round(ageMin / 60)}h ago` : `${Math.round(ageMin / 1440)}d ago`;
       banner.innerHTML =
-        `<span><strong>Restored chat</strong> · archived ${ageStr} · ${entry.messagesCount || 0} messages${entry.hadReport ? ' · had report' : ''}</span>` +
+        `<span><strong>Restored chat</strong> · archived ${ageStr} · ${Number(entry.messagesCount) || 0} messages${entry.hadReport ? ' · had report' : ''}</span>` +
         '<button id="dismissRestoredBanner" style="background: transparent; border: 1px solid var(--border-color, rgba(255,255,255,0.15)); color: var(--text-secondary, #aaa); padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">Dismiss</button>';
       chatContainer.insertBefore(banner, chatContainer.firstChild);
       const dismissBtn = banner.querySelector('#dismissRestoredBanner');
@@ -221,17 +221,16 @@ const WELCOME_MESSAGE_RE = /^\s*<div class="welcome-message"/i;
       listEl.innerHTML = '<div style="text-align:center; color:var(--text-tertiary, #888); font-size:13px; padding:24px;">No recent chats yet. Start an agent run; it will be archived automatically when the side panel closes or the run finishes.</div>';
       return;
     }
-    const rowsHtml = chats.reduce((acc, c) => {
-      if (!c) return acc;
+    const rowsHtml = chats.filter(Boolean).map((c) => {
       const goal = _escapeHtml((c.goal || '(no goal)').substring(0, 200));
       const ageStr = _formatAge(c.createdAt);
       const stats = [
-        `${c.messagesCount || 0} msgs`,
+        `${Number(c.messagesCount) || 0} msgs`,
         c.hadReport ? '<span style="color: var(--success-color, #6fcf80);">report</span>' : null,
         c.runLogId ? '<span style="color: var(--accent-primary, #ff6b00);">run-logged</span>' : null,
-        c.archivedReason ? c.archivedReason : null,
+        c.archivedReason ? _escapeHtml(c.archivedReason) : null,
       ].filter(Boolean).join(' · ');
-      acc.push(`
+      return `
         <div class="recent-chat-row" data-id="${_escapeHtml(c.id)}" style="padding:10px 12px; border:1px solid var(--border-color); border-radius:8px; margin-bottom:8px; background:var(--bg-secondary);">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;">
             <div style="flex:1; min-width:0;">
@@ -244,9 +243,8 @@ const WELCOME_MESSAGE_RE = /^\s*<div class="welcome-message"/i;
             <button class="recent-delete-btn small-btn" data-id="${_escapeHtml(c.id)}" style="font-size:11px; color:var(--error-color, #f44); margin-left:auto;">Delete</button>
           </div>
         </div>
-      `);
-      return acc;
-    }, []).join('');
+      `;
+    }).join('');
     listEl.innerHTML = rowsHtml;
     listEl.querySelectorAll('.recent-restore-btn').forEach(b => {
       b.addEventListener('click', async () => {

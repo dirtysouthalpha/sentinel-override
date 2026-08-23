@@ -6,6 +6,14 @@
 - **`scripts/check-html-injection.cjs`** — AST-based gate (via `@babel/parser`) that fails `npm run test:web` if any `web/` HTML sink (`innerHTML`/`outerHTML`/`insertAdjacentHTML`/`document.write`, inline or standalone script) receives an expression it cannot prove inert: literals, `escHtml()`/`escAttr()` calls, `Math`/`Number` results, safe compositions, never-reassigned consts with safe initializers, `map(fn).join()` with safe returns. Every XSS this project shipped was an unescaped interpolation into `innerHTML`; the rule is now mechanical instead of disciplinary. 8 jest tests prove both directions. 16 sinks currently checked, 0 unsafe.
 - **`lib/report-sanitize.js`** — the ONE copy of `sanitizeReportHtml`, previously hand-duplicated in `report-view.js` and `report-print.js` (drift between two copies of a security function is a one-page-only XSS waiting to fire). Loaded by both report pages before their page script; 8 jest tests pin strip behavior plus drift guards against private forks and wrong load order.
 
+### Added (2)
+- **HTML-injection gate now covers the whole repo.** `check-html-injection.cjs` extended from `web/` to `popup-modules/`, `content/`, and the root popup/report pages — 157 sinks proven safe, 0 exceptions. The prover grew sound compositional rules (safe-write `let`s, literal lookup tables, `.map/.filter/.join` pipelines, numeric/date formatters, escape aliases, IIFEs) and its failures now name the exact unproven interpolation. 45 initially-unproven sinks were triaged: most were hardened with `escapeHtml()`/`Number()` wraps so safety is locally evident; `setResponseHTML(rawHtml)` in quick-assist was replaced with a DOM-built `setResponseError(message)`.
+
+### Fixed (2)
+- **quick-assist markdown double-escape**: `renderMarkdown` escaped its input via `escapeHtml` and then re-escaped `&<>` a second time, so `<` in AI responses displayed as the literal text `&lt;`.
+- **Typing-banner double-escape** (`content/index.js`): the preview string was escaped at build AND at use; special characters in typed text displayed as entity text.
+- **Run-log rows escaped only `<`** (`chat.js`): the goal text now goes through full `escapeHtml` instead of a lone `<` replace.
+
 ### Fixed
 - **Prime dashboard: Escape now cancels inline conversation rename.** The input saved on blur, and Escape triggered a re-render that removed the focused input — firing blur and PATCHing the value the user asked to discard.
 - **Prime dashboard: conversation rail keyboard support.** Group headers declared `role="button"`/`tabindex="0"` but only handled click (Enter/Space now toggle, including the dynamic pinned group); the pinned group's saved collapse state was dropped every reload (created after `loadGroupState()` ran); the conversation context menu (`role="menu"`) closes on Escape.

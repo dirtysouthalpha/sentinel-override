@@ -2133,10 +2133,10 @@ function renderCommandList(commands) {
     item.dataset.index = idx;
     item.dataset.action = cmd.action;
     item.innerHTML = `
-      <div class="command-icon">${cmd.icon}</div>
+      <div class="command-icon">${escapeHtml(cmd.icon)}</div>
       <div class="command-text">
-        <div class="command-name">${cmd.name}</div>
-        <div class="command-desc">${cmd.desc}</div>
+        <div class="command-name">${escapeHtml(cmd.name)}</div>
+        <div class="command-desc">${escapeHtml(cmd.desc)}</div>
       </div>
     `;
     item.addEventListener('click', () => executeCommand(cmd.action));
@@ -2734,28 +2734,31 @@ function _formatDuration(ms) {
 
 /** Ensure a step card exists for this stepNumber and return its activity stream container. */
 function _ensureActivityStream(stepNumber) {
-  if (__activityState.has(stepNumber)) {
-    return __activityState.get(stepNumber).stream;
+  // Coerce before this value reaches a querySelector string and an HTML
+  // template below — it arrives on a runtime message, not from local code.
+  const stepNum = Number(stepNumber) || 0;
+  if (__activityState.has(stepNum)) {
+    return __activityState.get(stepNum).stream;
   }
   // Look up the action card by stepNumber (created by addActionCard) — if it
   // doesn't exist yet (agent_step_start arrived first), create a placeholder
   // card so the activity items have somewhere to go.
   const welcome = chatContainer.querySelector('.welcome-message');
   if (welcome) welcome.remove();
-  let card = chatContainer.querySelector(`.agent-action-group[data-step="${stepNumber}"]`);
+  let card = chatContainer.querySelector(`.agent-action-group[data-step="${stepNum}"]`);
   if (!card) {
     // Create a placeholder step card
     card = document.createElement('div');
     card.className = 'message-group agent-action-group activity-step-card';
-    card.setAttribute('data-step', stepNumber);
+    card.setAttribute('data-step', stepNum);
     card.innerHTML = `
       <div class="message-wrapper assistant-wrapper">
         <div class="message assistant-msg activity-step-msg">
           <div class="activity-step-header" style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-            <span class="activity-step-label" style="font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Step ${stepNumber}</span>
+            <span class="activity-step-label" style="font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Step ${stepNum}</span>
             <span class="activity-step-action" style="font-size:12px; color:var(--text-primary); line-height:1.4;">Preparing…</span>
           </div>
-          <div class="activity-stream" data-step="${stepNumber}"></div>
+          <div class="activity-stream" data-step="${stepNum}"></div>
         </div>
       </div>
     `;
@@ -2767,14 +2770,14 @@ function _ensureActivityStream(stepNumber) {
       if (msg) {
         const stream = document.createElement('div');
         stream.className = 'activity-stream';
-        stream.setAttribute('data-step', stepNumber);
+        stream.setAttribute('data-step', stepNum);
         stream.style.cssText = 'margin-top:6px;';
         msg.appendChild(stream);
       }
     }
   }
   const stream = card.querySelector('.activity-stream');
-  __activityState.set(stepNumber, { card, stream });
+  __activityState.set(stepNum, { card, stream });
   chatContainer.scrollTop = chatContainer.scrollHeight;
   return stream;
 }
@@ -2803,7 +2806,7 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
   // Duration string from detail
   let durationStr = '';
   if (detail && typeof detail.durationMs === 'number' && status !== 'in_progress') {
-    durationStr = ` <span style="color:var(--text-tertiary); font-size:11px; margin-left:6px;">· ${_formatDuration(detail.durationMs)}</span>`;
+    durationStr = ` <span style="color:var(--text-tertiary); font-size:11px; margin-left:6px;">· ${escapeHtml(_formatDuration(detail.durationMs))}</span>`;
   }
 
   item.innerHTML = `<span style="color:${statusColor}; display:inline-flex;">${_activityIcon(status)}</span>
@@ -3156,7 +3159,7 @@ function showRunLogExportButton(runLogId, entryCount) {
       <span>Forensic run log available</span>
     </div>
     <div style="font-size: 12px; margin: 6px 0 8px 22px;">
-      ${entryCount} structured log entries captured for this run. Export as JSON or CSV for the ticket.
+      ${Number(entryCount) || 0} structured log entries captured for this run. Export as JSON or CSV for the ticket.
     </div>
     <div class="safety-banner-actions" style="margin-left: 22px;">
       <button class="safety-banner-dismiss" id="exportRunLogJsonBtn" style="background: var(--accent-primary, #ff6b00); color: white; border-color: var(--accent-primary, #ff6b00);">Export JSON</button>
@@ -3219,15 +3222,15 @@ async function renderRunLogHistoryList() {
     };
     const rowsHtml = list.map((entry) => {
       const id = escapeHtml(entry.runLogId || '');
-      const goalShort = (entry.goal || '(no goal)').replace(/</g, '&lt;').slice(0, 140);
+      const goalShort = escapeHtml(String(entry.goal || '(no goal)').slice(0, 140));
       const statusChip = entry.completed
         ? '<span style="display:inline-block; padding:2px 6px; font-size:10px; border-radius:8px; background:rgba(0,255,100,0.12); color:#33cc66; border:1px solid #2a9d4a;">COMPLETE</span>'
         : '<span style="display:inline-block; padding:2px 6px; font-size:10px; border-radius:8px; background:rgba(255,180,0,0.12); color:#cc8800; border:1px solid #aa7700;">INCOMPLETE</span>';
       const duration = fmtDuration(entry.startedAt, entry.finishedAt);
       const subtitle = [
         fmtDate(entry.startedAt),
-        `${entry.stepCount || 0} steps`,
-        `${entry.apiCallCount || 0} AI calls`,
+        `${Number(entry.stepCount) || 0} steps`,
+        `${Number(entry.apiCallCount) || 0} AI calls`,
         duration
       ].filter(Boolean).join(' · ');
       return `
@@ -3235,7 +3238,7 @@ async function renderRunLogHistoryList() {
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
             <div style="flex:1; min-width:0;">
               <div style="font-size:13px; color:var(--text-primary); line-height:1.4; word-break:break-word;">${goalShort}</div>
-              <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px;">${subtitle}</div>
+              <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px;">${escapeHtml(subtitle)}</div>
             </div>
             <div style="flex-shrink:0;">${statusChip}</div>
           </div>
@@ -3392,7 +3395,7 @@ function showResumeBanner(goal, stepCount, ageSeconds) {
   banner.className = 'safety-banner';
   banner.style.borderColor = 'var(--accent-primary, #ff6b00)';
   const ageText = (!ageSeconds || Number.isNaN(ageSeconds)) ? 'unknown ago'
-    : ageSeconds < 60 ? `${ageSeconds}s ago` : `${Math.floor(ageSeconds / 60)}m ago`;
+    : ageSeconds < 60 ? `${Number(ageSeconds)}s ago` : `${Math.floor(ageSeconds / 60)}m ago`;
   const preview = `${(goal || '').slice(0, 200)}${(goal || '').length > 200 ? '…' : ''}`;
   banner.innerHTML = `
     <div class="safety-banner-header" style="color: var(--accent-primary, #ff6b00);">
@@ -3404,7 +3407,7 @@ function showResumeBanner(goal, stepCount, ageSeconds) {
       <span>Resume previous run?</span>
     </div>
     <div style="font-size: 12px; margin: 6px 0 6px 22px; opacity: 0.85;">
-      Last run reached step ${stepCount} (${ageText}). Goal preview:
+      Last run reached step ${Number(stepCount) || 0} (${ageText}). Goal preview:
     </div>
     <div style="font-size: 11px; margin: 0 0 8px 22px; padding: 6px 8px; background: rgba(0,0,0,0.18); border-radius: 4px; font-family: 'Inter', sans-serif; line-height: 1.4;">
       ${escapeHtml(preview)}
@@ -3792,10 +3795,10 @@ chrome.runtime.onMessage.addListener((message) => {
       }
       const colors = { healthy: '#4caf50', slow: '#ff9800', down: '#f44336', idle: '#666', unknown: '#666' };
       const labels = { healthy: 'API: responding', slow: 'API: slow', down: 'API: down', idle: 'API: idle', unknown: 'API: ?' };
-      const dot = colors[message.state] || '#666';
-      const label = labels[message.state] || 'API: ?';
-      const avg = (typeof message.avgMs === 'number') ? `${message.avgMs}ms avg` : '';
-      healthBar.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';"></span><span>' + label + '</span>' + (avg ? '<span style="margin-left:4px;color:#555;">' + avg + '</span>' : '');
+      const apiDot = colors[message.state] || '#666';
+      const apiLabel = labels[message.state] || 'API: ?';
+      const apiAvg = (typeof message.avgMs === 'number') ? `${Number(message.avgMs)}ms avg` : '';
+      healthBar.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + apiDot + ';"></span><span>' + apiLabel + '</span>' + (apiAvg ? '<span style="margin-left:4px;color:#555;">' + apiAvg + '</span>' : '');
     });
   }
   // (6.0) API health heartbeat
@@ -3832,7 +3835,7 @@ chrome.runtime.onMessage.addListener((message) => {
           if (details) details.style.display = details.style.display === 'none' ? 'block' : 'none';
         });
       }
-      knowledgeBar.innerHTML = '<span style="color:#5bc0de;">&#9432;</span><span>Using ' + message.factCount + ' facts' + (message.clientName ? ' for ' + escapeHtml(message.clientName || '') : '') + '</span>';
+      knowledgeBar.innerHTML = '<span style="color:#5bc0de;">&#9432;</span><span>Using ' + (Number(message.factCount) || 0) + ' facts' + (message.clientName ? ' for ' + escapeHtml(message.clientName || '') : '') + '</span>';
       // Add expandable details
       let details = document.getElementById('knowledge-details');
       if (!details) {
@@ -3931,7 +3934,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
     const header = document.createElement('div');
     header.style.cssText = 'font-size:13px;font-weight:600;color:#ccc;margin-bottom:8px;display:flex;justify-content:space-between;';
-    header.innerHTML = '<span>Plan: ' + message.totalSteps + ' steps</span><span style="font-size:11px;color:#666;cursor:pointer;" id="plan-toggle">Collapse</span>';
+    header.innerHTML = '<span>Plan: ' + (Number(message.totalSteps) || 0) + ' steps</span><span style="font-size:11px;color:#666;cursor:pointer;" id="plan-toggle">Collapse</span>';
     planPanel.appendChild(header);
 
     const stepsList = document.createElement('div');
@@ -3941,7 +3944,7 @@ chrome.runtime.onMessage.addListener((message) => {
     message.plan.forEach((step) => {
       const stepDiv = document.createElement('div');
       stepDiv.style.cssText = 'padding:4px 8px;margin:2px 0;border-radius:4px;color:#999;display:flex;gap:8px;';
-      stepDiv.innerHTML = '<span style="color:#555;min-width:20px;">' + (step.index + 1) + '.</span><span>' + escapeHtml(step.text) + '</span>';
+      stepDiv.innerHTML = '<span style="color:#555;min-width:20px;">' + (Number(step.index) + 1) + '.</span><span>' + escapeHtml(step.text) + '</span>';
       stepsList.appendChild(stepDiv);
     });
 
@@ -4035,7 +4038,7 @@ chrome.runtime.onMessage.addListener((message) => {
           const state = __activityState.get(p.stepNumber);
           const card = state ? state.card : null;
           if (card && !card.querySelector('.confidence-bar')) {
-            const pct = p.confidence;
+            const pct = Number(p.confidence);
             const color = pct > 80 ? '#4caf50' : pct > 50 ? '#ff9800' : '#f44336';
             const bar = document.createElement('div');
             bar.className = 'confidence-bar';
@@ -4184,13 +4187,13 @@ chrome.runtime.onMessage.addListener((message) => {
         // Define _trustRow here so it's available before card.innerHTML uses it below.
         const _trustRow = (label, comp) => {
           if (!comp) return '';
-          const pts = (typeof comp.points === 'number') ? comp.points : 0;
-          const max = (typeof comp.max === 'number') ? comp.max : 0;
+          const pts = (typeof comp.points === 'number') ? Number(comp.points) : 0;
+          const max = (typeof comp.max === 'number') ? Number(comp.max) : 0;
           const ratio = (typeof max === 'number' && max !== 0 && !Number.isNaN(max)) ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
           const barColor = pts < 0 ? '#f44' : (ratio > 0.7 ? '#9ece6a' : ratio > 0.4 ? '#e0af68' : '#f44');
           const widthPct = Math.min(100, Math.round(ratio * 100));
           return `<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">
-                   <span style="color:var(--text-secondary); flex-shrink:0; min-width:110px;">${label}</span>
+                   <span style="color:var(--text-secondary); flex-shrink:0; min-width:110px;">${escapeHtml(label)}</span>
                    <div style="flex:1; height:5px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden;">
                      <div style="width:${widthPct}%; height:100%; background:${barColor};"></div>
                    </div>
@@ -4215,7 +4218,7 @@ chrome.runtime.onMessage.addListener((message) => {
           card.innerHTML =
             `<div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-tcs-toggle="1">
               <div>
-                <strong style="color:${bandColor}; font-size:14px;">Trust ${ts.score}/100</strong>
+                <strong style="color:${bandColor}; font-size:14px;">Trust ${Number(ts.score)}/100</strong>
                 <span style="color:var(--text-secondary); margin-left:8px;">${bandLabel}</span>
               </div>
               <span style="font-size:10px; color:var(--text-tertiary);">▾ details</span>
@@ -4410,12 +4413,12 @@ chrome.runtime.onMessage.addListener((message) => {
         const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
         if (chatArea) chatArea.parentNode.insertBefore(patternsPanel, chatArea);
       }
-      const header = '<div style="color:#888;margin-bottom:4px;">Learned Patterns (' + message.patterns.length + ')</div>';
-      const rows = message.patterns.slice(0, 5).map(function(p) {
+      const patternsHeader = '<div style="color:#888;margin-bottom:4px;">Learned Patterns (' + message.patterns.length + ')</div>';
+      const patternRows = message.patterns.slice(0, 5).map(function(p) {
         const color = p.rate >= 90 ? '#4caf50' : p.rate >= 70 ? '#ff9800' : '#f44336';
         return '<div style="display:flex;justify-content:space-between;padding:2px 0;color:#777;"><span>' + escapeHtml(String(p.pattern)) + '</span><span style="color:' + color + '">' + escapeHtml(String(p.rate)) + '% (' + escapeHtml(String(p.uses)) + ')</span></div>';
       }).join('');
-      patternsPanel.innerHTML = header + rows;
+      patternsPanel.innerHTML = patternsHeader + patternRows;
     } catch (e) { console.warn('[Sentinel] Patterns panel render error:', e); }
   }
   // ERR-02/03: Render AgentError as error card in chat

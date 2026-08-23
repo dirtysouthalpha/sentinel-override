@@ -118,8 +118,8 @@ function renderTemplateList(templates) {
       <div class="template-card-goal">${escapeHtml(template.goal)}</div>
       ${tagsHtml}
       <div class="template-card-meta">
-        <span>Last used: ${relativeTime(template.lastUsedAt)}</span>
-        <span>Runs: ${template.runCount || 0}</span>
+        <span>Last used: ${escapeHtml(relativeTime(template.lastUsedAt))}</span>
+        <span>Runs: ${Number(template.runCount) || 0}</span>
         <span>${(function() { const pl = template.params && template.params.length || 0; return pl > 0 ? `${pl} param${pl > 1 ? 's' : ''}` : 'No params'; })()}</span>
       </div>
     `;
@@ -321,7 +321,7 @@ function updateParamEditor(existingParams) {
     row.className = 'template-param-row';
     row.innerHTML = `
       <label>${escapeHtml(label)}</label>
-      <input type="text" data-param-key="${key}" placeholder="Default value (optional)" value="${escapeHtml(defaultValue)}">
+      <input type="text" data-param-key="${escapeHtml(key)}" placeholder="Default value (optional)" value="${escapeHtml(defaultValue)}">
     `;
     container.appendChild(row);
   });
@@ -361,7 +361,7 @@ function openRunModal(templateId) {
         row.className = 'template-param-row';
         row.innerHTML = `
           <label>${escapeHtml(param.label || param.key)}</label>
-          <input type="text" data-run-param="${param.key}" placeholder="${escapeHtml(param.defaultValue || 'Enter value...')}" value="${escapeHtml(param.defaultValue || '')}">
+          <input type="text" data-run-param="${escapeHtml(param.key)}" placeholder="${escapeHtml(param.defaultValue || 'Enter value...')}" value="${escapeHtml(param.defaultValue || '')}">
         `;
         container.appendChild(row);
       });

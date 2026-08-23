@@ -265,11 +265,9 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   function renderMarkdown(text) {
     text = escapeHtml(text);
     if (!text) return '';
+    // NOTE: escapeHtml above is the ONLY escape pass. A second &/</> replace
+    // here used to double-escape, rendering '<' as the literal text '&lt;'.
     var html = text
-      // Escape HTML
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
       // Bold **text** or __text__
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/__(.+?)__/g, '<strong>$1</strong>')
@@ -515,7 +513,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
       selectedText = (window.getSelection() || { toString: () => '' }).toString().trim();
     }
     if (!selectedText) {
-      setResponseHTML('<span class="qa-error">No text selected. Select text on the page first, then try again.</span>');
+      setResponseError('No text selected. Select text on the page first, then try again.');
       return;
     }
 
@@ -538,16 +536,16 @@ ${selectedText}`;
       function(response) {
         setButtonsLoading(false);
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-          setResponseHTML(`<span class="qa-error">Error: ${escapeHtml(typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error')}</span>`);
+          setResponseError('Error: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error'));
           return;
         }
         var text = response && response.data && response.data.text;
         if (text) {
           setResponse(text);
         } else if (response && response.ok === false) {
-          setResponseHTML(`<span class="qa-error">Error: ${escapeHtml(response.error || 'Unknown error')}</span>`);
+          setResponseError('Error: ' + (response.error || 'Unknown error'));
         } else {
-          setResponseHTML('<span class="qa-error">No response received.</span>');
+          setResponseError('No response received.');
         }
       }
     );
@@ -583,11 +581,21 @@ ${selectedText}`;
     area.innerHTML = `<div class="qa-response">${renderMarkdown(text)}</div>`;
   }
 
-  function setResponseHTML(html) {
+  // Every caller shows an error line; built through the DOM so no caller
+  // can pass markup that reaches innerHTML unescaped (the old
+  // setResponseHTML(html) took a raw HTML string).
+  function setResponseError(message) {
     if (!shadow) return;
     var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
-    area.innerHTML = `<div class="qa-response">${html}</div>`;
+    area.textContent = '';
+    var wrap = document.createElement('div');
+    wrap.className = 'qa-response';
+    var span = document.createElement('span');
+    span.className = 'qa-error';
+    span.textContent = message;
+    wrap.appendChild(span);
+    area.appendChild(wrap);
   }
 
   function copyResponse() {

@@ -85,6 +85,33 @@ describe('check-html-injection gate', () => {
     expect(res.code).toBe(1);
   });
 
+  test('extension idioms pass: safe-write lets, lookup tables, escapeHtml alias, IIFE', () => {
+    const res = runOn({
+      'ok.js': `
+        const ICONS = { done: '<svg><path d="ok"/></svg>', fail: '<svg><path d="x"/></svg>' };
+        const dayNames = ['Sun', 'Mon'];
+        let badge = '';
+        if (cond) badge = '<span class="ok">' + escapeHtml(status) + '</span>';
+        const when = new Date(ts).toLocaleString();
+        el.innerHTML = \`\${ICONS[state] || ''} \${badge} \${when} \${list.map((d) => dayNames[d]).join(', ')}
+          \${(function () { const n = items.length || 0; return n + ' items'; })()}\`;
+      `,
+    });
+    expect(res.code).toBe(0);
+  });
+
+  test('a let written with an unescaped value anywhere still fails', () => {
+    const res = runOn({
+      'bad.js': `
+        let badge = '';
+        if (a) badge = '<b>' + escapeHtml(x) + '</b>';
+        else badge = '<b>' + x + '</b>';
+        el.innerHTML = \`\${badge}\`;
+      `,
+    });
+    expect(res.code).toBe(1);
+  });
+
   test('escHtml inside inline HTML script passes', () => {
     const res = runOn({
       'ok.html': '<html><body><script>document.getElementById("x").innerHTML = `<b>${escHtml(data.name)}</b>`;</script></body></html>',
