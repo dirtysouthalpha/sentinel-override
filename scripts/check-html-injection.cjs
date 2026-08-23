@@ -112,38 +112,120 @@ function analyze(code, label) {
     return;
   }
 
-  // Pass 1: declaration map + reassignment taint. The map is file-global, not
-  // scope-aware; when a name is declared more than once (distinct scopes), the
-  // identifier is treated safe only if EVERY initializer is safe.
-  const decls = new Map(); // name -> { inits: [node...] }
-  const fns = new Map(); // name -> [FunctionDeclaration nodes]
-  // name -> { rhs: [node...], onlyPlainOrPlus: bool } — every `x = rhs` /
-  // `x += rhs` in the file. An identifier's value is always one of its
-  // declarator inits or assignment RHSs, so it is safe iff ALL of them are
-  // (`+=` concatenates, which preserves safety when both halves are safe).
-  const assigns = new Map();
-  const tainted = new Set(); // ++/-- or exotic compound assignment
-  walkAst(ast, (n) => {
-    if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'Identifier') {
-      const prev = decls.get(n.id.name);
-      if (prev) prev.inits.push(n.init || null);
-      else decls.set(n.id.name, { inits: [n.init || null] });
-    } else if (n.type === 'FunctionDeclaration' && n.id) {
-      const prev = fns.get(n.id.name);
-      if (prev) prev.push(n);
-      else fns.set(n.id.name, [n]);
-    } else if (n.type === 'AssignmentExpression' && n.left.type === 'Identifier') {
-      if (n.operator === '=' || n.operator === '+=') {
-        const prev = assigns.get(n.left.name);
-        if (prev) prev.push(n.right);
-        else assigns.set(n.left.name, [n.right]);
-      } else {
-        tainted.add(n.left.name);
-      }
-    } else if (n.type === 'UpdateExpression' && n.argument.type === 'Identifier') {
-      // ++/-- produce numbers; numbers cannot carry markup. Not a taint.
+  // Pass 1: build real lexical scopes (function-granularity — let/const from
+  // sibling blocks of ONE function merge, which can only ADD conservatism).
+  // Every AST node is annotated with its enclosing scope, so resolution later
+  // sees exactly the bindings that code could see: two functions may reuse a
+  // name without contaminating each other, and a parameter SHADOWS any outer
+  // same-named binding instead of falling through to it (the file-global map
+  // this replaces had both defects — the first forced renames, the second was
+  // quietly unsound).
+  //
+  // An identifier's value is always one of its declarator inits or assignment
+  // RHSs, so it is safe iff ALL of them are (`+=` concatenates, which
+  // preserves safety when both halves are safe). Parameters, destructuring
+  // targets, and function-expression self-names bind OPAQUE: caller-supplied,
+  // never provable.
+  const OPAQUE = { type: '__opaque__' };
+
+  function makeScope(parent) {
+    return { parent, decls: new Map(), fns: new Map(), assigns: new Map(), tainted: new Set() };
+  }
+  const rootScope = makeScope(null);
+
+  function addDecl(scope, name, init) {
+    const prev = scope.decls.get(name);
+    if (prev) prev.inits.push(init);
+    else scope.decls.set(name, { inits: [init] });
+  }
+
+  function declarePatternOpaque(scope, pat) {
+    if (!pat) return;
+    if (pat.type === 'Identifier') addDecl(scope, pat.name, OPAQUE);
+    else if (pat.type === 'ObjectPattern') pat.properties.forEach((p) => declarePatternOpaque(scope, p.value || p.argument));
+    else if (pat.type === 'ArrayPattern') pat.elements.forEach((e) => declarePatternOpaque(scope, e));
+    else if (pat.type === 'AssignmentPattern') declarePatternOpaque(scope, pat.left);
+    else if (pat.type === 'RestElement') declarePatternOpaque(scope, pat.argument);
+  }
+
+  function collect(node, scope) {
+    if (!node || typeof node.type !== 'string') return;
+    Object.defineProperty(node, '__scope', { value: scope, enumerable: false, configurable: true });
+    let childScope = scope;
+    switch (node.type) {
+      case 'FunctionDeclaration':
+        if (node.id) {
+          const prev = scope.fns.get(node.id.name);
+          if (prev) prev.push(node);
+          else scope.fns.set(node.id.name, [node]);
+        }
+        childScope = makeScope(scope);
+        node.params.forEach((p) => declarePatternOpaque(childScope, p));
+        break;
+      case 'FunctionExpression':
+        childScope = makeScope(scope);
+        if (node.id) addDecl(childScope, node.id.name, OPAQUE);
+        node.params.forEach((p) => declarePatternOpaque(childScope, p));
+        break;
+      case 'ArrowFunctionExpression':
+        childScope = makeScope(scope);
+        node.params.forEach((p) => declarePatternOpaque(childScope, p));
+        break;
+      case 'CatchClause':
+        childScope = makeScope(scope);
+        if (node.param) declarePatternOpaque(childScope, node.param);
+        break;
+      case 'VariableDeclarator':
+        if (node.id && node.id.type === 'Identifier') addDecl(scope, node.id.name, node.init || null);
+        else declarePatternOpaque(scope, node.id);
+        break;
     }
+    for (const key of Object.keys(node)) {
+      if (key === 'loc' || key === 'leadingComments' || key === 'trailingComments') continue;
+      const child = node[key];
+      if (Array.isArray(child)) child.forEach((c) => collect(c, childScope));
+      else if (child && typeof child.type === 'string') collect(child, childScope);
+    }
+  }
+  collect(ast, rootScope);
+
+  // The scope holding a name's declaration, seen from `scope`.
+  function bindingScope(scope, name) {
+    for (let s = scope; s; s = s.parent) {
+      if (s.decls.has(name) || s.fns.has(name)) return s;
+    }
+    return null;
+  }
+
+  // Pass 2: writes, bucketed onto the scope that owns the binding (falling
+  // back to the root for undeclared / cross-file names).
+  walkAst(ast, (n) => {
+    if (n.type === 'AssignmentExpression' && n.left.type === 'Identifier') {
+      const target = bindingScope(n.__scope || rootScope, n.left.name) || rootScope;
+      if (n.operator === '=' || n.operator === '+=') {
+        const prev = target.assigns.get(n.left.name);
+        if (prev) prev.push(n.right);
+        else target.assigns.set(n.left.name, [n.right]);
+      } else {
+        target.tainted.add(n.left.name);
+      }
+    }
+    // UpdateExpression (++/--) produces numbers; numbers cannot carry markup.
   });
+
+  // Everything the resolver needs to know about `name` as seen from `scope`:
+  // its declarators, function declarations, writes, and taint — all from the
+  // single scope that owns the binding.
+  function resolve(scope, name) {
+    const s = bindingScope(scope || rootScope, name);
+    if (!s) return null;
+    return {
+      d: s.decls.get(name) || null,
+      f: s.fns.get(name) || null,
+      writes: s.assigns.get(name) || null,
+      tainted: s.tainted.has(name),
+    };
+  }
 
   function returnsOf(fn) {
     // Arrow with expression body returns that expression.
@@ -156,13 +238,14 @@ function analyze(code, label) {
   }
 
   // `const _esc = escapeHtml` style aliases count as the escape they point to.
-  function isEscapeName(name, hops = 0) {
+  function isEscapeName(name, scope, hops = 0) {
     if (SAFE_ESCAPES.has(name)) return true;
     if (hops > 3) return false;
-    if (tainted.has(name) || assigns.has(name)) return false;
-    const d = decls.get(name);
-    if (!d || d.inits.length !== 1 || !d.inits[0]) return false;
-    return d.inits[0].type === 'Identifier' && isEscapeName(d.inits[0].name, hops + 1);
+    const r = resolve(scope, name);
+    if (!r || r.tainted || r.writes || !r.d || r.d.inits.length !== 1) return false;
+    const init = r.d.inits[0];
+    return !!init && init.type === 'Identifier'
+      && isEscapeName(init.name, init.__scope || scope, hops + 1);
   }
 
   function isSafe(node, depth) {
@@ -195,15 +278,13 @@ function analyze(code, label) {
         return ['+', '-', '~', '!', 'void', 'typeof'].includes(node.operator);
       case 'Identifier': {
         if (node.name === 'undefined') return true;
-        if (tainted.has(node.name)) return false;
-        const d = decls.get(node.name);
-        if (!d) return false;
+        const r = resolve(node.__scope, node.name);
+        if (!r || r.tainted || !r.d) return false;
         // A declarator with no init (`let x;`) holds undefined until assigned —
         // renders as the string "undefined", which is inert — so only actual
         // expressions need proving.
-        if (!d.inits.every((init) => init === null || isSafe(init, depth + 1))) return false;
-        const writes = assigns.get(node.name);
-        return !writes || writes.every((rhs) => isSafe(rhs, depth + 1));
+        if (!r.d.inits.every((init) => init === null || isSafe(init, depth + 1))) return false;
+        return !r.writes || r.writes.every((rhs) => isSafe(rhs, depth + 1));
       }
       case 'MemberExpression': {
         // .length is a number whatever the receiver is.
@@ -214,12 +295,11 @@ function analyze(code, label) {
         // safe (icon maps, color maps): FEED_COLORS[category] can only ever
         // yield one of the map's values or undefined.
         if (node.object.type !== 'Identifier') return false;
-        if (tainted.has(node.object.name) || assigns.has(node.object.name)) return false;
-        const d = decls.get(node.object.name);
-        if (!d || d.inits.length === 0) return false;
-        // Several same-named lookup tables in different scopes are fine as
-        // long as every one of them is a literal table with safe values.
-        return d.inits.every((init) => {
+        const r = resolve(node.object.__scope, node.object.name);
+        if (!r || r.tainted || r.writes || !r.d || r.d.inits.length === 0) return false;
+        // A name redeclared by sibling blocks in one function merges here;
+        // fine as long as every initializer is a literal table with safe values.
+        return r.d.inits.every((init) => {
           if (!init) return false;
           if (init.type === 'ObjectExpression') {
             return init.properties.every((p) =>
@@ -236,7 +316,7 @@ function analyze(code, label) {
           return returnsOf(callee).every((r) => isSafe(r, depth + 1));
         }
         if (callee.type === 'Identifier') {
-          if (isEscapeName(callee.name)) return true;
+          if (isEscapeName(callee.name, callee.__scope)) return true;
           if (callee.name === 'Number') return true;
           // Output alphabet is %-encoded: no quotes, <, >, &, =, or spaces
           // survive, so the result cannot form markup or attributes.
@@ -244,15 +324,16 @@ function analyze(code, label) {
           // A call to a same-file function is safe when every return in that
           // function is itself safe — this is what lets icon/badge helpers
           // that return fixed SVG strings interpolate without a whitelist.
-          const fdecls = fns.get(callee.name);
-          if (fdecls && fdecls.length === 1 && !tainted.has(callee.name) && !assigns.has(callee.name)) {
-            return returnsOf(fdecls[0]).every((r) => isSafe(r, depth + 1));
-          }
-          // const fn = () => ... / function expressions bound to a const.
-          const d = decls.get(callee.name);
-          if (d && d.inits.length === 1 && d.inits[0] && !tainted.has(callee.name) && !assigns.has(callee.name)
-              && (d.inits[0].type === 'ArrowFunctionExpression' || d.inits[0].type === 'FunctionExpression')) {
-            return returnsOf(d.inits[0]).every((r) => isSafe(r, depth + 1));
+          const r = resolve(callee.__scope, callee.name);
+          if (r && !r.tainted && !r.writes) {
+            if (r.f && r.f.length === 1 && !r.d) {
+              return returnsOf(r.f[0]).every((ret) => isSafe(ret, depth + 1));
+            }
+            // const fn = () => ... / function expressions bound to a const.
+            if (r.d && !r.f && r.d.inits.length === 1 && r.d.inits[0]
+                && (r.d.inits[0].type === 'ArrowFunctionExpression' || r.d.inits[0].type === 'FunctionExpression')) {
+              return returnsOf(r.d.inits[0]).every((ret) => isSafe(ret, depth + 1));
+            }
           }
           return false;
         }
@@ -315,21 +396,19 @@ function analyze(code, label) {
       case 'ConditionalExpression': kids.push(node.consequent, node.alternate); break;
       case 'LogicalExpression': case 'BinaryExpression': kids.push(node.left, node.right); break;
       case 'Identifier': {
-        const d = decls.get(node.name);
-        if (d) kids.push(...d.inits.filter(Boolean));
-        const w = assigns.get(node.name);
-        if (w) kids.push(...w);
+        const r = resolve(node.__scope, node.name);
+        if (r && r.d) kids.push(...r.d.inits.filter((i) => i && i !== OPAQUE));
+        if (r && r.writes) kids.push(...r.writes);
         break;
       }
       case 'CallExpression': {
         const callee = node.callee;
         let fn = null;
         if (callee.type === 'Identifier') {
-          const fd = fns.get(callee.name);
-          if (fd && fd.length === 1) fn = fd[0];
-          const d = decls.get(callee.name);
-          if (!fn && d && d.inits.length === 1 && d.inits[0]
-              && (d.inits[0].type === 'ArrowFunctionExpression' || d.inits[0].type === 'FunctionExpression')) fn = d.inits[0];
+          const r = resolve(callee.__scope, callee.name);
+          if (r && r.f && r.f.length === 1) fn = r.f[0];
+          if (!fn && r && r.d && r.d.inits.length === 1 && r.d.inits[0]
+              && (r.d.inits[0].type === 'ArrowFunctionExpression' || r.d.inits[0].type === 'FunctionExpression')) fn = r.d.inits[0];
         } else if (callee.type === 'ArrowFunctionExpression' || callee.type === 'FunctionExpression') fn = callee;
         else if (callee.type === 'MemberExpression' && !callee.computed && callee.property.name === 'map') fn = node.arguments[0];
         else if (callee.type === 'MemberExpression') kids.push(callee.object, ...node.arguments);

@@ -78,6 +78,38 @@ describe('check-html-injection gate', () => {
     expect(res.code).toBe(1);
   });
 
+  test('same-named locals in different functions do not cross-contaminate', () => {
+    // Pre-scope-chain versions of the checker merged all declarations of a
+    // name file-wide, so the unsafe `rows` in exportCsv() poisoned the safe
+    // `rows` in renderPanel() and forced renames.
+    const res = runOn({
+      'ok.js': `
+        function exportCsv(log) {
+          const rows = (log.entries || []).map((e) => [e.ts, e.msg]);
+          return rows;
+        }
+        function renderPanel(items) {
+          const rows = items.map((p) => '<tr><td>' + escapeHtml(p.name) + '</td></tr>').join('');
+          el.innerHTML = rows;
+        }
+      `,
+    });
+    expect(res.code).toBe(0);
+  });
+
+  test('a parameter shadowing a safe outer const is NOT proven by the outer binding', () => {
+    // The reverse defect of the file-global map: the param must shadow.
+    const res = runOn({
+      'bad.js': `
+        const title = escapeHtml(page.title);
+        function render(title) {
+          el.innerHTML = '<h1>' + title + '</h1>';
+        }
+      `,
+    });
+    expect(res.code).toBe(1);
+  });
+
   test('checks inline scripts inside HTML pages', () => {
     const res = runOn({
       'bad.html': '<html><body><script>document.getElementById("x").innerHTML = `<b>${data.name}</b>`;</script></body></html>',
