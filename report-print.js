@@ -33,7 +33,16 @@
     // apply and the user sees the page first.
     setTimeout(() => { window.print(); }, 350);
   } catch (e) {
-    document.getElementById('reportBody').innerHTML = '<div class="loading" style="color:#b00;">Error loading report: ' + (e && e.message ? e.message : e) + '</div>';
+    // Built through the DOM: report-view.js escapes this message, but this
+    // path concatenated it raw into innerHTML — an exception message can carry
+    // fragments of the attacker-influenced report it choked on.
+    const body = document.getElementById('reportBody');
+    body.textContent = '';
+    const div = document.createElement('div');
+    div.className = 'loading';
+    div.style.color = '#b00';
+    div.textContent = 'Error loading report: ' + (e && e.message ? e.message : String(e));
+    body.appendChild(div);
   }
 })();
 
