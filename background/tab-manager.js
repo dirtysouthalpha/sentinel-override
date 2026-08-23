@@ -215,6 +215,9 @@ const CONTENT_SCRIPT_FILES = [
   'content/special-inputs.js',
   'content/overlay-detector.js',
   'content/frame-manager.js',
+  // Must precede index.js: index.js reads window.__sentinelUtils.execjs at
+  // top level and fails execute_js closed if it is missing.
+  'content/execute-js-sandbox.js',
   'content/index.js'
 ];
 
