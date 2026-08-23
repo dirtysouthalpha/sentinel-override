@@ -21,13 +21,46 @@
 
 import { createServer } from 'http';
 import { randomUUID } from 'crypto';
+import { fileURLToPath } from 'url';
+import { realpathSync } from 'fs';
 
 // ── Configuration ──
 const DEFAULT_PORT = 8766;
 const POLL_INTERVAL_MS = 5000;
 const MAX_TASK_AGE_MS = 300000; // 5 minutes
 
-const port = parseInt(process.env.UAP_PORT || process.argv.find(a => a === '--port') ? process.argv[process.argv.indexOf('--port') + 1] : '', 10) || DEFAULT_PORT;
+/**
+ * Resolve the listen port from the environment and argv.
+ *
+ * The previous one-liner read
+ *   `parseInt(env.UAP_PORT || argv.find(a => a === '--port') ? argv[idx+1] : '', 10)`
+ * which parses as `parseInt((A || B) ? C : '')` — so whenever UAP_PORT was set
+ * the ternary took the `--port` branch, `indexOf('--port')` returned -1,
+ * `argv[0]` (the node binary path) was parsed, and the NaN fell through to the
+ * default. UAP_PORT was therefore silently ignored despite being documented.
+ *
+ * Precedence: UAP_PORT env var → `--port N` argv flag → DEFAULT_PORT.
+ *
+ * @param {Record<string, string|undefined>} [env=process.env]
+ * @param {string[]} [argv=process.argv]
+ * @returns {number} A valid TCP port (1-65535), or DEFAULT_PORT.
+ */
+export function resolvePort(env = process.env, argv = process.argv) {
+  const isValid = (n) => Number.isInteger(n) && n >= 1 && n <= 65535;
+
+  const fromEnv = parseInt(env.UAP_PORT || '', 10);
+  if (isValid(fromEnv)) return fromEnv;
+
+  const flagIdx = argv.indexOf('--port');
+  if (flagIdx !== -1) {
+    const fromFlag = parseInt(argv[flagIdx + 1] || '', 10);
+    if (isValid(fromFlag)) return fromFlag;
+  }
+
+  return DEFAULT_PORT;
+}
+
+const port = resolvePort();
 const authToken = process.env.UAP_AUTH || `uap_${randomUUID()}`;
 
 // ── In-memory state ──
@@ -404,42 +437,65 @@ function handleFedGetResults(req, res, jobId) {
   sendJSON(res, 200, { jobId, status: completed.length > 0 ? 'success' : 'pending', completedSubGoals: completed.length, totalSubGoals: job.subGoals.length, results: job.results });
 }
 
-const cleanupInterval = setInterval(() => {
-  const now = Date.now();
-  // Clean stale runs (older than 1 hour)
-  for (const [runId, run] of activeRuns) {
-    if (run.endTime && now - run.endTime > 3600000) {
-      activeRuns.delete(runId);
-    }
-  }
-}, 3600000);
+let cleanupInterval = null;
 
 // ── Startup ──
-server.listen(port, () => {
-  console.log(`[UAP] Server listening on http://localhost:${port}`);
-  console.log(`[UAP] Auth token: ${authToken.substring(0, 12)}...`);
-  console.log(`[UAP] Endpoints:`);
-  console.log(`  POST /uap/events  — Receive agent events from bridge`);
-  console.log(`  GET  /uap/tasks   — Poll for pending tasks`);
-  console.log(`  POST /uap/goal    — Submit goal from external client`);
-  console.log(`  GET  /uap/status  — Server health and stats`);
-  console.log(`  GET  /uap/events  — Stream recent events`);
-  console.log(`  GET  /uap/runs/:id — Run status`);
-  console.log(`  GET  /uap/audit   — Audit log (auth required)`);
-});
+// NOTE: importing this module must NOT bind a port. It is imported as a plain
+// module by tests (tests/federation-remote.test.js reads fedPeers/fedJobs from
+// it). While startup was unconditional, every Jest worker that touched it tried
+// to listen on 8766; the second one hit EADDRINUSE and the handler below called
+// process.exit(1), which killed the worker outright ("Jest worker encountered 4
+// child process exceptions, exceeding retry limit"). Same hazard for anything
+// else importing it while a real UAP server is running.
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`[UAP] Port ${port} is already in use. Use --port or UAP_PORT env var.`);
-    process.exit(1);
-  }
-  console.error('[UAP] Server error:', err);
-});
+/**
+ * Bind the UAP server and start the stale-run cleanup timer.
+ * Only called when this file is executed directly (see the main-module guard).
+ *
+ * @param {number} [listenPort=port]
+ * @returns {import('http').Server}
+ */
+export function startServer(listenPort = port) {
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    // Clean stale runs (older than 1 hour)
+    for (const [runId, run] of activeRuns) {
+      if (run.endTime && now - run.endTime > 3600000) {
+        activeRuns.delete(runId);
+      }
+    }
+  }, 3600000);
+  // Don't let the cleanup timer alone hold the event loop open.
+  if (typeof cleanupInterval.unref === 'function') cleanupInterval.unref();
+
+  server.listen(listenPort, () => {
+    console.log(`[UAP] Server listening on http://localhost:${listenPort}`);
+    console.log(`[UAP] Auth token: ${authToken.substring(0, 12)}...`);
+    console.log(`[UAP] Endpoints:`);
+    console.log(`  POST /uap/events  — Receive agent events from bridge`);
+    console.log(`  GET  /uap/tasks   — Poll for pending tasks`);
+    console.log(`  POST /uap/goal    — Submit goal from external client`);
+    console.log(`  GET  /uap/status  — Server health and stats`);
+    console.log(`  GET  /uap/events  — Stream recent events`);
+    console.log(`  GET  /uap/runs/:id — Run status`);
+    console.log(`  GET  /uap/audit   — Audit log (auth required)`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[UAP] Port ${listenPort} is already in use. Use --port or UAP_PORT env var.`);
+      process.exit(1);
+    }
+    console.error('[UAP] Server error:', err);
+  });
+
+  return server;
+}
 
 // Graceful shutdown
 function shutdown() {
   console.log('\n[UAP] Shutting down...');
-  clearInterval(cleanupInterval);
+  if (cleanupInterval) clearInterval(cleanupInterval);
   server.close(() => {
     console.log('[UAP] Server stopped.');
     process.exit(0);
@@ -448,7 +504,30 @@ function shutdown() {
   setTimeout(() => process.exit(0), 5000);
 }
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+/**
+ * True when this module is the process entry point (`node scripts/uap-server.js`),
+ * false when it is merely imported. Resolves symlinks on both sides so a
+ * symlinked bin path still counts as "main".
+ *
+ * @param {string} moduleUrl - import.meta.url of the module under test.
+ * @param {string[]} [argv=process.argv]
+ * @returns {boolean}
+ */
+export function isMainModule(moduleUrl, argv = process.argv) {
+  const entry = argv[1];
+  if (!entry) return false;
+  const real = (p) => { try { return realpathSync(p); } catch { return p; } };
+  try {
+    return real(fileURLToPath(moduleUrl)) === real(entry);
+  } catch {
+    return false;
+  }
+}
 
-export { fedPeers, fedJobs };
+if (isMainModule(import.meta.url)) {
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+  startServer();
+}
+
+export { fedPeers, fedJobs, server, DEFAULT_PORT };
