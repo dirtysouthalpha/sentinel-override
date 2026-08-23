@@ -11,6 +11,9 @@
 
 - **`npm run routes:sync`** — one-command heal for route-manifest drift: regenerates `contract/server-routes.json` and commits it if changed (never pushes). `routes:check` now says when a stale table is metadata-only drift (source lines moved, route set unchanged) instead of printing a bare FAIL.
 
+- **Scope-aware injection prover.** The checker resolves names through real lexical scope chains (function granularity); parameters, destructuring targets and catch params bind opaque. Fixes both defects of the old file-global map: same-named locals in different functions no longer cross-contaminate (no more prover-driven renames), and a parameter can no longer be wrongly proven via a same-named safe outer const.
+- **DOM regression tests for the hardened sinks** (linkedom/vm): chat stepNumber coercion (numeric, numeric-string, hostile), scheduler card adversarial fields, action-hud step coercion, typing-banner single-escape. The quick-assist markdown tests were also repointed at the REAL renderMarkdown — they previously asserted a hand-copied version, which is how the double-escape bug stayed invisible.
+
 ### Fixed (2)
 - **quick-assist markdown double-escape**: `renderMarkdown` escaped its input via `escapeHtml` and then re-escaped `&<>` a second time, so `<` in AI responses displayed as the literal text `&lt;`.
 - **Typing-banner double-escape** (`content/index.js`): the preview string was escaped at build AND at use; special characters in typed text displayed as entity text.
