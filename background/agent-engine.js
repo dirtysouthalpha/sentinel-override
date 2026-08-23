@@ -7,6 +7,7 @@ import {callLLMWithRetry, parseVisionResponse} from './llm-client.js';
 import {getPlatformProfile} from './platforms/index.js';
 import {isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat} from './agent-ticket-format.js';
 import {auditReport} from './report-grounding.js';
+import {resetEgressScrubber} from './egress-scrub.js';
 import {diagnoseFailure, buildDiagnosticMessage, saveDomainStrategy, getDomainStrategy, extractWinningStrategy, getDomainFromUrl} from './agent-adaptive.js';
 import {isComplexGoal, buildDecompositionPrompt, parseDecomposition, buildSubTaskGoal, createOrchestratorState} from './agent-orchestrator.js';
 import {detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop} from './agent-captcha.js';
@@ -1102,6 +1103,9 @@ export function resetAgentState() {
   _lastNoActionProse = '';
   _noActionProseRepeats = 0;
   _visionDegraded = false;
+  // Drop masked-value mappings so placeholder tokens never cross runs (a
+  // [[EMAIL-1]] from a previous client's ticket must not resolve here).
+  resetEgressScrubber();
   consecutiveFailures = 0;
   sharedState.pageStagnation = 0;
   currentStrategies = [];

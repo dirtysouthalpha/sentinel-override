@@ -727,6 +727,66 @@ if (window.__sentinelInitialized) {
         };
       }
 
+      case 'mask_sensitive_for_capture': {
+        // A screenshot cannot be regex-scrubbed, so the only way to keep a
+        // password manager, a CVV box or an API-key field out of a vision
+        // payload is to cover it BEFORE the pixels are taken. Reuses the same
+        // __sentinelCheckSensitiveField() detector the typing guard uses, so
+        // "Client Secret" and "Recovery code" are covered too, not just
+        // input[type=password].
+        try {
+          let masked = 0;
+          const els = document.querySelectorAll('input, textarea, [contenteditable="true"]');
+          for (const el of els) {
+            const isPw = el.type === 'password';
+            if (!isPw && !__sentinelCheckSensitiveField(el)) continue;
+            const r = el.getBoundingClientRect();
+            if (!r || r.width < 2 || r.height < 2) continue;
+            const box = document.createElement('div');
+            box.className = '__sentinel-capture-mask';
+            box.setAttribute('data-sentinel-mask', '1');
+            box.style.cssText = [
+              'position:fixed',
+              `left:${Math.round(r.left)}px`,
+              `top:${Math.round(r.top)}px`,
+              `width:${Math.round(r.width)}px`,
+              `height:${Math.round(r.height)}px`,
+              'background:#1b1b1f',
+              'color:#8a8a94',
+              'font:11px/1 monospace',
+              'display:flex',
+              'align-items:center',
+              'justify-content:center',
+              'letter-spacing:.5px',
+              'z-index:2147483646',
+              'pointer-events:none',
+              'border-radius:3px'
+            ].join(';');
+            box.textContent = 'MASKED';
+            document.documentElement.appendChild(box);
+            masked++;
+          }
+          return { masked };
+        } catch (e) {
+          console.warn('[Sentinel] capture mask failed:', getErrorMessage(e));
+          return { masked: 0, error: getErrorMessage(e) };
+        }
+      }
+
+      case 'unmask_sensitive_for_capture': {
+        try {
+          let removed = 0;
+          for (const box of document.querySelectorAll('[data-sentinel-mask="1"]')) {
+            box.remove();
+            removed++;
+          }
+          return { removed };
+        } catch (e) {
+          console.warn('[Sentinel] capture unmask failed:', getErrorMessage(e));
+          return { removed: 0 };
+        }
+      }
+
       case 'get_bbox': {
         // (#9) CDP trusted-input support. Resolve ref or selector to the
         // element's bounding-rect center in CSS pixels. The background uses

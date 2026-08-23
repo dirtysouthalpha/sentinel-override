@@ -983,6 +983,30 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     }
   } catch (e) { console.warn('[Sentinel/tab-manager] viewport parse failed, keeping defaults:', getErrorMessage(e)); }
 
+  // ── Pre-capture masking of sensitive fields ──────────────────────────────
+  // A screenshot cannot be regex-scrubbed the way page text can, and this tool
+  // photographs client admin consoles and password managers. Cover sensitive
+  // inputs before the pixels are taken. Default on; operators can disable via
+  // chrome.storage.local.maskScreenshotFields = false.
+  let _maskedCount = 0;
+  try {
+    const _cfg = await chrome.storage.local.get(['maskScreenshotFields']);
+    if (_cfg.maskScreenshotFields !== false) {
+      const _r = await sendMessageWithRetry(tabId, { action: 'mask_sensitive_for_capture' }, 1);
+      _maskedCount = (_r && _r.masked) || 0;
+    }
+  } catch (e) {
+    console.warn('[Sentinel/tab-manager] pre-capture mask failed:', getErrorMessage(e));
+  }
+  // Must run on EVERY exit path below, including the early `return null`, or the
+  // page is left covered in MASKED boxes and the agent can no longer see or
+  // click the fields it just hid.
+  const _unmaskAfterCapture = async () => {
+    if (!_maskedCount) return;
+    try { await sendMessageWithRetry(tabId, { action: 'unmask_sensitive_for_capture' }, 1); }
+    catch (e) { console.warn('[Sentinel/tab-manager] post-capture unmask failed:', getErrorMessage(e)); }
+  };
+
   let base64Image = null;
   try {
     if (!attachedDebuggees.has(tabId)) {
@@ -1033,10 +1057,13 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
       if (!Array.isArray(_parts) || _parts.length < 2 || !_parts[1] || !_parts[1].length) throw new Error('captureVisibleTab returned invalid data URL');
       base64Image = _parts[1];
     } catch {
+      await _unmaskAfterCapture();
       if (sendSilentUpdateFn) sendSilentUpdateFn('Screenshot skipped (text-only mode)', stepNumber);
       return null;
     }
   }
+
+  await _unmaskAfterCapture();
 
   if (base64Image) {
     const snapshot = {

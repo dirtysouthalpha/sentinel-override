@@ -5,6 +5,7 @@
 ;
 import {getAllTabContexts, getActiveTabId, TAB_LIMIT} from './tab-context.js';
 import {resolveProvider, getActiveProvider, getModelSupportsVision, providerRequiresApiKey} from './provider-registry.js';
+import {getEgressScrubber, shouldScrub, SCRUB_MODE} from './egress-scrub.js';
 import {getPlatformProfile} from './platforms/index.js';
 import {getErrorMessage} from './error-utils.js';
 import {API_TIMEOUT_MS, PLATFORM_CTX_CACHE_TTL_MS, ONE_SECOND_MS} from './constants.js';
@@ -1672,7 +1673,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   const historyWindowSize = isRunbook ? 25 : CONFIG.historyWindow;
   const sanitizedHistory = _sanitizeHistory(history, isRunbook, CONFIG);
 
-  const prompt = buildAgentPrompt({
+  const _rawPrompt = buildAgentPrompt({
     quickModeCtx, runbookCtx, platformCtx,
     goal, currentUrl, stepCount, pageContent,
     trimmedElements, totalElementCount,
@@ -1685,6 +1686,37 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     multiArticleCtx: getMultiArticleDirective(goal),
     visionCapable: supportsVision(agentState && agentState.model) && !(agentState && agentState.visionDegraded)
   });
+
+  // ── Outbound scrub ────────────────────────────────────────────────────────
+  // Single chokepoint: everything bound for the model — page text, DOM
+  // extracts, action results, agent memory, the goal — has already been
+  // assembled into `prompt` by this line, so scrubbing here cannot miss a
+  // field the way per-call-site scrubbing would.
+  //
+  // Secrets and PII become stable placeholders ([[SECRET-1]], [[EMAIL-2]]) that
+  // survive the whole run, so the model can still reason about "the email in
+  // the ticket". llm-retry.js restores the real values in the command that
+  // comes back, before the agent acts on it.
+  let prompt = _rawPrompt;
+  try {
+    const _scrubMode = (await chrome.storage.local.get(['egressScrubMode']))
+      .egressScrubMode || SCRUB_MODE.CLOUD;
+    if (shouldScrub(endpoint, _scrubMode)) {
+      const _scrubber = getEgressScrubber();
+      const _before = _scrubber.count();
+      prompt = _scrubber.scrub(_rawPrompt);
+      const _added = _scrubber.count() - _before;
+      if (_added > 0) {
+        agentState.egressMasked = _scrubber.summary();
+        console.warn('[Sentinel/scrub] Masked before egress:', JSON.stringify(_scrubber.summary()));
+      }
+    }
+  } catch (e) {
+    // Fail CLOSED on an unexpected scrubber fault: a page we could not scrub
+    // must not be shipped to a third party just because the guard broke.
+    console.error('[Sentinel/scrub] Scrub failed — refusing to send raw content:', getErrorMessage(e));
+    throw new Error('Outbound scrub failed; request blocked to avoid leaking page content. See console.');
+  }
 
   const controller = new AbortController();
   // Adaptive timeout: a vision request (screenshot payload + a slower vision

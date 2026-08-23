@@ -1,6 +1,7 @@
 // ========== API Call with Retry ==========
 // Extracted from llm-client.js for modularity.
 // Wraps callLLM with exponential backoff retry on transient errors.
+import {getEgressScrubber} from './egress-scrub.js';
 import { ONE_SECOND_MS, TWO_SECONDS_MS } from './constants.js';
 import { getErrorMessage, sleep } from './error-utils.js';
 import { sendSilentUpdate } from './message-protocol.js';
@@ -39,7 +40,16 @@ let _triedModels = new Set(); // (v21.6.1) Prevent infinite model cycling
  */
 export async function callLLMWithRetry(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, retryCount, CONFIG, agentState) {
   try {
-    return await callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState);
+    const _cmd = await callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState);
+    // Restore anything the outbound scrubber masked. The model sees and echoes
+    // placeholders like [[EMAIL-1]]; without this the agent would literally type
+    // "[[EMAIL-1]]" into a form field. Idempotent — safe on an unscrubbed run.
+    try {
+      return getEgressScrubber().restoreDeep(_cmd);
+    } catch (e) {
+      console.warn('[Sentinel/scrub] restore failed, returning command as-is:', getErrorMessage(e));
+      return _cmd;
+    }
   } catch (err) {
     console.error('[Sentinel/LLM] API call failed:', getErrorMessage(err));
     const msg = (typeof err.message === 'string' ? err.message : String(err));

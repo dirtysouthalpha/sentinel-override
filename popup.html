@@ -499,6 +499,46 @@
         </div>
       </div>
 
+      <!-- ══════ PRIVACY / EGRESS ══════ -->
+      <details class="details-panel">
+        <summary>Privacy &amp; Data Protection</summary>
+        <div class="details-panel-body">
+          <p class="field-hint">
+            This agent sends page text and screenshots to your AI provider. On a
+            client's ticket system or admin console that can include credentials
+            and personal data. These controls mask it before it leaves your browser.
+          </p>
+          <div class="modal-field">
+            <label for="egressScrubMode">Mask secrets &amp; personal data before sending</label>
+            <select id="egressScrubMode" class="form-input">
+              <option value="cloud">Cloud providers only (recommended)</option>
+              <option value="always">Always, including local models</option>
+              <option value="off">Never — send raw (not recommended)</option>
+            </select>
+            <p class="field-hint">
+              API keys, tokens, passwords, emails, phone numbers, card and SSN
+              numbers become placeholders such as <code>[[EMAIL-1]]</code>, and the
+              real values are restored locally before the agent acts. Git SHAs,
+              UUIDs, version numbers and IDs are deliberately left alone.
+            </p>
+          </div>
+          <div class="toggle-row form-field">
+            <div class="toggle-row-label">
+              <span>Cover sensitive fields in screenshots</span>
+            </div>
+            <label class="toggle-switch"><input type="checkbox" id="maskScreenshotFields" checked><span class="toggle-slider"></span></label>
+          </div>
+          <p class="field-hint">
+            Password, CVV, SSN and API-key fields are covered before each capture.
+            <strong>Limitation:</strong> a screenshot cannot be text-scrubbed, so
+            anything else visible on screen — an open password manager, a client
+            record, another tab's content in view — is sent to the model as-is.
+            Turn off vision, or close sensitive windows, when working on a page
+            you cannot share.
+          </p>
+        </div>
+      </details>
+
       <!-- ══════ TICKET MODE ══════ -->
       <details class="details-panel">
         <summary>Ticket Mode (MSP Templates)</summary>

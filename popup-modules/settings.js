@@ -767,6 +767,53 @@ if (ticketFormatSelect) {
   }
 }
 
+// ========== Privacy / Egress Scrubbing ==========
+// Controls background/egress-scrub.js. Default is 'cloud': mask before any
+// third-party egress, send raw to a self-hosted model on the operator's own
+// network. Screenshot field masking defaults ON.
+{
+  const egressSelect = document.getElementById('egressScrubMode');
+  const shotToggle = document.getElementById('maskScreenshotFields');
+
+  if (egressSelect || shotToggle) {
+    chrome.storage.local.get(['egressScrubMode', 'maskScreenshotFields'], (result) => {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+        console.warn('[Sentinel/settings] Failed to read privacy settings:', getErrorMessage(chrome.runtime.lastError));
+        return;
+      }
+      if (egressSelect) egressSelect.value = result.egressScrubMode || 'cloud';
+      if (shotToggle) shotToggle.checked = result.maskScreenshotFields !== false;
+    });
+  }
+
+  if (egressSelect) {
+    egressSelect.addEventListener('change', () => {
+      const mode = egressSelect.value;
+      chrome.storage.local.set({ egressScrubMode: mode }).catch((e) => {
+        console.error('[Sentinel] Error saving egressScrubMode:', window.getErrorMessage ? window.getErrorMessage(e) : String(e));
+      });
+      try {
+        showToast(
+          mode === 'off'
+            ? 'Masking OFF — page content will be sent to your provider unredacted'
+            : mode === 'always'
+              ? 'Masking ON for every provider, including local models'
+              : 'Masking ON for cloud providers; local models receive raw text',
+          mode === 'off' ? 'error' : 'success'
+        );
+      } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+    });
+  }
+
+  if (shotToggle) {
+    shotToggle.addEventListener('change', () => {
+      chrome.storage.local.set({ maskScreenshotFields: shotToggle.checked }).catch((e) => {
+        console.error('[Sentinel] Error saving maskScreenshotFields:', window.getErrorMessage ? window.getErrorMessage(e) : String(e));
+      });
+    });
+  }
+}
+
 // ========== Expected Tenant (3.7.0) ==========
 // Cross-client safety: when set, the header chip on Microsoft admin URLs
 // turns green when the detected tenant matches and red when it doesn't.
@@ -1662,7 +1709,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     'adaptivePromptsMode', 'adaptiveExpansionMode', 'telemetryLevel',
     'telemetryPersist', 'telemetryRedact', 'telemetrySkillAdapt',
     'quickMode', 'show_api_health_bar', 'ticketMode', 'ticketFormat',
-    'technicianInfo', 'expectedTenant'
+    'technicianInfo', 'expectedTenant', 'egressScrubMode', 'maskScreenshotFields'
   ];
 
   function doExportSettings() {
