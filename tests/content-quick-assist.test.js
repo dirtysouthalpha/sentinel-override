@@ -4,6 +4,11 @@
  */
 
 import { jest } from '@jest/globals';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __testDir = dirname(fileURLToPath(import.meta.url));
 
 // Mock chrome.runtime API
 global.chrome = {
@@ -43,30 +48,28 @@ describe('content/quick-assist.js', () => {
   });
 
   describe('Markdown rendering', () => {
-    function renderMarkdown(text) {
-      if (!text) return '';
-      let html = text
-        // Escape HTML
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        // Bold **text** or __text__
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/__(.+?)__/g, '<strong>$1</strong>')
-        // Inline code `text`
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        // Lists: - item or * item or 1. item
-        .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
-        .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-        // Line breaks
-        .replace(/\n/g, '<br>');
-
-      // Wrap consecutive <li> in <ul>
-      html = html.replace(/((?:<li>.*?<\/li>(?:<br>)?)+)/g, '<ul>$1</ul>');
-      html = html.replace(/<br><\/ul>/g, '</ul>');
-      html = html.replace(/<\/li><br>/g, '</li>');
-      return html;
+    // The REAL renderMarkdown + escapeHtml, extracted from the shipped
+    // source. This block previously tested a hand-copied version — which is
+    // exactly how the double-escape bug (escapeHtml() up front PLUS a second
+    // &/</> replace pass) stayed invisible: the copy had one escape pass
+    // while the shipped code had two.
+    const QA_SRC = readFileSync(join(__testDir, '..', 'content', 'quick-assist.js'), 'utf-8');
+    function extractFn(name) {
+      const at = QA_SRC.indexOf(`function ${name}(`);
+      if (at < 0) throw new Error(`${name} not found in quick-assist.js`);
+      let i = QA_SRC.indexOf('{', at);
+      let depth = 0;
+      for (; i < QA_SRC.length; i++) {
+        if (QA_SRC[i] === '{') depth++;
+        else if (QA_SRC[i] === '}') { depth--; if (!depth) break; }
+      }
+      return QA_SRC.slice(at, i + 1);
     }
+    // eslint-disable-next-line no-new-func
+    const renderMarkdown = new Function(
+      `${extractFn('escapeHtml')}
+${extractFn('renderMarkdown')}
+return renderMarkdown;`)();
 
     it('should escape HTML in text', () => {
       const input = '<script>alert("xss")</script>';
@@ -98,6 +101,23 @@ describe('content/quick-assist.js', () => {
       expect(output).toContain('<li>Second item</li>');
     });
 
+    // Regression (2026-08-23): the shipped code once escaped TWICE — the
+    // escapeHtml() call plus a literal &/</> replace pass — so '<' in AI
+    // responses displayed as the text '&lt;'. Single-escape is the contract.
+    it('escapes exactly once — no double-escaped entities', () => {
+      const output = renderMarkdown('a < b & c > d');
+      expect(output).toContain('a &lt; b &amp; c &gt; d');
+      expect(output).not.toContain('&amp;lt;');
+      expect(output).not.toContain('&amp;amp;');
+      expect(output).not.toContain('&amp;gt;');
+    });
+
+    it('blocks an adversarial payload while keeping markdown features', () => {
+      const output = renderMarkdown('**bold** <img src=x onerror=alert(1)>');
+      expect(output).toContain('<strong>bold</strong>');
+      expect(output).toContain('&lt;img');
+      expect(output).not.toContain('<img');
+    });
     it('should handle numbered lists', () => {
       const input = '1. First\n2. Second';
       const output = renderMarkdown(input);
