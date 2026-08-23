@@ -489,24 +489,33 @@ describe('_describeTarget', () => {
 // 3. getTechnicianInfo
 // ══════════════════════════════════════════════════════════════════════
 describe('getTechnicianInfo', () => {
-  test('returns defaults when storage is empty', async () => {
+  // These used to pin the fabrication: an unconfigured install was handed the
+  // placeholder identity "John Smith / IT Support Technician / Acme IT /
+  // 555-000-0000 / support@example.com", which the ticket templates then wrote
+  // into the Ownership Statement and into a client-facing email body. Unset
+  // fields are now null and the formatters render a visible "not set" marker.
+  test('returns null fields when storage is empty — never a placeholder identity', async () => {
     const info = await getTechnicianInfo();
-    expect(info.name).toBe('John Smith');
-    expect(info.title).toBe('IT Support Technician');
-    expect(info.company).toBe('Acme IT');
-    expect(info.phone).toBe('555-000-0000');
-    expect(info.email).toBe('support@example.com');
+    expect(info.name).toBeNull();
+    expect(info.title).toBeNull();
+    expect(info.company).toBeNull();
+    expect(info.phone).toBeNull();
+    expect(info.email).toBeNull();
+    expect(info.configured).toBe(false);
   });
 
-  test('merges stored values with defaults', async () => {
+  test('does NOT backfill the fields the operator left blank', async () => {
+    // The settings UI only persists non-empty fields, so the old
+    // `{...defaults, ...stored}` merge gave Jane Doe a fake phone and a fake
+    // support address to put in front of her client.
     storageData.technicianInfo = { name: 'Jane Doe', phone: '555-1234' };
     const info = await getTechnicianInfo();
     expect(info.name).toBe('Jane Doe');
     expect(info.phone).toBe('555-1234');
-    // Defaults preserved for missing fields
-    expect(info.title).toBe('IT Support Technician');
-    expect(info.company).toBe('Acme IT');
-    expect(info.email).toBe('support@example.com');
+    expect(info.title).toBeNull();
+    expect(info.company).toBeNull();
+    expect(info.email).toBeNull();
+    expect(info.missingFields).toEqual(['title', 'company', 'email']);
   });
 
   test('overwrites all defaults when all fields stored', async () => {
@@ -523,18 +532,26 @@ describe('getTechnicianInfo', () => {
     expect(info.company).toBe('Test Co');
   });
 
-  test('returns defaults when stored value is not an object', async () => {
+  test('returns null fields when stored value is not an object', async () => {
     storageData.technicianInfo = 'invalid';
     const info = await getTechnicianInfo();
-    expect(info.name).toBe('John Smith');
+    expect(info.name).toBeNull();
+    expect(info.configured).toBe(false);
   });
 
-  test('returns defaults when storage.get throws', async () => {
+  test('returns null fields when storage.get throws', async () => {
     const origGet = chrome.storage.local.get;
     chrome.storage.local.get = jest.fn(async () => { throw new Error('fail'); });
-    const info = await getTechnicianInfo();
-    expect(info.name).toBe('John Smith');
-    chrome.storage.local.get = origGet;
+    try {
+      const info = await getTechnicianInfo();
+      expect(info.name).toBeNull();
+      expect(info.configured).toBe(false);
+    } finally {
+      // MUST be a finally: this restore used to sit after the assertion, so the
+      // moment the assertion failed every later test in this file inherited a
+      // throwing chrome.storage and 13 saveLearnedPattern tests cascaded.
+      chrome.storage.local.get = origGet;
+    }
   });
 });
 

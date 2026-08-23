@@ -575,19 +575,20 @@ describe('extractTicketNumber — edge cases', () => {
 // getTechnicianInfo — async function
 // ══════════════════════════════════════════════════════════════════
 describe('getTechnicianInfo', () => {
-  test('returns defaults when storage is empty', async () => {
+  test('returns null fields when storage is empty', async () => {
     storageData.technicianInfo = undefined;
     const info = await getTechnicianInfo();
-    expect(info.name).toBe('John Smith');
-    expect(info.company).toBe('Acme IT');
+    expect(info.name).toBeNull();
+    expect(info.company).toBeNull();
+    expect(info.configured).toBe(false);
   });
 
-  test('merges stored info with defaults', async () => {
+  test('keeps stored fields and leaves the rest null', async () => {
     storageData.technicianInfo = { name: 'Test Tech', phone: '555-1234' };
     const info = await getTechnicianInfo();
     expect(info.name).toBe('Test Tech');
     expect(info.phone).toBe('555-1234');
-    expect(info.company).toBe('Acme IT');
+    expect(info.company).toBeNull();
   });
 });
 

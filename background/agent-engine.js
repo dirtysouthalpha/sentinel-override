@@ -6,6 +6,7 @@ import {buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames
 import {callLLMWithRetry, parseVisionResponse} from './llm-client.js';
 import {getPlatformProfile} from './platforms/index.js';
 import {isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat} from './agent-ticket-format.js';
+import {auditReport} from './report-grounding.js';
 import {diagnoseFailure, buildDiagnosticMessage, saveDomainStrategy, getDomainStrategy, extractWinningStrategy, getDomainFromUrl} from './agent-adaptive.js';
 import {isComplexGoal, buildDecompositionPrompt, parseDecomposition, buildSubTaskGoal, createOrchestratorState} from './agent-orchestrator.js';
 import {detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop} from './agent-captcha.js';
@@ -4122,6 +4123,24 @@ finished = true;
             finalSummary = formatTicketOutput(fmt, finalSummary, goal, tech, {
               stepCount, apiCallCount
             });
+            // Grounding audit. The templates no longer fabricate, but the
+            // model's own summary text flows through them verbatim and can
+            // still assert an outcome or invent a contact address. Anything we
+            // cannot tie back to a page the agent read, a value it extracted,
+            // or the operator's configured identity gets flagged in the output
+            // itself — a technician sees it before pasting into a PSA ticket.
+            try {
+              const _audit = auditReport(finalSummary, {
+                goal, agentMemory, history, technicianInfo: tech
+              });
+              finalSummary = _audit.report;
+              if (!_audit.ok) {
+                tel.warn('report', `Report contains ${_audit.claims.length} ungrounded claim(s)`, {
+                  kinds: _audit.claims.map(c => c.kind),
+                  values: _audit.claims.map(c => String(c.value).slice(0, 60))
+                });
+              }
+            } catch (e) { console.warn('[Sentinel] report grounding audit failed:', getErrorMessage(e)); }
           }
         } catch (e) { console.warn('[Sentinel] ticket formatter failed:', getErrorMessage(e)); }
 

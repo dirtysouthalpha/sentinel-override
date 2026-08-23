@@ -937,9 +937,10 @@ describe('getTechnicianInfo — new edge cases', () => {
     expect(info).toHaveProperty('phone');
     expect(info).toHaveProperty('email');
   });
-  test('returns defaults with correct name', async () => {
+  test('an unconfigured install gets null, not a placeholder identity', async () => {
     const info = await getTechnicianInfo();
-    expect(info.name).toBe('John Smith');
+    expect(info.name).toBeNull();
+    expect(info.configured).toBe(false);
   });
 });
 
@@ -1150,12 +1151,21 @@ describe('formatTicketOutput — new edge cases', () => {
     expect(typeof result).toBe('string');
   });
   // FIX: throws TypeError on null tech (calls tech.name)
-  test('null tech handled gracefully', () => {
-    expect(() => formatTicketOutput('FINAL_NOTES', 'S', 'G', null)).toThrow();
+  // These used to assert the formatter THREW on a missing tech object (it did
+  // `tech.name` unguarded). The engine wraps this call in a try/catch that only
+  // console.warns, so a throw meant ticket formatting was silently skipped and
+  // the operator got a bare summary with no explanation. It now degrades to a
+  // report that names the missing configuration instead.
+  test('null tech degrades to a marked report instead of throwing', () => {
+    const out = formatTicketOutput('FINAL_NOTES', 'S', 'G', null);
+    expect(typeof out).toBe('string');
+    expect(out).toMatch(/no technician|not set/i);
+    expect(out).not.toContain('John Smith');
   });
-  // FIX: throws TypeError on undefined tech
-  test('undefined tech handled gracefully', () => {
-    expect(() => formatTicketOutput('FINAL_NOTES', 'S', 'G', undefined)).toThrow();
+  test('undefined tech degrades to a marked report instead of throwing', () => {
+    const out = formatTicketOutput('FINAL_NOTES', 'S', 'G', undefined);
+    expect(typeof out).toBe('string');
+    expect(out).toMatch(/no technician|not set/i);
   });
   test('null options handled', () => {
     expect(typeof formatTicketOutput('FINAL_NOTES', 'S', 'G', tech, null)).toBe('string');

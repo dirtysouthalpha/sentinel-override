@@ -1116,7 +1116,9 @@ describe('ticket formatting functions', () => {
     test('produces waiting on vendor format', () => {
       const result = formatWaitingOnVendor('Opened vendor case for RMA.', 'Ticket #22222', tech);
       expect(result).toContain('Waiting on Vendor');
-      expect(result).toContain('Vendor case opened');
+      // The agent never opens a vendor case, so the template must not say it
+      // did. The summary text below still carries whatever the tech reported.
+      expect(result).toContain('No vendor case was opened by the agent');
       expect(result).toContain('John Smith');
     });
   });
@@ -1146,9 +1148,11 @@ describe('ticket formatting functions', () => {
       const result = formatClientEmail('The issue has been fully resolved.', 'Ticket #12345 - VPN not connecting', tech);
       expect(result).toContain('Client Email');
       expect(result).toContain('Subject:');
-      expect(result).toContain('Resolved:');
       expect(result).toContain('Hello [Client Name]');
       expect(result).toContain('555-000-0000');
+      // Subject no longer asserts an outcome the agent cannot verify.
+      expect(result).toMatch(/\*\*Subject:\*\* Update:/);
+      expect(result).not.toMatch(/\*\*Subject:\*\* Resolved:/);
     });
   });
 

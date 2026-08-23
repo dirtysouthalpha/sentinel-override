@@ -893,10 +893,17 @@ describe('formatClientEmail', () => {
       phone: '555-000-0000',
       email: 'support@example.com',
     });
-    expect(result).toContain('Resolved');
+    // Configured (if implausible) technician details are rendered verbatim —
+    // that part is the operator's own data. What must NOT appear is an
+    // unconditional "Resolved" claim: this draft goes to a paying client and
+    // the agent only read pages, so it cannot know the issue is fixed.
     expect(result).toContain('John Smith');
     expect(result).toContain('555-000-0000');
     expect(result).toContain('support@example.com');
+    expect(result).not.toMatch(/\*\*Subject:\*\* Resolved:/);
+    expect(result).not.toMatch(/has been resolved/i);
+    expect(result).toContain('DRAFT');
+    expect(result).toMatch(/\[STATUS — complete this line before sending/);
   });
 });
 

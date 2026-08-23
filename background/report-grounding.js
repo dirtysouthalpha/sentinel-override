@@ -55,9 +55,14 @@ const KNOWN_PLACEHOLDERS = [
 ];
 
 const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-// Deliberately narrow: 10+ digits with common separators. Avoids matching
-// timestamps, byte counts, and step numbers.
+// Deliberately narrow: 10-15 digits with common separators.
 const PHONE_RE = /(?:\+?\d[\d\s().-]{8,}\d)/g;
+// Date/time shapes are stripped BEFORE phone scanning. Every report carries a
+// "2026-08-23 20:47 UTC" stamp, and `2026-08-23 20` satisfies any reasonable
+// phone pattern — without this the audit block fired on every single report,
+// which is exactly the cry-wolf failure that gets a safety feature ignored.
+const DATETIME_RE = /\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?(?:\s*(?:UTC|Z|[+-]\d{2}:?\d{2}))?/g;
+const CLOCK_RE = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g;
 
 /**
  * Outcome assertions the agent cannot substantiate on its own.
@@ -202,11 +207,12 @@ export function findUngroundedClaims(report, corpus) {
     }
   }
 
-  // Phone numbers, compared digits-only.
+  // Phone numbers, compared digits-only, with timestamps masked out first.
   const hayDigits = digitsOnly(hay);
-  for (const m of text.match(PHONE_RE) || []) {
+  const phoneScan = text.replace(DATETIME_RE, ' ').replace(CLOCK_RE, ' ');
+  for (const m of phoneScan.match(PHONE_RE) || []) {
     const d = digitsOnly(m);
-    if (d.length < 10) continue;
+    if (d.length < 10 || d.length > 15) continue;
     if (isKnownPlaceholder(m)) continue;
     if (!hayDigits.includes(d)) {
       push(CLAIM_KIND.PHONE, m.trim(), 'phone number does not appear in anything the agent observed or the operator configured');

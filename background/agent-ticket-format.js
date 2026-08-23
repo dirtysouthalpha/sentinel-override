@@ -45,22 +45,115 @@ function isTicketInvestigationGoal(goal) {
   return TICKET_GOAL_RE.test(goal);
 }
 
+const TECH_FIELDS = ['name', 'title', 'company', 'phone', 'email'];
+
+const TECH_LABEL = {
+  name: 'Technician name',
+  title: 'Title',
+  company: 'Company',
+  phone: 'Phone',
+  email: 'Email',
+};
+
+/**
+ * Read the operator's configured technician identity.
+ *
+ * This used to fall back to hardcoded placeholders — "John Smith",
+ * "IT Support Technician", "Acme IT", "555-000-0000", "support@example.com" —
+ * whenever `technicianInfo` was unset, which is the state of every fresh
+ * install. Those values were then rendered into the Ownership Statement and
+ * into the body of a client-facing email, so the product deterministically
+ * signed MSP tickets with a fake person and a fake support address.
+ *
+ * The merge made it worse than an all-or-nothing default: the settings UI only
+ * persists non-empty fields, so a technician who filled in just their name
+ * still shipped `555-000-0000` and `support@example.com` to a paying client.
+ *
+ * Now: unset fields are null. Every formatter renders a visible
+ * "not set — configure in Settings" marker instead of inventing a plausible
+ * value. `configured` / `missingFields` let callers warn earlier.
+ *
+ * @returns {Promise<{name: string|null, title: string|null, company: string|null,
+ *   phone: string|null, email: string|null, configured: boolean, missingFields: string[]}>}
+ */
 async function getTechnicianInfo() {
-  const defaults = {
-    name: 'John Smith',
-    title: 'IT Support Technician',
-    company: 'Acme IT',
-    phone: '555-000-0000',
-    email: 'support@example.com'
-  };
+  const info = { name: null, title: null, company: null, phone: null, email: null };
   try {
     const stored = await chrome.storage.local.get(['technicianInfo']);
-    if (stored && stored.technicianInfo && typeof stored.technicianInfo === 'object' && stored.technicianInfo !== null) {
-      return { ...defaults, ...stored.technicianInfo };
+    const t = stored && stored.technicianInfo;
+    if (t && typeof t === 'object') {
+      for (const k of TECH_FIELDS) {
+        const v = typeof t[k] === 'string' ? t[k].trim() : '';
+        if (v) info[k] = v;
+      }
     }
   } catch (_e) { /* storage read non-fatal */ }
-  return defaults;
+  info.missingFields = TECH_FIELDS.filter(k => !info[k]);
+  info.configured = info.missingFields.length === 0;
+  return info;
 }
+
+/**
+ * Render one technician field, or a visible marker when it is not configured.
+ * Never substitutes a plausible-looking value.
+ *
+ * @param {object} tech
+ * @param {string} key - One of TECH_FIELDS.
+ * @returns {string}
+ */
+function techField(tech, key) {
+  const v = tech && tech[key];
+  if (typeof v === 'string' && v.trim()) return v.trim();
+  return `[${TECH_LABEL[key] || key} not set — configure in Settings → Ticket Mode]`;
+}
+
+/** True when the operator has configured at least a name. */
+function hasTechIdentity(tech) {
+  return !!(tech && typeof tech.name === 'string' && tech.name.trim());
+}
+
+/**
+ * The signature block. With no configured identity it says so plainly rather
+ * than printing five placeholder markers.
+ *
+ * @param {object} tech
+ * @returns {string[]} lines
+ */
+function techSignature(tech) {
+  if (!hasTechIdentity(tech)) {
+    return [
+      '_Prepared by Sentinel Override (automated investigation)._',
+      '_⚠️ No technician details configured — set your name, title, company, phone and email in Settings → Ticket Mode before sending this to a client._',
+    ];
+  }
+  return [
+    `_${techField(tech, 'name')} · ${techField(tech, 'title')} · ${techField(tech, 'company')}_`,
+    `_Phone: ${techField(tech, 'phone')} · Email: ${techField(tech, 'email')}_`,
+  ];
+}
+
+/**
+ * Ownership line. Attributing work to a named person requires that the operator
+ * actually named themselves.
+ *
+ * @param {object} tech
+ * @param {string} trailing - What that person did / will do.
+ * @returns {string}
+ */
+function ownershipLine(tech, trailing) {
+  if (!hasTechIdentity(tech)) {
+    return `Automated investigation by Sentinel Override — ${trailing}. `
+      + 'No technician identity is configured; add yours in Settings before this goes to a client.';
+  }
+  return `${techField(tech, 'name')} (${techField(tech, 'title')}, ${techField(tech, 'company')}) — ${trailing}.`;
+}
+
+// The agent performs read-only investigation. It does not remediate, close
+// tickets, open vendor cases, or contact anyone — so no template may assert
+// that it did. This is the one line every "what happens next" field uses.
+const NO_REMEDIATION_NOTE =
+  'This run was read-only investigation by an automated agent: nothing was changed, '
+  + 'no ticket was closed and no one was contacted.';
 
 function extractTicketNumber(goal) {
   if (!goal) return '';
@@ -87,11 +180,19 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
   if (!actionTaken) actionTaken = 'Investigation completed via Sentinel Override agent.';
   if (actionTaken.length > 240) actionTaken = `${actionTaken.slice(0, 237)}...`;
 
+  // "None required. Ticket closed pending client confirmation." used to be
+  // asserted here whenever a regex failed to spot partial-run wording. The
+  // agent cannot know whether a ticket may be closed — that is a technician's
+  // judgement about a client commitment — and stating it in a PSA note is a
+  // false record.
   const nextStep = partial
-    ? 'Manual review required — see investigation findings below. Recommend follow-up within 1 business day.'
-    : 'None required. Ticket closed pending client confirmation.';
+    ? `Manual review required — see investigation findings below. Recommend follow-up within 1 business day. ${NO_REMEDIATION_NOTE}`
+    : `Technician review required before closing. ${NO_REMEDIATION_NOTE}`;
 
-  const ownership = `${tech.name} (${tech.title}, ${tech.company}) — ${partial ? 'investigation in progress' : 'investigation completed and findings documented'}.`;
+  const ownership = ownershipLine(
+    tech,
+    partial ? 'investigation in progress' : 'investigation completed and findings documented'
+  );
 
   let header = '';
   if (ticketNum) header = `**Ticket #${ticketNum}** — `;
@@ -104,7 +205,7 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
     `- ${actionTaken}`,
     '',
     '**Contact Attempt Details:**',
-    `- Automated investigation via Sentinel Override agent at ${stamp} (${stepCount} steps, ${apiCallCount} AI calls).`,
+    `- No client or vendor contact was attempted. Automated investigation via Sentinel Override at ${stamp} (${stepCount} steps, ${apiCallCount} AI calls).`,
     '',
     '**Next Step and Time:**',
     `- ${nextStep}`,
@@ -136,8 +237,7 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
     '',
     '---',
     '',
-    `_${tech.name} · ${tech.title} · ${tech.company}_`,
-    `_Phone: ${tech.phone} · Email: ${tech.email}_`
+    ...techSignature(tech)
   ].join('\n');
 
   return block;
@@ -168,7 +268,13 @@ function formatTicketKickoff(summary, goal, tech, options) {
   const tail = sentences.slice(-3);
   const pathLines = tail.length
     ? tail.map((s, i) => `${i + 1}. ${s.replace(WHITESPACE_NORMALIZE_RE, ' ').slice(0, 240)}`)
-    : ['1. Low-risk check (verify configuration, run diagnostics).', '2. Next step (apply targeted fix or escalate).', '3. Escalation/fix (vendor case, change request, or remediation)'];
+    // Labelled, because this is a boilerplate ladder that has nothing to do
+    // with THIS ticket. Presenting it unmarked as "the fastest safe resolution
+    // path" reads as an agent recommendation derived from the investigation.
+    : ['_(generic checklist — this run produced no ticket-specific steps; replace before use)_',
+       '1. Low-risk check (verify configuration, run diagnostics).',
+       '2. Next step (apply targeted fix or escalate).',
+       '3. Escalation/fix (vendor case, change request, or remediation)'];
 
   const lines = [
     `## ${_ticketHeader(ticketNum, 'Ticket Kickoff')}`,
@@ -190,8 +296,7 @@ function formatTicketKickoff(summary, goal, tech, options) {
     '',
     '---',
     '',
-    `_${tech.name} · ${tech.title} · ${tech.company}_`,
-    `_Phone: ${tech.phone} · Email: ${tech.email}_`
+    ...techSignature(tech)
   ];
   return lines.join('\n');
 }
@@ -210,13 +315,13 @@ function formatWaitingOnClient(summary, goal, tech, options) {
     `- ${firstSentence}`,
     '',
     '**Contact Attempt Details:**',
-    `- Automated investigation completed at ${stamp}. Awaiting client confirmation or additional details.`,
+    `- No outbound contact was made by the agent. Automated investigation completed at ${stamp}; awaiting client confirmation or additional details.`,
     '',
     '**Next Step and Time:**',
     `- Follow up by ${followUp} (or sooner if client responds).`,
     '',
     '**Ownership Statement:**',
-    `- ${tech.name} (${tech.title}, ${tech.company}) — will re-engage once client responds.`,
+    `- ${ownershipLine(tech, 'will re-engage once client responds')}`,
     '',
     '---',
     '',
@@ -226,7 +331,7 @@ function formatWaitingOnClient(summary, goal, tech, options) {
     '',
     '---',
     '',
-    `_ ${tech.name} · Phone: ${tech.phone} · Email: ${tech.email}_`
+    ...techSignature(tech)
   ];
   return lines.join('\n');
 }
@@ -235,7 +340,7 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
   const _opts = options || {};
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
-  const firstSentence = getFirstSentence(summary || '').slice(0, 240) || 'Diagnostics completed; vendor case opened.';
+  const firstSentence = getFirstSentence(summary || '').slice(0, 240) || 'Diagnostics completed.';
   const followUp = `${new Date(Date.now() + ONE_DAY_MS).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 
   const lines = [
@@ -245,13 +350,13 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
     `- ${firstSentence}`,
     '',
     '**Contact Attempt Details:**',
-    `- Vendor case opened at ${stamp}. Awaiting vendor response / ETA.`,
+    `- No vendor case was opened by the agent. Diagnostics captured at ${stamp} — open the vendor case and record its reference here.`,
     '',
     '**Next Step and Time:**',
     `- Follow up by ${followUp} (or on vendor response).`,
     '',
     '**Ownership Statement:**',
-    `- ${tech.name} (${tech.title}, ${tech.company}) — will follow up with vendor and update ticket.`,
+    `- ${ownershipLine(tech, 'will follow up with vendor and update ticket')}`,
     '',
     '---',
     '',
@@ -261,7 +366,7 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
     '',
     '---',
     '',
-    `_ ${tech.name} · Phone: ${tech.phone} · Email: ${tech.email}_`
+    ...techSignature(tech)
   ];
   return lines.join('\n');
 }
@@ -314,7 +419,9 @@ function formatItGlueKb(summary, goal, tech, options) {
     '',
     '---',
     '',
-    `_Documented by ${tech.name} · ${tech.company}_`
+    hasTechIdentity(tech)
+      ? `_Documented by ${techField(tech, 'name')} · ${techField(tech, 'company')}_`
+      : '_Documented by Sentinel Override (automated) — no technician identity configured._'
   ];
   return out.join('\n');
 }
@@ -325,26 +432,35 @@ function formatClientEmail(summary, goal, tech, options) {
   const ticketRef = ticketNum ? `Ticket #${ticketNum}` : 'your recent ticket';
   const ticketRefShort = ticketNum ? `Ticket #${ticketNum}` : 'your ticket';
   const briefIssue = getFirstLine(goal || '').replace(TICKET_PREFIX_RE, '').slice(0, 80) || 'your reported issue';
-  const oneLine = getFirstSentence(summary || 'The issue has been investigated and addressed.').slice(0, 240);
+  const oneLine = getFirstSentence(summary || 'We have investigated the issue.').slice(0, 240);
 
-  const subject = `Resolved: ${ticketRefShort} \u2013 ${briefIssue}`;
+  // This template is the highest-risk output in the product: it is drafted to
+  // be sent verbatim to a paying client. It used to open with "has been
+  // resolved" and close with "Everything is now working as expected" \u2014 two
+  // unconditional factual claims about an outcome the agent never verified and
+  // could not have produced, since it only reads pages. The subject line said
+  // "Resolved:" for the same reason. All three are now honest, and the one
+  // sentence that must state status is an explicit blank for the technician.
+  const subject = `Update: ${ticketRefShort} \u2013 ${briefIssue}`;
 
   const body = [
     'Hello [Client Name],',
     '',
-    `The issue reported in ${ticketRef} has been resolved. ${oneLine}`,
+    `Here is an update on ${ticketRef}. ${oneLine}`,
     '',
-    `Everything is now working as expected. If you need further assistance, contact us at ${tech.phone} or ${tech.email}.`,
+    '[STATUS \u2014 complete this line before sending. The automated investigation cannot confirm whether the issue is resolved.]',
+    '',
+    `If you need further assistance, contact us at ${techField(tech, 'phone')} or ${techField(tech, 'email')}.`,
     '',
     'Best regards,',
-    tech.name,
-    tech.title,
-    tech.company,
-    `Phone: ${tech.phone} | Email: ${tech.email}`
+    techField(tech, 'name'),
+    techField(tech, 'title'),
+    techField(tech, 'company'),
+    `Phone: ${techField(tech, 'phone')} | Email: ${techField(tech, 'email')}`
   ];
 
   const block = [
-    '## Client Email',
+    '## Client Email (DRAFT \u2014 do not send unedited)',
     '',
     `**Subject:** ${subject}`,
     '',
@@ -354,7 +470,12 @@ function formatClientEmail(summary, goal, tech, options) {
     '',
     '---',
     '',
-    '_Replace `[Client Name]` before sending. Investigation findings (for your reference, not in email body):_',
+    '_Before sending: replace `[Client Name]`, complete the `[STATUS \u2026]` line, and check every bracketed field above._',
+    ...(hasTechIdentity(tech)
+      ? []
+      : ['_\u26a0\ufe0f No technician details are configured \u2014 this draft has no valid sender identity or contact details. Set them in Settings \u2192 Ticket Mode._']),
+    '',
+    '_Investigation findings (for your reference, not in the email body):_',
     '',
     summary || '(no summary)'
   ];
