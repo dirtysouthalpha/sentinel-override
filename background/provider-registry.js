@@ -344,9 +344,13 @@ export const PROVIDERS = {
      * @param {string} apiKey - API key for Bearer authentication.
      * @returns {object} Headers object with Content-Type and Authorization.
      */
+    // resolveProvider() maps every non-Anthropic, non-Z.ai endpoint here,
+    // including self-hosted ones, so omit Authorization entirely when there is
+    // no key rather than sending a meaningless `Bearer ` that some local
+    // servers reject outright.
     buildHeaders: (apiKey) => ({
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
     }),
 
     /**
@@ -1363,6 +1367,37 @@ export const PROVIDER_CATALOG = [
  */
 export function getCatalogProvider(id) {
   return PROVIDER_CATALOG.find(p => p.id === id) || null;
+}
+
+// Loopback and RFC1918 / CGNAT / Tailscale-range hosts. A server on one of
+// these is self-hosted by definition, so an empty API key is a valid
+// configuration rather than a misconfiguration.
+const _LOCAL_HOST_RE =
+  /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[?::1\]?|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+|[\w-]+\.local|host\.docker\.internal)$/i;
+
+/**
+ * Does this provider actually need an API key before we let a call through?
+ *
+ * Seven catalog entries (ollama, lmstudio, koboldcpp, vllm, …) are declared
+ * `auth: 'none'` and every one of them was unusable: callLLM rejected an empty
+ * key with "No API key configured. Open Settings and configure a provider."
+ * before the provider's own optional-auth buildHeaders was ever reached. A
+ * self-hosted endpoint is also recognised by its host, so a "custom" provider
+ * pointed at 127.0.0.1 or a tailnet address works with no key too.
+ *
+ * @param {string} providerId - Active provider id (catalog id).
+ * @param {string} endpoint - Configured endpoint URL.
+ * @returns {boolean} True when a non-empty API key is required.
+ */
+export function providerRequiresApiKey(providerId, endpoint) {
+  const entry = getCatalogProvider(providerId);
+  if (entry && entry.auth === 'none') return false;
+  if (!endpoint) return true;
+  try {
+    return !_LOCAL_HOST_RE.test(new URL(endpoint).hostname);
+  } catch {
+    return true;
+  }
 }
 
 // ========== Models Auto-Detect (3.10.0) ==========

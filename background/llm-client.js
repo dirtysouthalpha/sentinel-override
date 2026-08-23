@@ -4,7 +4,7 @@
 
 ;
 import {getAllTabContexts, getActiveTabId, TAB_LIMIT} from './tab-context.js';
-import {resolveProvider, getActiveProvider, getModelSupportsVision} from './provider-registry.js';
+import {resolveProvider, getActiveProvider, getModelSupportsVision, providerRequiresApiKey} from './provider-registry.js';
 import {getPlatformProfile} from './platforms/index.js';
 import {getErrorMessage} from './error-utils.js';
 import {API_TIMEOUT_MS, PLATFORM_CTX_CACHE_TTL_MS, ONE_SECOND_MS} from './constants.js';
@@ -1535,8 +1535,12 @@ export async function callLLM(trimmedElements, totalElementCount, pageContent, b
   agentState.apiCallCount++; // increment before any throws so the count is always recorded
   const providerConfig = await getActiveProvider();
   const { endpoint, apiKey } = providerConfig;
-  if (!apiKey) {
-    console.error('[Sentinel/LLM] No API key configured! Provider:', providerConfig.providerId || endpoint || 'unknown');
+  // Self-hosted providers (ollama, LM Studio, vLLM, KoboldCpp, …) are declared
+  // `auth: 'none'` in PROVIDER_CATALOG and legitimately have no key. This guard
+  // used to reject them outright, so every local-first configuration failed
+  // here — before the provider's own optional-auth buildHeaders ever ran.
+  if (!apiKey && providerRequiresApiKey(providerConfig.id, endpoint)) {
+    console.error('[Sentinel/LLM] No API key configured! Provider:', providerConfig.id || endpoint || 'unknown');
     throw new Error('No API key configured. Open Settings and configure a provider.');
   }
   const provider = resolveProvider(endpoint);
@@ -2426,7 +2430,10 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
   const providerConfig = await getActiveProvider();
   if (!providerConfig) throw new Error('No active provider configured. Set one in extension settings.');
   const { endpoint, apiKey, model } = providerConfig;
-  if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
+  // Same rule as callLLM: a local `auth: 'none'` provider needs no key.
+  if (!apiKey && providerRequiresApiKey(providerConfig.id, endpoint)) {
+    throw new Error('API key not configured. Set it in extension settings.');
+  }
   const provider = resolveProvider(endpoint);
   if (!provider) throw new Error(`Unknown provider for endpoint: ${endpoint}`);
 

@@ -222,3 +222,103 @@ describe('supportsVision recognises self-hosted VL builds', () => {
     expect(supportsVision('qwen2.5-vl-text-only')).toBe(false);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Local, keyless providers
+//
+// PROVIDER_CATALOG declares seven self-hosted providers with `auth: 'none'`
+// (ollama, LM Studio, KoboldCpp, vLLM, …) and the PROVIDERS definitions even
+// carry optional-auth buildHeaders commented "no API key required for a local
+// server". None of them worked: callLLM rejected an empty key with "No API key
+// configured. Open Settings and configure a provider." before any of that ran,
+// so the entire local-first path was dead.
+describe('self-hosted providers work without an API key', () => {
+  test('ollama with no key reaches the endpoint instead of throwing', async () => {
+    _storageData = {
+      active_provider: 'ollama',
+      providers: {
+        ollama: { api_key: '', model: 'llama3.2', endpoint: 'http://localhost:11434/v1/chat/completions' },
+      },
+    };
+    const result = await call(agentState({ model: 'llama3.2' }), null);
+    expect(result.type).toBe('note');
+    expect(requests).toHaveLength(1);
+  });
+
+  test('a keyless custom provider on a loopback endpoint is allowed', async () => {
+    _storageData = {
+      active_provider: 'custom',
+      providers: {
+        custom: { api_key: '', model: 'LongCat-2.0-nonthink', endpoint: 'http://127.0.0.1:8800/v1/chat/completions' },
+      },
+    };
+    const result = await call(agentState({ model: 'LongCat-2.0-nonthink' }), null);
+    expect(result.type).toBe('note');
+  });
+
+  test('no Authorization header is sent when there is no key', async () => {
+    _storageData = {
+      active_provider: 'ollama',
+      providers: {
+        ollama: { api_key: '', model: 'llama3.2', endpoint: 'http://localhost:11434/v1/chat/completions' },
+      },
+    };
+    await call(agentState({ model: 'llama3.2' }), null);
+    const init = globalThis.fetch.mock.calls[0][1];
+    expect(init.headers.Authorization).toBeUndefined();
+  });
+
+  test('a CLOUD provider with no key still fails loudly', async () => {
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: { api_key: '', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1/chat/completions' },
+      },
+    };
+    await expect(call(agentState(), null)).rejects.toThrow(/No API key configured/);
+  });
+});
+
+describe('providerRequiresApiKey', () => {
+  let providerRequiresApiKey;
+  beforeAll(async () => {
+    ({ providerRequiresApiKey } = await import('../background/provider-registry.js'));
+  });
+
+  test('false for every catalog provider declared auth: none', async () => {
+    const { PROVIDER_CATALOG } = await import('../background/provider-registry.js');
+    const keyless = PROVIDER_CATALOG.filter(p => p.auth === 'none');
+    expect(keyless.length).toBeGreaterThan(0);
+    for (const p of keyless) {
+      expect(providerRequiresApiKey(p.id, p.endpoint)).toBe(false);
+    }
+  });
+
+  test('false for loopback and private-range hosts regardless of provider id', () => {
+    for (const url of [
+      'http://localhost:1234/v1/chat/completions',
+      'http://127.0.0.1:8800/v1/chat/completions',
+      'http://192.168.1.50:9090/v1/chat/completions',
+      'http://10.0.0.9:8080/v1',
+      'http://172.16.4.4:8080/v1',
+      'http://100.70.240.55:9090/v1/chat/completions', // tailnet
+      'http://nuke.local:8083/v1/chat/completions',
+    ]) {
+      expect(providerRequiresApiKey('custom', url)).toBe(false);
+    }
+  });
+
+  test('true for public endpoints', () => {
+    expect(providerRequiresApiKey('openai', 'https://api.openai.com/v1/chat/completions')).toBe(true);
+    expect(providerRequiresApiKey('anthropic', 'https://api.anthropic.com/v1/messages')).toBe(true);
+    expect(providerRequiresApiKey('zai', 'https://api.z.ai/api/paas/v4/chat/completions')).toBe(true);
+    // 100.x outside the CGNAT range is public
+    expect(providerRequiresApiKey('custom', 'http://100.200.1.1/v1')).toBe(true);
+  });
+
+  test('true when the endpoint is missing or unparseable', () => {
+    expect(providerRequiresApiKey('custom', '')).toBe(true);
+    expect(providerRequiresApiKey('custom', 'not a url')).toBe(true);
+    expect(providerRequiresApiKey(undefined, undefined)).toBe(true);
+  });
+});

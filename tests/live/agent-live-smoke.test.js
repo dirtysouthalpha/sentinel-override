@@ -420,10 +420,10 @@ async function reachable(endpoint, model, key) {
 const TEXT_UP = await reachable(TEXT_ENDPOINT, TEXT_MODEL, '');
 const VISION_UP = VISION_KEY ? await reachable(VISION_ENDPOINT, VISION_MODEL, VISION_KEY) : false;
 
-function configureProvider({ endpoint, model, apiKey }) {
-  storageData.active_provider = 'openai';
+function configureProvider({ endpoint, model, apiKey, id = 'openai' }) {
+  storageData.active_provider = id;
   storageData.providers = {
-    openai: { endpoint, api_key: apiKey || 'local-no-auth', model, max_tokens: 4000, temperature: 0.2 },
+    [id]: { endpoint, api_key: apiKey === undefined ? 'local-no-auth' : apiKey, model, max_tokens: 4000, temperature: 0.2 },
   };
 }
 
@@ -573,4 +573,59 @@ describe('LIVE: vision path', () => {
     expect(String(snap.exit || '')).not.toMatch(/NO_LLM_CALL/);
     expect(finishSummary().length).toBeGreaterThan(0);
   }, 300000);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A keyless self-hosted provider must reach the model at all. Before the
+// providerRequiresApiKey() fix, callLLM threw "No API key configured" for every
+// `auth: 'none'` provider in the catalog, so this configuration could not make
+// a single request. This drives the REAL llm-client directly (one call) rather
+// than a whole run: ollama on this box is CPU-only, so a full multi-step run
+// takes many minutes and would tell us nothing extra about the key gate.
+describe('LIVE: keyless local provider (ollama)', () => {
+  const OLLAMA = process.env.SENTINEL_LIVE_OLLAMA_ENDPOINT
+    || 'http://127.0.0.1:11434/v1/chat/completions';
+  const OLLAMA_MODEL = process.env.SENTINEL_LIVE_OLLAMA_MODEL || 'qwen2.5-degrade:3b';
+  let up = false;
+  let callLLMWithRetry;
+
+  beforeAll(async () => {
+    up = await reachable(OLLAMA, OLLAMA_MODEL, '');
+    ({ callLLMWithRetry } = await import('../../background/llm-client.js'));
+  });
+
+  test('callLLM reaches the endpoint with an empty api_key', async () => {
+    if (!up) {
+      // eslint-disable-next-line no-console
+      console.warn(`[live] SKIPPING ollama test — ${OLLAMA} (${OLLAMA_MODEL}) did not answer 200`);
+      return;
+    }
+    storageData.active_provider = 'ollama';
+    storageData.providers = {
+      ollama: { endpoint: OLLAMA, api_key: '', model: OLLAMA_MODEL, max_tokens: 512, temperature: 0.2 },
+    };
+
+    const state = {
+      apiCallCount: 0, consecutiveFailures: 0, currentStrategies: [],
+      agentMemory: {}, agentPlan: null, currentPlanStep: 0, model: OLLAMA_MODEL,
+    };
+    const cmd = await callLLMWithRetry(
+      [], 0, SITE[START_URL].text, null,
+      'Say how many tickets are listed on this page.',
+      [], 1, START_URL, 0,
+      { maxRetries: 1, retryDelay: 100, maxRetryDelay: 500, fetchTimeout: 180000,
+        historyWindow: 5, strategyShiftThreshold: 3, streaming: false },
+      state
+    );
+
+    const calls = wireLog.filter(e => e.url.includes('11434'));
+    // eslint-disable-next-line no-console
+    console.log('[live] ollama wire:\n' + wireSummary() + '\ncommand=' + JSON.stringify(cmd).slice(0, 300));
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.some(e => e.status === 200)).toBe(true);
+    // No Authorization header was invented for a keyless provider.
+    expect(cmd).toBeTruthy();
+    expect(typeof cmd.type).toBe('string');
+  }, 400000);
 });
