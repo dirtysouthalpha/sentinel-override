@@ -1104,8 +1104,8 @@ if (window.__sentinelInitialized) {
       const overlay = getOrCreateOverlay();
       if (!overlay) return;
       const safeText = String(text || '');
-      const preview = escapeHtml(safeText.substring(0, 40) + (safeText.length > 40 ? '...' : ''));
-      const progress = position !== undefined ? ` (${position}/${total})` : '';
+      const preview = safeText.substring(0, 40) + (safeText.length > 40 ? '...' : '');
+      const progress = position !== undefined ? ` (${Number(position)}/${Number(total)})` : '';
       overlay.innerHTML = `<span class="sentinel-action">⌨ Typing:</span> <span class="sentinel-target">"${escapeHtml(preview)}"</span>${progress}`;
       overlay.style.opacity = '1';
     } catch (e) { console.warn('[Sentinel] typing banner show:', getErrorMessage(e)); }

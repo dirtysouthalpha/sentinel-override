@@ -25,6 +25,34 @@
 - Sandboxed user code is now strict-mode, so an assignment to an undeclared identifier throws `ReferenceError` instead of creating a page global. That was the stated intent of the previous hardening commit; it is now actually in force.
 - Observed live and NOT changed: with an MSP report goal the model fills the structured-report template with invented specifics (a fabricated technician name, "Ticket closed pending client confirmation") alongside the correctly-extracted data. That is a prompt/report-template problem, not a loop bug, and needs its own change.
 
+## [Unreleased] - 2026-08-23 upgrade day: dashboard fixes + mechanical XSS gate
+
+### Added
+- **`scripts/check-html-injection.cjs`** — AST-based gate (via `@babel/parser`) that fails `npm run test:web` if any `web/` HTML sink (`innerHTML`/`outerHTML`/`insertAdjacentHTML`/`document.write`, inline or standalone script) receives an expression it cannot prove inert: literals, `escHtml()`/`escAttr()` calls, `Math`/`Number` results, safe compositions, never-reassigned consts with safe initializers, `map(fn).join()` with safe returns. Every XSS this project shipped was an unescaped interpolation into `innerHTML`; the rule is now mechanical instead of disciplinary. 8 jest tests prove both directions. 16 sinks currently checked, 0 unsafe.
+- **`lib/report-sanitize.js`** — the ONE copy of `sanitizeReportHtml`, previously hand-duplicated in `report-view.js` and `report-print.js` (drift between two copies of a security function is a one-page-only XSS waiting to fire). Loaded by both report pages before their page script; 8 jest tests pin strip behavior plus drift guards against private forks and wrong load order.
+
+### Added (2)
+- **HTML-injection gate now covers the whole repo.** `check-html-injection.cjs` extended from `web/` to `popup-modules/`, `content/`, and the root popup/report pages — 157 sinks proven safe, 0 exceptions. The prover grew sound compositional rules (safe-write `let`s, literal lookup tables, `.map/.filter/.join` pipelines, numeric/date formatters, escape aliases, IIFEs) and its failures now name the exact unproven interpolation. 45 initially-unproven sinks were triaged: most were hardened with `escapeHtml()`/`Number()` wraps so safety is locally evident; `setResponseHTML(rawHtml)` in quick-assist was replaced with a DOM-built `setResponseError(message)`.
+
+- **`npm run routes:sync`** — one-command heal for route-manifest drift: regenerates `contract/server-routes.json` and commits it if changed (never pushes). `routes:check` now says when a stale table is metadata-only drift (source lines moved, route set unchanged) instead of printing a bare FAIL.
+
+- **Scope-aware injection prover.** The checker resolves names through real lexical scope chains (function granularity); parameters, destructuring targets and catch params bind opaque. Fixes both defects of the old file-global map: same-named locals in different functions no longer cross-contaminate (no more prover-driven renames), and a parameter can no longer be wrongly proven via a same-named safe outer const.
+- **DOM regression tests for the hardened sinks** (linkedom/vm): chat stepNumber coercion (numeric, numeric-string, hostile), scheduler card adversarial fields, action-hud step coercion, typing-banner single-escape. The quick-assist markdown tests were also repointed at the REAL renderMarkdown — they previously asserted a hand-copied version, which is how the double-escape bug stayed invisible.
+
+### Fixed (2)
+- **quick-assist markdown double-escape**: `renderMarkdown` escaped its input via `escapeHtml` and then re-escaped `&<>` a second time, so `<` in AI responses displayed as the literal text `&lt;`.
+- **Typing-banner double-escape** (`content/index.js`): the preview string was escaped at build AND at use; special characters in typed text displayed as entity text.
+- **Run-log rows escaped only `<`** (`chat.js`): the goal text now goes through full `escapeHtml` instead of a lone `<` replace.
+
+### Fixed
+- **Prime dashboard: Escape now cancels inline conversation rename.** The input saved on blur, and Escape triggered a re-render that removed the focused input — firing blur and PATCHing the value the user asked to discard.
+- **Prime dashboard: conversation rail keyboard support.** Group headers declared `role="button"`/`tabindex="0"` but only handled click (Enter/Space now toggle, including the dynamic pinned group); the pinned group's saved collapse state was dropped every reload (created after `loadGroupState()` ran); the conversation context menu (`role="menu"`) closes on Escape.
+- **`report-print.js`: raw error text concatenated into `innerHTML`** on the failure path (report-view escaped the same message). Now built through the DOM with `textContent`.
+
+### Changed
+- `contract/server-routes.json` re-extracted after upgrade-day commits landed in neuralis and sentinel-prime-premium (540 routes / 3 servers; `routes:check` current, contract holds 57/57).
+- `dashboard.js`: render-local `goal` const renamed `goalCell` (cross-scope name collision with the user-input `goal`).
+
 ## [Unreleased] - runAgentLoop state machine (#45)
 
 ### Added

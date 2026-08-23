@@ -716,3 +716,44 @@ describe('chat.js — _formatDuration', () => {
     expect(result).toBe('1m 0s');
   });
 });
+
+// ── Sink hardening (2026-08-23): _ensureActivityStream stepNumber coercion ────
+// stepNumber arrives on runtime messages and used to flow raw into a
+// querySelector string, a data-step attribute, and an HTML template. It is now
+// coerced once (Number(...) || 0). These tests pin both directions: numeric
+// values render as before, and a hostile string can never reach the HTML.
+describe('chat.js — _ensureActivityStream coerces stepNumber', () => {
+  let sandbox;
+  beforeEach(() => { sandbox = createSandbox(); loadModule(sandbox); });
+
+  function lastCard(sb) {
+    const container = sb.document.getElementById('chat-container');
+    return container._children[container._children.length - 1];
+  }
+
+  test('numeric stepNumber renders into the card and data-step', () => {
+    sandbox._ensureActivityStream(3);
+    const card = lastCard(sandbox);
+    expect(card).toBeDefined();
+    expect(card._attrs['data-step']).toBe(3);
+    expect(card._innerHTML).toContain('Step 3');
+    expect(card._innerHTML).toContain('data-step="3"');
+  });
+
+  test('numeric-string stepNumber coerces to the same number', () => {
+    sandbox._ensureActivityStream('7');
+    const card = lastCard(sandbox);
+    expect(card._attrs['data-step']).toBe(7);
+    expect(card._innerHTML).toContain('Step 7');
+  });
+
+  test('hostile non-numeric stepNumber cannot reach the HTML', () => {
+    const payload = '"]"><img src=x onerror=alert(1)>';
+    sandbox._ensureActivityStream(payload);
+    const card = lastCard(sandbox);
+    expect(card._attrs['data-step']).toBe(0);
+    expect(card._innerHTML).toContain('Step 0');
+    expect(card._innerHTML).not.toContain('<img');
+    expect(card._innerHTML).not.toContain(payload);
+  });
+});

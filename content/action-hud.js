@@ -197,8 +197,8 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       const el = ensureHUD();
       if (!el) return;
 
-      if (opts.step !== undefined) currentStep = opts.step;
-      if (opts.totalSteps !== undefined) totalSteps = opts.totalSteps;
+      if (opts.step !== undefined) currentStep = Number(opts.step) || 0;
+      if (opts.totalSteps !== undefined) totalSteps = Number(opts.totalSteps) || 0;
       if (opts.action) currentAction = opts.action;
 
       // Update step counter

@@ -242,9 +242,9 @@ function renderRuns(runs) {
       : '<span class="badge orange">Running</span>';
     const ago = r.startedAt ? timeAgo(r.startedAt) : '—';
     const duration = r.duration ? Math.round(r.duration / 1000) + 's' : '—';
-    const goal = escHtml(String(r.goal || '').substring(0, 60));
+    const goalCell = escHtml(String(r.goal || '').substring(0, 60));
     const steps = escHtml(r.stepCount || 0);
-    return `<tr><td>${goal}</td><td>${statusBadge}</td><td>${steps}</td><td>${escHtml(duration)}</td><td>${escHtml(ago)}</td></tr>`;
+    return `<tr><td>${goalCell}</td><td>${statusBadge}</td><td>${steps}</td><td>${escHtml(duration)}</td><td>${escHtml(ago)}</td></tr>`;
   }).join('');
 }
 

@@ -10,10 +10,11 @@
     "test:all": "npm test && npm run build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test:web": "node scripts/check-web-dashboards.cjs",
+    "test:web": "node scripts/check-web-dashboards.cjs && node scripts/check-html-injection.cjs",
     "test:contract": "node scripts/check-contract.cjs",
     "routes:manifest": "node scripts/generate-route-manifest.cjs",
     "routes:check": "node scripts/generate-route-manifest.cjs --check",
+    "routes:sync": "node scripts/sync-route-manifest.cjs",
     "check": "npm run lint && npm run test:web && npm run routes:check && npm run test:contract && npm test && npm run build",
     "build": "node scripts/build.js",
     "test:live": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js --config jest.live.config.js --runInBand"

@@ -272,7 +272,7 @@ const ERROR_WARN_LEVEL_RE = /^(error|warn)$/;
       { id: 'storage', label: 'Storage' },
     ];
     filtersBar.innerHTML = chips.map(c =>
-      `<button class="telem-chip" data-filter="${c.id}" style="padding:2px 8px; font-size:10px; background:${c.id === activeFilter ? 'var(--accent-primary, #ff6b00)' : 'var(--bg-input, rgba(255,255,255,0.04))'}; color:${c.id === activeFilter ? '#fff' : 'var(--text-secondary, #aaa)'}; border:1px solid ${c.id === activeFilter ? 'var(--accent-primary, #ff6b00)' : 'var(--border-color, rgba(255,255,255,0.10))'}; border-radius:10px; cursor:pointer;">${c.label}</button>`
+      `<button class="telem-chip" data-filter="${_esc(c.id)}" style="padding:2px 8px; font-size:10px; background:${c.id === activeFilter ? 'var(--accent-primary, #ff6b00)' : 'var(--bg-input, rgba(255,255,255,0.04))'}; color:${c.id === activeFilter ? '#fff' : 'var(--text-secondary, #aaa)'}; border:1px solid ${c.id === activeFilter ? 'var(--accent-primary, #ff6b00)' : 'var(--border-color, rgba(255,255,255,0.10))'}; border-radius:10px; cursor:pointer;">${_esc(c.label)}</button>`
     ).join('');
     const filterChips = filtersBar.querySelectorAll('.telem-chip');
     if (filterChips && typeof filterChips.forEach === 'function') {
@@ -447,7 +447,7 @@ const ERROR_WARN_LEVEL_RE = /^(error|warn)$/;
         const goalSnip = (run.goal || '(no goal)').substring(0, 60);
         const main = document.createElement('div');
         main.style.cssText = 'flex:1; min-width:0;';
-        main.innerHTML = `<strong>${completed} ${_esc(goalSnip)}${run.goal && run.goal.length > 60 ? '…' : ''}</strong><div style="font-size:10px; color:var(--text-tertiary, #777); margin-top:2px;">${startStr} · ${run.count || 0} events</div>`;
+        main.innerHTML = `<strong>${completed} ${_esc(goalSnip)}${run.goal && run.goal.length > 60 ? '…' : ''}</strong><div style="font-size:10px; color:var(--text-tertiary, #777); margin-top:2px;">${startStr} · ${Number(run.count) || 0} events</div>`;
         item.appendChild(main);
         const delBtn = document.createElement('button');
         delBtn.textContent = '✕';

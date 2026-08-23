@@ -11,6 +11,12 @@
   /* ── Dimensions ── */
   --sidebar-w: 280px;
   --right-w: 320px;
+  /* Phone drawer widths. Separate vars from the desktop rails because the two
+     are different objects: the rails are grid columns that shrink the content,
+     the drawers are overlays that cover it. Sharing one var made a comfortable
+     desktop rail into a drawer that swallowed the phone screen. */
+  --mob-sb-w: min(280px, 85vw);
+  --mob-fe-w: min(320px, 90vw);
   --top-h: 48px;
   --r: 10px;
   --t: .2s ease;
@@ -329,12 +335,53 @@ body::before {
   transition: background var(--t);
 }
 .rail-grip:hover, .rail-grip.dragging { background: var(--border-active); }
+/* Without this a touch-drag scrolls the page instead of resizing the rail —
+   the browser claims the gesture before the pointermove handler ever sees it. */
+.rail-grip { touch-action: none; }
 #grip-left { left: calc(var(--sidebar-w) - 4px); }
 #grip-right { right: calc(var(--right-w) - 4px); }
 #app.sidebar-collapsed #grip-left,
 #app.right-collapsed #grip-right,
 #app.both-collapsed .rail-grip { display: none; }
-@media (max-width: 767px) { .rail-grip { display: none !important; } }
+
+/* Phone: the rails are overlay drawers, not grid columns, so a grip pinned to
+   a column edge would float in open space. Each grip instead rides its own
+   drawer's inner edge and exists only while that drawer is open. Previously
+   this block was a blanket `display:none !important`, which is why the phone
+   had no resize affordance at all — the control wasn't broken, it was absent. */
+@media (max-width: 767px) {
+  .rail-grip {
+    display: none;
+    position: fixed;
+    z-index: 210;
+    width: 22px;
+  }
+  #app.mob-sb-open #grip-left {
+    display: block;
+    left: calc(var(--mob-sb-w) - 11px);
+    right: auto;
+  }
+  #app.mob-fe-open #grip-right {
+    display: block;
+    right: calc(var(--mob-fe-w) - 11px);
+    left: auto;
+  }
+  /* Touch has no hover, so the grip must show a resting seam or it reads as
+     empty space. Desktop keeps its hover-to-reveal behaviour untouched. */
+  #app.mob-sb-open #grip-left::after,
+  #app.mob-fe-open #grip-right::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 46px;
+    border-radius: 2px;
+    background: var(--border-active);
+    opacity: .9;
+  }
+}
 /* Suppress text selection while dragging, or the whole page highlights. */
 body.resizing { user-select: none; cursor: col-resize; }
 
@@ -566,6 +613,74 @@ body.resizing { user-select: none; cursor: col-resize; }
 
 .conv-item-del:hover {
   opacity: 1 !important;
+}
+
+/* -- conversation options menu button (replaces the bare ✕ with a ⋯) -- */
+.conv-item-menu {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .9rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: opacity var(--t);
+  flex-shrink: 0;
+  line-height: 1;
+}
+.conv-item:hover .conv-item-menu { opacity: .7; }
+.conv-item-menu:hover { opacity: 1 !important; color: var(--text); }
+.conv-item.is-pinned .conv-item-title { color: var(--accent2); }
+
+/* -- context menu (rename / pin / delete) -- */
+.conv-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 170px;
+  background: var(--surface2);
+  border: 1px solid var(--border-active);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.5);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: ctx-in .12s ease;
+}
+@keyframes ctx-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: .78rem;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  width: 100%;
+  font-family: inherit;
+}
+.ctx-item:hover { background: var(--accent-soft); }
+.ctx-item.ctx-danger { color: var(--err); }
+.ctx-item.ctx-danger:hover { background: rgba(255,77,107,.12); }
+.ctx-ic { font-size: .85rem; width: 16px; text-align: center; }
+
+/* -- inline rename input -- */
+.conv-rename-input {
+  width: 100%;
+  padding: 1px 4px;
+  font-size: .78rem;
+  color: var(--text);
+  background: var(--bg3);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  outline: none;
+  font-family: inherit;
+  box-shadow: 0 0 6px rgba(0,212,255,.25);
 }
 
 #sb-footer {
@@ -1627,7 +1742,7 @@ body.resizing { user-select: none; cursor: col-resize; }
     top: 0;
     left: 0;
     bottom: 0;
-    width: min(280px, 85vw);
+    width: var(--mob-sb-w);
     z-index: 200;
     transform: translateX(-101%);
     transition: transform var(--t);
@@ -1642,7 +1757,7 @@ body.resizing { user-select: none; cursor: col-resize; }
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(320px, 90vw);
+    width: var(--mob-fe-w);
     z-index: 200;
     transform: translateX(101%);
     transition: transform var(--t);
@@ -3026,9 +3141,19 @@ function loadPanelState() {
 
 /** Close any open mobile overlay and sync the backdrop to reality. */
 function syncMobileOverlay() {
-  const open = document.getElementById('sidebar').classList.contains('mob-open')
-    || document.getElementById('file-explorer').classList.contains('mob-open');
-  document.getElementById('mob-overlay').classList.toggle('open', open);
+  const sbOpen = document.getElementById('sidebar').classList.contains('mob-open');
+  const feOpen = document.getElementById('file-explorer').classList.contains('mob-open');
+  document.getElementById('mob-overlay').classList.toggle('open', sbOpen || feOpen);
+  // The phone resize grips ride their own drawer's edge, so they can only be
+  // positioned while that drawer is open. Mirroring the drawer state onto #app
+  // (rather than selecting on the drawer itself) keeps the CSS independent of
+  // DOM order — #grip-right sits BEFORE #file-explorer, so a sibling combinator
+  // would silently never match.
+  const app = document.getElementById('app');
+  if (app) {
+    app.classList.toggle('mob-sb-open', sbOpen);
+    app.classList.toggle('mob-fe-open', feOpen);
+  }
 }
 
 function toggleSidebar() {
@@ -3076,10 +3201,18 @@ const RAIL_MIN = 180, RAIL_MAX = 620;
 // Horizontal travel (px) that separates a click on a rail grip from a drag.
 const RAIL_DRAG_SLOP = 4;
 
+// Phone drawers get their own bounds. They overlay content instead of shrinking
+// it, so the desktop 620px ceiling would let a drawer cover a whole phone
+// screen with no way to see what is underneath.
+const MOB_RAIL_MIN = 200;
+const mobRailMax = () => Math.round(window.innerWidth * 0.92);
+
 function applyRailWidths(w) {
   const root = document.documentElement;
   if (w.sidebar) root.style.setProperty('--sidebar-w', w.sidebar + 'px');
   if (w.right) root.style.setProperty('--right-w', w.right + 'px');
+  if (w.mobSidebar) root.style.setProperty('--mob-sb-w', w.mobSidebar + 'px');
+  if (w.mobRight) root.style.setProperty('--mob-fe-w', w.mobRight + 'px');
 }
 
 function loadRailWidths() {
@@ -3094,9 +3227,15 @@ function loadRailWidths() {
 function setupRailResize() {
   if (typeof document.addEventListener !== 'function') return;
 
+  // Pointer Events, not mouse events. These grips carried a mousedown-only
+  // handler, so on a phone they were inert even where they were visible — which
+  // is why the mobile rule hid them outright rather than fixing them. One
+  // pointerdown path now serves mouse, touch and pen; pointer capture keeps the
+  // drag alive when the finger slides off the 22px target, which on touch is
+  // the normal case rather than the exception.
   const drag = (grip, side) => {
     if (!grip) return;
-    grip.addEventListener('mousedown', e => {
+    grip.addEventListener('pointerdown', e => {
       e.preventDefault();
 
       // Press-then-release without moving is a CLICK, and a click on the bar
@@ -3104,10 +3243,21 @@ function setupRailResize() {
       // mousedown only: it lit up on hover like a control and then ignored every
       // click, which is what "the collapse bar does not work" meant. The slop
       // threshold is what keeps the two gestures apart — .dragging / .resizing
-      // are no longer applied on mousedown, or a plain click would flash the
+      // are no longer applied on pointerdown, or a plain click would flash the
       // drag styling and suppress selection for no reason.
       const startX = e.clientX;
       let dragging = false;
+
+      // Which width this drag owns is decided ONCE, at pointerdown. Re-reading
+      // isMobile() per move would let a drag started on a phone drawer jump to
+      // writing the desktop rail var mid-gesture if the viewport crossed the
+      // breakpoint (rotation, or the URL bar collapsing).
+      const mob = isMobile();
+      const varName = mob
+        ? (side === 'sidebar' ? '--mob-sb-w' : '--mob-fe-w')
+        : (side === 'sidebar' ? '--sidebar-w' : '--right-w');
+
+      try { grip.setPointerCapture(e.pointerId); } catch { /* older engines */ }
 
       const move = ev => {
         if (!dragging) {
@@ -3119,32 +3269,43 @@ function setupRailResize() {
         // Left rail grows rightwards from x=0; right rail grows leftwards from
         // the viewport edge.
         const raw = side === 'sidebar' ? ev.clientX : (window.innerWidth - ev.clientX);
-        const px = Math.max(RAIL_MIN, Math.min(RAIL_MAX, Math.round(raw)));
-        document.documentElement.style.setProperty(
-          side === 'sidebar' ? '--sidebar-w' : '--right-w', px + 'px');
+        const lo = mob ? MOB_RAIL_MIN : RAIL_MIN;
+        const hi = mob ? mobRailMax() : RAIL_MAX;
+        const px = Math.max(lo, Math.min(hi, Math.round(raw)));
+        document.documentElement.style.setProperty(varName, px + 'px');
       };
       const up = () => {
-        document.removeEventListener('mousemove', move);
-        document.removeEventListener('mouseup', up);
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', up);
+        grip.removeEventListener('pointercancel', up);
         grip.classList.remove('dragging');
         document.body.classList.remove('resizing');
         if (!dragging) {
           // A click: collapse (or reopen) the panel. Goes through the same
           // toggle as the header chevron and Ctrl+B, so the class, the ARIA
-          // state and the persisted entry can never disagree.
+          // state and the persisted entry can never disagree. On mobile the
+          // same toggle closes the drawer, which is the tap most people try
+          // first after dragging one open.
           if (side === 'sidebar') toggleSidebar(); else toggleRight();
           return;
         }
         const cs = getComputedStyle(document.documentElement);
+        const num = n => parseInt(cs.getPropertyValue(n), 10) || undefined;
         try {
           localStorage.setItem(WIDTH_KEY, JSON.stringify({
-            sidebar: parseInt(cs.getPropertyValue('--sidebar-w'), 10) || undefined,
-            right: parseInt(cs.getPropertyValue('--right-w'), 10) || undefined,
+            sidebar: num('--sidebar-w'),
+            right: num('--right-w'),
+            mobSidebar: num('--mob-sb-w'),
+            mobRight: num('--mob-fe-w'),
           }));
         } catch { /* storage blocked */ }
       };
-      document.addEventListener('mousemove', move);
-      document.addEventListener('mouseup', up);
+      // Bound to the grip, not the document: with pointer capture active the
+      // events retarget to the grip, so document-level listeners would never
+      // fire once the finger left the element.
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', up);
+      grip.addEventListener('pointercancel', up);
     });
   };
 
@@ -3290,12 +3451,24 @@ function toggleGroup(hdr) {
   saveGroupState();
 }
 
+// role="button" promises keyboard activation, but the headers only had click
+// handlers. One delegated listener covers the four static date groups AND the
+// dynamically created pinned group.
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ')
+      && e.target.classList && e.target.classList.contains('conv-group-hdr')) {
+    e.preventDefault();
+    toggleGroup(e.target);
+  }
+});
+
 function saveGroupState() {
   const state = {};
   document.querySelectorAll('.conv-group').forEach(g => {
     state[g.dataset.group] = g.classList.contains('collapsed');
   });
-  localStorage.setItem(GROUP_KEY, JSON.stringify(state));
+  // Same guard the reader has: localStorage can throw (private mode, quota).
+  try { localStorage.setItem(GROUP_KEY, JSON.stringify(state)); } catch {}
 }
 
 function loadGroupState() {
@@ -3384,9 +3557,12 @@ function renderConvs(convs) {
   const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
   const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - 7);
 
+  // Pinned conversations float above the date groups, regardless of age.
+  const pinned = convs.filter(c => c.pinned);
   const groups = { today: [], yesterday: [], 'last-week': [], older: [] };
 
   convs.forEach(c => {
+    if (c.pinned) return;  // already rendered in the pinned group
     const d = new Date(c.updated_at || c.created_at || 0);
     if (d >= today) groups.today.push(c);
     else if (d >= yesterday) groups.yesterday.push(c);
@@ -3394,7 +3570,10 @@ function renderConvs(convs) {
     else groups.older.push(c);
   });
 
-  document.querySelectorAll('.conv-group').forEach(g => {
+  // Build / update the pinned group once (insert before the first date group)
+  ensurePinnedGroup(pinned);
+
+  document.querySelectorAll('.conv-group[data-group]').forEach(g => {
     const body = g.querySelector('.conv-group-body');
     const count = g.querySelector('.conv-group-count');
     const items = groups[g.dataset.group] || [];
@@ -3407,30 +3586,71 @@ function renderConvs(convs) {
     }
 
     items.forEach(c => {
-      const div = document.createElement('div');
-      div.className = 'conv-item' + (c.id === convId ? ' on' : '');
-      div.setAttribute('role', 'option');
-      div.setAttribute('tabindex', '0');
-      // The delete button used to be `onclick="...delConv('${esc(c.id)}')"`.
-      // esc() left `'` alone, so an id containing an apostrophe closed the JS
-      // string literal and the rest of the id ran as code. Now the id never
-      // enters a code context at all — the listener closes over the raw value.
-      div.innerHTML = `
-        <div class="conv-item-body">
-          <div class="conv-item-title">${escHtml(c.title || 'Untitled')}</div>
-          <div class="conv-item-meta">${escHtml(timeAgo(c.updated_at || c.created_at))}${c.step_count ? ' · ' + escHtml(c.step_count) + ' steps' : ''}</div>
-        </div>
-        <button class="conv-item-del" aria-label="Delete conversation">✕</button>
-      `;
-      div.querySelector('.conv-item-del').addEventListener('click', e => {
-        e.stopPropagation();
-        delConv(c.id);
-      });
-      div.addEventListener('click', () => openConv(c.id, div));
-      div.addEventListener('keydown', e => { if (e.key === 'Enter') openConv(c.id, div); });
-      body.appendChild(div);
+      body.appendChild(buildConvItem(c));
     });
   });
+}
+
+function ensurePinnedGroup(pinned) {
+  let group = document.querySelector('.conv-group[data-group="pinned"]');
+  if (!pinned.length) {
+    if (group) group.remove();
+    return;
+  }
+  if (!group) {
+    group = document.createElement('div');
+    group.className = 'conv-group';
+    group.dataset.group = 'pinned';
+    group.innerHTML = `
+      <div class="conv-group-hdr" tabindex="0" role="button" aria-expanded="true">
+        <span class="conv-group-label">📌 Pinned</span>
+        <span class="conv-group-count">0</span>
+        <span class="conv-group-chevron">▼</span>
+      </div>
+      <div class="conv-group-body"></div>`;
+    const sbConvs = document.getElementById('sb-convs');
+    sbConvs.insertBefore(group, sbConvs.firstChild);
+    group.querySelector('.conv-group-hdr').addEventListener('click', function () { toggleGroup(this); });
+    // The group is created after loadGroupState() ran at startup, so restore
+    // its saved collapse state here or a collapsed pinned group never stays
+    // collapsed across reloads.
+    try {
+      const state = JSON.parse(localStorage.getItem(GROUP_KEY) || '{}');
+      if (state.pinned === true) {
+        group.classList.add('collapsed');
+        group.querySelector('.conv-group-hdr').setAttribute('aria-expanded', 'false');
+      }
+    } catch {}
+  }
+  const body = group.querySelector('.conv-group-body');
+  const count = group.querySelector('.conv-group-count');
+  count.textContent = pinned.length;
+  body.innerHTML = '';
+  pinned.forEach(c => body.appendChild(buildConvItem(c)));
+}
+
+function buildConvItem(c) {
+  const div = document.createElement('div');
+  div.className = 'conv-item' + (c.id === convId ? ' on' : '');
+  if (c.pinned) div.classList.add('is-pinned');
+  div.setAttribute('role', 'option');
+  div.setAttribute('tabindex', '0');
+  div.innerHTML = `
+    <div class="conv-item-body">
+      <div class="conv-item-title">${c.pinned ? '📌 ' : ''}${escHtml(c.title || 'Untitled')}</div>
+      <div class="conv-item-meta">${escHtml(timeAgo(c.updated_at || c.created_at))}${c.step_count ? ' · ' + escHtml(c.step_count) + ' steps' : ''}</div>
+    </div>
+    <button class="conv-item-menu" aria-label="Conversation options" title="Options">⋯</button>
+  `;
+  div.querySelector('.conv-item-menu').addEventListener('click', e => {
+    e.stopPropagation();
+    convContextMenu(div, c.id, e, c.title, !!c.pinned);
+  });
+  div.addEventListener('click', () => openConv(c.id, div));
+  div.addEventListener('keydown', e => { if (e.key === 'Enter') openConv(c.id, div); });
+  // Right-click also opens the context menu
+  div.addEventListener('contextmenu', e => convContextMenu(div, c.id, e, c.title, !!c.pinned));
+  return div;
 }
 
 function timeAgo(dateStr) {
@@ -3494,6 +3714,104 @@ async function delConv(id) {
   }
   toast('Conversation deleted', 'ok');
   loadConvs();
+}
+
+// ═══════════ RENAME + PIN ═══════════
+// Inline rename: replaces the title text with an input field instead of using
+// the browser prompt(). Saves on Enter/blur, cancels on Escape.
+function inlineRenameConv(div, id, currentTitle) {
+  const titleEl = div.querySelector('.conv-item-title');
+  if (!titleEl) return;
+  const oldText = currentTitle || 'Untitled';
+  titleEl.textContent = '';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'conv-rename-input';
+  inp.value = oldText;
+  titleEl.appendChild(inp);
+  inp.focus();
+  inp.setSelectionRange(0, inp.value.length);
+  // Escape must actually cancel. The blur listener below fires when the input
+  // leaves the DOM — including the re-render loadConvs() triggers — so without
+  // this flag, Escape ended up SAVING the typed value via blur→save().
+  let cancelled = false;
+  const save = async () => {
+    if (cancelled) return;
+    const t = inp.value.trim();
+    if (t && t !== oldText) {
+      try {
+        await apiJson(API + '/api/conversations/' + encodeURIComponent(id), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: t }),
+          timeoutMs: 10000,
+        });
+        toast('Renamed', 'ok');
+      } catch (exc) {
+        toast('Rename failed (' + errLabel(exc) + ')', 'err');
+      }
+    }
+    loadConvs();
+  };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelled = true; inp.blur(); loadConvs(); }
+  });
+  inp.addEventListener('blur', save);
+}
+
+async function togglePinConv(id, pinned) {
+  try {
+    await apiJson(API + '/api/conversations/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pinned: pinned }),
+      timeoutMs: 10000,
+    });
+    toast(pinned ? 'Pinned' : 'Unpinned', 'ok');
+    loadConvs();
+  } catch (exc) {
+    toast('Pin failed (' + errLabel(exc) + ')', 'err');
+  }
+}
+
+// Context menu for a conversation row (rename / pin / delete).
+function convContextMenu(div, id, ev, title, pinned) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  closeConvMenu();
+  const menu = document.createElement('div');
+  menu.className = 'conv-context-menu';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = `
+    <button class="ctx-item" data-a="rename" role="menuitem"><span class="ctx-ic">✏️</span>Rename</button>
+    <button class="ctx-item" data-a="pin" role="menuitem"><span class="ctx-ic">📌</span>${pinned ? 'Unpin' : 'Pin'}</button>
+    <button class="ctx-item ctx-danger" data-a="delete" role="menuitem"><span class="ctx-ic">🗑️</span>Delete</button>`;
+  // Position relative to the row, clamped to viewport
+  const r = div.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = Math.min(r.bottom, window.innerHeight - 120) + 'px';
+  menu.style.left = Math.min(r.left, window.innerWidth - 180) + 'px';
+  document.body.appendChild(menu);
+  const close = () => { menu.remove(); document.removeEventListener('keydown', onKey); };
+  // role="menu" without Escape-to-close strands keyboard users; the listener is
+  // removed on close so stacked opens never accumulate handlers.
+  const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
+  menu._close = close;
+  document.addEventListener('keydown', onKey);
+  setTimeout(() => document.addEventListener('click', close, { once: true }), 0);
+  menu.addEventListener('click', async e => {
+    const a = e.target.closest('[data-a]')?.dataset.a;
+    if (!a) return;
+    e.stopPropagation(); close();
+    if (a === 'rename') inlineRenameConv(div, id, title);
+    else if (a === 'pin') togglePinConv(id, !pinned);
+    else if (a === 'delete') delConv(id);
+  });
+}
+
+function closeConvMenu() {
+  document.querySelectorAll('.conv-context-menu').forEach(m => m._close ? m._close() : m.remove());
 }
 
 // ═══════════ BRAIN STATS (v9: live from the Neuralis brain on :8001) ═══════════
@@ -4873,6 +5191,7 @@ function setupKeyboard() {
       closeFileViewer();
       omniClose();
       closePops();
+      closeConvMenu();
     }
   });
 }

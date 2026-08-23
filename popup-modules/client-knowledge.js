@@ -139,7 +139,7 @@ async function refreshClientList() {
         </div>
         <div class="template-card-meta" style="margin-top:4px;">
           <span>${entryCount} entries</span>
-          <span>Runs: ${c.runCount || 0}</span>
+          <span>Runs: ${Number(c.runCount) || 0}</span>
           ${c.tenant ? `<span title="Linked tenant">${_safeEsc(c.tenant)}</span>` : ''}
         </div>
       </div>
@@ -227,7 +227,7 @@ async function refreshEntriesList(clientId) {
             <div style="font-size:13px; color:var(--text-primary); line-height:1.5;">${_safeEsc(e.wisdom)}</div>
             <div style="font-size:11px; color:var(--text-tertiary); margin-top:6px; display:flex; gap:8px;">
               <span>${e.scope === 'url' ? `URL: <code>${_safeEsc(e.urlPattern || '*')}</code>` : 'Always applies'}</span>
-              <span>Used ${e.useCount || 0}x</span>
+              <span>Used ${Number(e.useCount) || 0}x</span>
             </div>
           </div>
           <button class="small-btn" data-entry-action="delete" data-entry-id="${_safeEsc(e.id)}" style="color:var(--error-color); flex-shrink:0;">×</button>

@@ -295,11 +295,20 @@ function main() {
       console.error(`FAIL: ${id} route table is stale.`);
       const wasSet = new Set((was.routes || []).map((r) => `${r.method} ${r.path}`));
       const nowSet = new Set((now.routes || []).map((r) => `${r.method} ${r.path}`));
-      for (const r of nowSet) if (!wasSet.has(r)) console.error(`      + ${r}`);
-      for (const r of wasSet) if (!nowSet.has(r)) console.error(`      - ${r}`);
+      let routeDelta = 0;
+      for (const r of nowSet) if (!wasSet.has(r)) { routeDelta += 1; console.error(`      + ${r}`); }
+      for (const r of wasSet) if (!nowSet.has(r)) { routeDelta += 1; console.error(`      - ${r}`); }
+      if (!routeDelta) {
+        // The most common drift on upgrade days: the sibling's commits moved
+        // code around, so only source line/file metadata changed. Without this
+        // line the failure looks mysterious — a "stale" table with no route
+        // diff printed.
+        console.error('      (route set unchanged — only source line/file metadata drifted)');
+      }
     }
     if (stale) {
-      console.error('\nRun: node scripts/generate-route-manifest.cjs  and commit contract/server-routes.json.');
+      console.error('\nRun: npm run routes:sync  (regenerates and commits contract/server-routes.json),');
+      console.error('or:  node scripts/generate-route-manifest.cjs  and commit the file yourself.');
       process.exit(1);
     }
     console.log(`ok: route manifest current for ${checked.length} server(s).`);

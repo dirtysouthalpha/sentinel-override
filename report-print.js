@@ -16,10 +16,11 @@
     if (goalEl) goalEl.textContent = data.goal || '';
     if (tsEl) tsEl.textContent = data.timestamp ? new Date(data.timestamp).toLocaleString() : '';
 
-    // Render markdown -> HTML
+    // Render markdown -> HTML. The fallback matches report-view.js: the full
+    // escapeHtml from lib/report-sanitize.js, not the old <-only replace.
     const html = window.marked && window.marked.parse
       ? window.marked.parse(data.fullReport)
-      : data.fullReport.replace(/</g, '&lt;');
+      : escapeHtml(data.fullReport).replace(/\n/g, '<br>');
 
     // Decorate [src:key] / [unverified] markers as small inline chips
     // for paper-friendly auditability.
@@ -33,26 +34,19 @@
     // apply and the user sees the page first.
     setTimeout(() => { window.print(); }, 350);
   } catch (e) {
-    document.getElementById('reportBody').innerHTML = '<div class="loading" style="color:#b00;">Error loading report: ' + (e && e.message ? e.message : e) + '</div>';
+    // Built through the DOM: report-view.js escapes this message, but this
+    // path concatenated it raw into innerHTML — an exception message can carry
+    // fragments of the attacker-influenced report it choked on.
+    const body = document.getElementById('reportBody');
+    body.textContent = '';
+    const div = document.createElement('div');
+    div.className = 'loading';
+    div.style.color = '#b00';
+    div.textContent = 'Error loading report: ' + (e && e.message ? e.message : String(e));
+    body.appendChild(div);
   }
 })();
 
-// (audit) The report body is built from untrusted LLM/page-derived text and
-// rendered via marked into innerHTML. Strip code-executing / resource-loading
-// elements and dangerous attributes before insertion (see report-view.js).
-function sanitizeReportHtml(dirty) {
-  if (!dirty) return '';
-  const doc = new DOMParser().parseFromString(String(dirty), 'text/html');
-  doc.querySelectorAll('script,iframe,object,embed,form,link,base,meta,svg,math,img,source,video,audio,track,input,button,textarea,style').forEach((el) => el.remove());
-  const URL_ATTR = /^(href|src|srcset|action|formaction|xlink:href|background|poster)$/i;
-  const BAD_PROTO = /^\s*(javascript|data|vbscript)\s*:/i;
-  doc.querySelectorAll('*').forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith('on')) { el.removeAttribute(attr.name); continue; }
-      if (name === 'style') { el.removeAttribute(attr.name); continue; }
-      if (URL_ATTR.test(name) && BAD_PROTO.test(attr.value)) el.removeAttribute(attr.name);
-    }
-  });
-  return doc.body.innerHTML;
-}
+// sanitizeReportHtml lives in lib/report-sanitize.js (loaded by
+// report-print.html before this file). One copy for both report pages —
+// duplicated security functions drift.

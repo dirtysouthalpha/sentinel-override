@@ -634,3 +634,67 @@ describe('scheduler-ui.js showRunHistory', () => {
     expect(sandbox.elements['schedule-history-modal'].classList.contains('show')).toBe(true);
   });
 });
+
+// ── Sink hardening (2026-08-23): adversarial schedule fields stay escaped ─────
+// renderScheduleCard output goes straight into card.innerHTML. Schedule fields
+// are user- or import-supplied, so every one of them must survive a markup
+// payload without producing a tag. (Escaped text may still CONTAIN the words
+// of the payload — the assertion that matters is that no raw '<img' remains.)
+describe('renderScheduleCard — adversarial fields stay escaped', () => {
+  let sandbox, result;
+  const PAYLOAD = '"><img src=x onerror=alert(1)>';
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+    result = runSchedulerUI(sandbox);
+  });
+
+  test('markup in name/goal/id/time/lastRunStatus never survives raw', () => {
+    const schedule = {
+      id: PAYLOAD, name: PAYLOAD, enabled: true, type: 'recurring',
+      goal: PAYLOAD,
+      recurrence: { interval: 'daily', time: PAYLOAD },
+      nextRunAt: Date.now(), lastRunAt: Date.now(), lastRunStatus: PAYLOAD,
+    };
+    const html = result.ctx.renderScheduleCard(schedule);
+    expect(html).not.toContain('<img');
+    expect(html).toContain('&lt;img');
+    // The data-id attribute value itself must open with the ESCAPED quote,
+    // proving the payload could not break out of the attribute.
+    expect(html).toContain('data-id="&quot;&gt;&lt;img');
+  });
+
+  test('periodInMinutes is numerically coerced, not interpolated', () => {
+    const schedule = {
+      id: 's', name: 'n', enabled: true, type: 'recurring',
+      recurrence: { interval: 'custom', periodInMinutes: PAYLOAD },
+    };
+    const html = result.ctx.renderScheduleCard(schedule);
+    expect(html).toContain('Every 60 minutes'); // Number(payload) || 60
+    expect(html).not.toContain('<img');
+  });
+
+  test('lastRunStatus outside the whitelist maps to the unknown badge class', () => {
+    const schedule = {
+      id: 's', name: 'n', enabled: true, type: 'once',
+      lastRunStatus: PAYLOAD,
+    };
+    const html = result.ctx.renderScheduleCard(schedule);
+    expect(html).toContain('schedule-status-badge unknown');
+    expect(html).not.toContain('<img');
+  });
+
+  test('benign schedules still render all their fields', () => {
+    const schedule = {
+      id: 's9', name: 'Nightly backup check', enabled: true, type: 'recurring',
+      goal: 'Verify backups completed',
+      recurrence: { interval: 'daily', time: '03:30' },
+      nextRunAt: Date.now(), lastRunAt: Date.now(), lastRunStatus: 'success',
+    };
+    const html = result.ctx.renderScheduleCard(schedule);
+    expect(html).toContain('Nightly backup check');
+    expect(html).toContain('Verify backups completed');
+    expect(html).toContain('Daily at 03:30');
+    expect(html).toContain('schedule-status-badge success');
+  });
+});

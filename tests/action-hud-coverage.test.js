@@ -289,3 +289,25 @@ describe('auto-hide timer callbacks (lines 245-249)', () => {
     expect(hudEl.classList.contains('visible')).toBe(false);
   });
 });
+
+// ── Sink hardening (2026-08-23): step values are numerically coerced ──────────
+// opts.step / opts.totalSteps arrive on runtime messages and are interpolated
+// into the HUD's innerHTML. They are now coerced with Number(...) || 0.
+describe('updateHUD — hostile step values are numerically coerced', () => {
+  test('non-numeric step/totalSteps become 0 and never reach innerHTML', () => {
+    const payload = '"><img src=x onerror=alert(1)>';
+    hud.update({ step: payload, totalSteps: payload });
+    const hudEl = _elementsById.get('__sentinel_action_hud__');
+    const stepEl = hudEl._childEls['hud-step'];
+    expect(stepEl.innerHTML).toContain('>0</span>/0');
+    expect(stepEl.innerHTML).not.toContain('<img');
+    expect(stepEl.innerHTML).not.toContain(payload);
+  });
+
+  test('numeric strings coerce to their numbers', () => {
+    hud.update({ step: '4', totalSteps: '9' });
+    const hudEl = _elementsById.get('__sentinel_action_hud__');
+    const stepEl = hudEl._childEls['hud-step'];
+    expect(stepEl.innerHTML).toContain('>4</span>/9');
+  });
+});

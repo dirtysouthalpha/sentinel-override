@@ -628,14 +628,14 @@
           "method": "GET",
           "path": "/",
           "raw": "/",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2886",
+          "declaredIn": "sentinel-prime-premium:server/app.py:2913",
           "wildcard": true
         },
         {
           "method": "GET",
           "path": "/:splat",
           "raw": "/<path:filename>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3190",
+          "declaredIn": "sentinel-prime-premium:server/app.py:3217",
           "wildcard": true
         },
         {
@@ -666,145 +666,145 @@
           "method": "GET",
           "path": "/api/activity",
           "raw": "/api/activity",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2447"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2474"
         },
         {
           "method": "POST",
           "path": "/api/admin/reload",
           "raw": "/api/admin/reload",
-          "declaredIn": "sentinel-prime-premium:server/app.py:472"
+          "declaredIn": "sentinel-prime-premium:server/app.py:479"
         },
         {
           "method": "GET",
           "path": "/api/agent-launcher/available",
           "raw": "/api/agent-launcher/available",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7849"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7899"
         },
         {
           "method": "POST",
           "path": "/api/agent-launcher/kill",
           "raw": "/api/agent-launcher/kill",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7954"
+          "declaredIn": "sentinel-prime-premium:server/app.py:8004"
         },
         {
           "method": "POST",
           "path": "/api/agent-launcher/launch",
           "raw": "/api/agent-launcher/launch",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7901"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7951"
         },
         {
           "method": "GET",
           "path": "/api/agent-launcher/sessions",
           "raw": "/api/agent-launcher/sessions",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7857"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7907"
         },
         {
           "method": "POST",
           "path": "/api/agentic/autopub/:param/veto",
           "raw": "/api/agentic/autopub/<item_id>/veto",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2351"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2378"
         },
         {
           "method": "POST",
           "path": "/api/agentic/briefing",
           "raw": "/api/agentic/briefing",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2300"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2327"
         },
         {
           "method": "POST",
           "path": "/api/agentic/briefing-text",
           "raw": "/api/agentic/briefing-text",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2305"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2332"
         },
         {
           "method": "GET",
           "path": "/api/agentic/journal",
           "raw": "/api/agentic/journal",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2356"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2383"
         },
         {
           "method": "POST",
           "path": "/api/agentic/overnight",
           "raw": "/api/agentic/overnight",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2288"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2315"
         },
         {
           "method": "POST",
           "path": "/api/agentic/perf-refresh",
           "raw": "/api/agentic/perf-refresh",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2311"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2338"
         },
         {
           "method": "POST",
           "path": "/api/agentic/plan",
           "raw": "/api/agentic/plan",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2316"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2343"
         },
         {
           "method": "POST",
           "path": "/api/agentic/proposals/:param/dismiss",
           "raw": "/api/agentic/proposals/<pid>/dismiss",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2341"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2368"
         },
         {
           "method": "POST",
           "path": "/api/agentic/propose",
           "raw": "/api/agentic/propose",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2346"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2373"
         },
         {
           "method": "POST",
           "path": "/api/agentic/report",
           "raw": "/api/agentic/report",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2336"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2363"
         },
         {
           "method": "POST",
           "path": "/api/agentic/score",
           "raw": "/api/agentic/score",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2322"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2349"
         },
         {
           "method": "GET",
           "path": "/api/agentic/status",
           "raw": "/api/agentic/status",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2274"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2301"
         },
         {
           "method": "POST",
           "path": "/api/agentlink/brain/build",
           "raw": "/api/agentlink/brain/build",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5187"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5214"
         },
         {
           "method": "POST",
           "path": "/api/agentlink/brain/evolve",
           "raw": "/api/agentlink/brain/evolve",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5196"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5223"
         },
         {
           "method": "GET",
           "path": "/api/agentlink/brain/history",
           "raw": "/api/agentlink/brain/history",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5094"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5121"
         },
         {
           "method": "GET",
           "path": "/api/agentlink/brain/neurons",
           "raw": "/api/agentlink/brain/neurons",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5104"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5131"
         },
         {
           "method": "POST",
           "path": "/api/agentlink/brain/research",
           "raw": "/api/agentlink/brain/research",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5178"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5205"
         },
         {
           "method": "GET",
           "path": "/api/agentlink/brain/scheduler",
           "raw": "/api/agentlink/brain/scheduler",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5113"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5140"
         },
         {
           "method": "GET",
@@ -822,61 +822,61 @@
           "method": "GET",
           "path": "/api/agents",
           "raw": "/api/agents",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5277"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5324"
         },
         {
           "method": "GET",
           "path": "/api/agents/:param",
           "raw": "/api/agents/<agent_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9491"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9541"
         },
         {
           "method": "POST",
           "path": "/api/agents/delegate",
           "raw": "/api/agents/delegate",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9520"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9570"
         },
         {
           "method": "GET",
           "path": "/api/agents/delegations",
           "raw": "/api/agents/delegations",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9555"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9605"
         },
         {
           "method": "POST",
           "path": "/api/agents/delegations/:param/:param",
           "raw": "/api/agents/delegations/<did>/<action>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9571"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9621"
         },
         {
           "method": "GET",
           "path": "/api/agents/registry",
           "raw": "/api/agents/registry",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9473"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9523"
         },
         {
           "method": "GET",
           "path": "/api/agents/search",
           "raw": "/api/agents/search",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9501"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9551"
         },
         {
           "method": "POST",
           "path": "/api/agi/cycle",
           "raw": "/api/agi/cycle",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7715"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7765"
         },
         {
           "method": "GET",
           "path": "/api/agi/search",
           "raw": "/api/agi/search",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7727"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7777"
         },
         {
           "method": "POST",
           "path": "/api/agi/stats",
           "raw": "/api/agi/stats",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7708"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7758"
         },
         {
           "method": "POST",
@@ -900,31 +900,31 @@
           "method": "GET",
           "path": "/api/alerts/external",
           "raw": "/api/alerts/external",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1039"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1061"
         },
         {
           "method": "POST",
           "path": "/api/alerts/external",
           "raw": "/api/alerts/external",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1049"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1071"
         },
         {
           "method": "DELETE",
           "path": "/api/alerts/external/:param",
           "raw": "/api/alerts/external/<key>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1079"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1101"
         },
         {
           "method": "GET",
           "path": "/api/analytics/metrics",
           "raw": "/api/analytics/metrics",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4284"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4311"
         },
         {
           "method": "GET",
           "path": "/api/argus",
           "raw": "/api/argus",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1455"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1477"
         },
         {
           "method": "GET",
@@ -948,139 +948,139 @@
           "method": "GET",
           "path": "/api/autonomy",
           "raw": "/api/autonomy",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2253"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2280"
         },
         {
           "method": "POST",
           "path": "/api/autonomy",
           "raw": "/api/autonomy",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2253"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2280"
         },
         {
           "method": "GET",
           "path": "/api/brain-stats",
           "raw": "/api/brain-stats",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1464"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1486"
         },
         {
           "method": "GET",
           "path": "/api/brain-viz/summary",
           "raw": "/api/brain-viz/summary",
-          "declaredIn": "sentinel-prime-premium:server/brain_viz_bp.py:52"
+          "declaredIn": "sentinel-prime-premium:server/brain_viz_bp.py:60"
         },
         {
           "method": "GET",
           "path": "/api/brain-viz/timeseries",
           "raw": "/api/brain-viz/timeseries",
-          "declaredIn": "sentinel-prime-premium:server/brain_viz_bp.py:142"
+          "declaredIn": "sentinel-prime-premium:server/brain_viz_bp.py:150"
         },
         {
           "method": "GET",
           "path": "/api/brain/activity",
           "raw": "/api/brain/activity",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4596"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4623"
         },
         {
           "method": "GET",
           "path": "/api/brain/data-server/graph",
           "raw": "/api/brain/data-server/graph",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4514"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4541"
         },
         {
           "method": "GET",
           "path": "/api/brain/data-server/summary",
           "raw": "/api/brain/data-server/summary",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4504"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4531"
         },
         {
           "method": "GET",
           "path": "/api/brain/data-server/thoughts",
           "raw": "/api/brain/data-server/thoughts",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4521"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4548"
         },
         {
           "method": "GET",
           "path": "/api/brain/diagnose",
           "raw": "/api/brain/diagnose",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4711"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4738"
         },
         {
           "method": "GET",
           "path": "/api/brain/dreams",
           "raw": "/api/brain/dreams",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3043"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3070"
         },
         {
           "method": "GET",
           "path": "/api/brain/events",
           "raw": "/api/brain/events",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4964"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4991"
         },
         {
           "method": "GET",
           "path": "/api/brain/evolution",
           "raw": "/api/brain/evolution",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3067"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3094"
         },
         {
           "method": "GET",
           "path": "/api/brain/graph",
           "raw": "/api/brain/graph",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4375"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4402"
         },
         {
           "method": "POST",
           "path": "/api/brain/heal",
           "raw": "/api/brain/heal",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4690"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4717"
         },
         {
           "method": "GET",
           "path": "/api/brain/nebula",
           "raw": "/api/brain/nebula",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3013"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3040"
         },
         {
           "method": "GET",
           "path": "/api/brain/recall",
           "raw": "/api/brain/recall",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4546"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4573"
         },
         {
           "method": "GET",
           "path": "/api/brain/regions",
           "raw": "/api/brain/regions",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4366"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4393"
         },
         {
           "method": "GET",
           "path": "/api/brain/search",
           "raw": "/api/brain/search",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4668"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4695"
         },
         {
           "method": "GET",
           "path": "/api/brain/stats",
           "raw": "/api/brain/stats",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4309"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4336"
         },
         {
           "method": "POST",
           "path": "/api/brain/think",
           "raw": "/api/brain/think",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4680"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4707"
         },
         {
           "method": "GET",
           "path": "/api/brain/topics",
           "raw": "/api/brain/topics",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2949"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2976"
         },
         {
           "method": "GET",
           "path": "/api/briefing",
           "raw": "/api/briefing",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7817"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7867"
         },
         {
           "method": "POST",
@@ -1098,127 +1098,127 @@
           "method": "GET",
           "path": "/api/catalog",
           "raw": "/api/catalog",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2038"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2065"
         },
         {
           "method": "GET",
           "path": "/api/catalog/app-status",
           "raw": "/api/catalog/app-status",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2498"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2525"
         },
         {
           "method": "GET",
           "path": "/api/catalog/item/:param",
           "raw": "/api/catalog/item/<item_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2522"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2549"
         },
         {
           "method": "POST",
           "path": "/api/catalog/item/:param/publish",
           "raw": "/api/catalog/item/<item_id>/publish",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2713"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2740"
         },
         {
           "method": "POST",
           "path": "/api/catalog/item/:param/qa",
           "raw": "/api/catalog/item/<item_id>/qa",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2686"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2713"
         },
         {
           "method": "POST",
           "path": "/api/catalog/item/:param/regenerate",
           "raw": "/api/catalog/item/<item_id>/regenerate",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2634"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2661"
         },
         {
           "method": "POST",
           "path": "/api/catalog/item/:param/status",
           "raw": "/api/catalog/item/<item_id>/status",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2549"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2576"
         },
         {
           "method": "POST",
           "path": "/api/catalog/new",
           "raw": "/api/catalog/new",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2668"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2695"
         },
         {
           "method": "POST",
           "path": "/api/catalog/regen-job/:param",
           "raw": "/api/catalog/regen-job/<job_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2705"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2732"
         },
         {
           "method": "GET",
           "path": "/api/catalog/thumb/:param",
           "raw": "/api/catalog/thumb/<item_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2530"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2557"
         },
         {
           "method": "GET",
           "path": "/api/chat-agents",
           "raw": "/api/chat-agents",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3539"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3566"
         },
         {
           "method": "POST",
           "path": "/api/chat/:param",
           "raw": "/api/chat/<agent_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3398"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3425"
         },
         {
           "method": "POST",
           "path": "/api/chat/:param/async",
           "raw": "/api/chat/<agent_id>/async",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4210"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4237"
         },
         {
           "method": "POST",
           "path": "/api/chat/:param/stream",
           "raw": "/api/chat/<agent_id>/stream",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3714"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3741"
         },
         {
           "method": "GET",
           "path": "/api/chat/job/:param",
           "raw": "/api/chat/job/<job_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4233"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4260"
         },
         {
           "method": "POST",
           "path": "/api/chat/job/:param/cancel",
           "raw": "/api/chat/job/<job_id>/cancel",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4224"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4251"
         },
         {
           "method": "GET",
           "path": "/api/chat/quick-stream",
           "raw": "/api/chat/quick-stream",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3135"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3162"
         },
         {
           "method": "POST",
           "path": "/api/chat/start",
           "raw": "/api/chat/start",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1215"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1237"
         },
         {
           "method": "GET",
           "path": "/api/chat/stream",
           "raw": "/api/chat/stream",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1310"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1332"
         },
         {
           "method": "POST",
           "path": "/api/client-log",
           "raw": "/api/client-log",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2853"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2880"
         },
         {
           "method": "GET",
           "path": "/api/client-log/recent",
           "raw": "/api/client-log/recent",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2874"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2901"
         },
         {
           "method": "GET",
@@ -1302,109 +1302,109 @@
           "method": "GET",
           "path": "/api/content/videos",
           "raw": "/api/content/videos",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7680"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7730"
         },
         {
           "method": "GET",
           "path": "/api/conversations",
           "raw": "/api/conversations",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3569"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3596"
         },
         {
           "method": "POST",
           "path": "/api/conversations",
           "raw": "/api/conversations",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3595"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3622"
         },
         {
           "method": "DELETE",
           "path": "/api/conversations/:param",
           "raw": "/api/conversations/<int:conv_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3656"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3683"
         },
         {
           "method": "GET",
           "path": "/api/conversations/:param",
           "raw": "/api/conversations/<int:conv_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3609"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3636"
         },
         {
           "method": "PATCH",
           "path": "/api/conversations/:param",
           "raw": "/api/conversations/<int:conv_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3626"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3653"
         },
         {
           "method": "GET",
           "path": "/api/conversations/:param/messages",
           "raw": "/api/conversations/<int:conv_id>/messages",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3668"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3695"
         },
         {
           "method": "POST",
           "path": "/api/conversations/:param/messages",
           "raw": "/api/conversations/<int:conv_id>/messages",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3686"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3713"
         },
         {
           "method": "DELETE",
           "path": "/api/conversations/:param/messages/:param",
           "raw": "/api/conversations/<int:conv_id>/messages/<int:msg_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3645"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3672"
         },
         {
           "method": "GET",
           "path": "/api/conversations/search",
           "raw": "/api/conversations/search",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3514"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3541"
         },
         {
           "method": "POST",
           "path": "/api/council/agentic",
           "raw": "/api/council/agentic",
-          "declaredIn": "sentinel-prime-premium:server/app.py:8553"
+          "declaredIn": "sentinel-prime-premium:server/app.py:8603"
         },
         {
           "method": "POST",
           "path": "/api/council/apply_staged",
           "raw": "/api/council/apply_staged",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9014"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9064"
         },
         {
           "method": "POST",
           "path": "/api/council/chat",
           "raw": "/api/council/chat",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9049"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9099"
         },
         {
           "method": "POST",
           "path": "/api/council/deliberate",
           "raw": "/api/council/deliberate",
-          "declaredIn": "sentinel-prime-premium:server/app.py:8240"
+          "declaredIn": "sentinel-prime-premium:server/app.py:8290"
         },
         {
           "method": "POST",
           "path": "/api/council/evolve",
           "raw": "/api/council/evolve",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9191"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9241"
         },
         {
           "method": "GET",
           "path": "/api/council/evolve/status",
           "raw": "/api/council/evolve/status",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9395"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9445"
         },
         {
           "method": "GET",
           "path": "/api/council/skills",
           "raw": "/api/council/skills",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9123"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9173"
         },
         {
           "method": "POST",
           "path": "/api/council/writeback",
           "raw": "/api/council/writeback",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5065"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5092"
         },
         {
           "method": "GET",
@@ -1428,187 +1428,187 @@
           "method": "POST",
           "path": "/api/cron",
           "raw": "/api/cron",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7647"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7697"
         },
         {
           "method": "POST",
           "path": "/api/cron/run",
           "raw": "/api/cron/run",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7654"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7704"
         },
         {
           "method": "GET",
           "path": "/api/cron/timeline",
           "raw": "/api/cron/timeline",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7701"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7751"
         },
         {
           "method": "POST",
           "path": "/api/curiosity",
           "raw": "/api/curiosity",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4939"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4966"
         },
         {
           "method": "POST",
           "path": "/api/curiosity/answer",
           "raw": "/api/curiosity/answer",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4946"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4973"
         },
         {
           "method": "GET",
           "path": "/api/dashboard",
           "raw": "/api/dashboard",
-          "declaredIn": "sentinel-prime-premium:server/app.py:6730"
+          "declaredIn": "sentinel-prime-premium:server/app.py:6780"
         },
         {
           "method": "GET",
           "path": "/api/dashboard/enhanced",
           "raw": "/api/dashboard/enhanced",
-          "declaredIn": "sentinel-prime-premium:server/dashboard_enhance.py:35"
+          "declaredIn": "sentinel-prime-premium:server/dashboard_enhance.py:40"
         },
         {
           "method": "GET",
           "path": "/api/dual-models",
           "raw": "/api/dual-models",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4186"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4213"
         },
         {
           "method": "POST",
           "path": "/api/dual-models",
           "raw": "/api/dual-models",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4192"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4219"
         },
         {
           "method": "GET",
           "path": "/api/empire",
           "raw": "/api/empire",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2430"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2457"
         },
         {
           "method": "GET",
           "path": "/api/empire/health",
           "raw": "/api/empire/health",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1363"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1385"
         },
         {
           "method": "GET",
           "path": "/api/empire/history",
           "raw": "/api/empire/history",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2215"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2242"
         },
         {
           "method": "GET",
           "path": "/api/eval",
           "raw": "/api/eval",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4798"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4825"
         },
         {
           "method": "POST",
           "path": "/api/eval/approve",
           "raw": "/api/eval/approve",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4826"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4853"
         },
         {
           "method": "POST",
           "path": "/api/eval/run",
           "raw": "/api/eval/run",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4844"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4871"
         },
         {
           "method": "GET",
           "path": "/api/feed",
           "raw": "/api/feed",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1476"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1503"
         },
         {
           "method": "GET",
           "path": "/api/files",
           "raw": "/api/files",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1807"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1834"
         },
         {
           "method": "GET",
           "path": "/api/files/list",
           "raw": "/api/files/list",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3350"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3377"
         },
         {
           "method": "GET",
           "path": "/api/files/raw",
           "raw": "/api/files/raw",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1908"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1935"
         },
         {
           "method": "GET",
           "path": "/api/files/read",
           "raw": "/api/files/read",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1858"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1885"
         },
         {
           "method": "GET",
           "path": "/api/files/zip",
           "raw": "/api/files/zip",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2779"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2806"
         },
         {
           "method": "GET",
           "path": "/api/fleet",
           "raw": "/api/fleet",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5205"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5232"
         },
         {
           "method": "POST",
           "path": "/api/fleet/audit",
           "raw": "/api/fleet/audit",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5172"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5199"
         },
         {
           "method": "POST",
           "path": "/api/fleet/drive",
           "raw": "/api/fleet/drive",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5164"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5191"
         },
         {
           "method": "POST",
           "path": "/api/fleet/enroll",
           "raw": "/api/fleet/enroll",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5153"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5180"
         },
         {
           "method": "POST",
           "path": "/api/fleet/estop",
           "raw": "/api/fleet/estop",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5159"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5186"
         },
         {
           "method": "POST",
           "path": "/api/fleet/exec",
           "raw": "/api/fleet/exec",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5138"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5165"
         },
         {
           "method": "GET",
           "path": "/api/fleet/flows",
           "raw": "/api/fleet/flows",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3081"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3108"
         },
         {
           "method": "POST",
           "path": "/api/fleet/nodes",
           "raw": "/api/fleet/nodes",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5132"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5159"
         },
         {
           "method": "GET",
           "path": "/api/fleet/services",
           "raw": "/api/fleet/services",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1499"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1526"
         },
         {
           "method": "GET",
           "path": "/api/fleet/timeline",
           "raw": "/api/fleet/timeline",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3102"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3129"
         },
         {
           "method": "POST",
@@ -1668,43 +1668,43 @@
           "method": "GET",
           "path": "/api/goals",
           "raw": "/api/goals",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2408"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2435"
         },
         {
           "method": "POST",
           "path": "/api/goals",
           "raw": "/api/goals",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2408"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2435"
         },
         {
           "method": "DELETE",
           "path": "/api/goals/:param",
           "raw": "/api/goals/<gid>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2419"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2446"
         },
         {
           "method": "POST",
           "path": "/api/goals/:param/propose",
           "raw": "/api/goals/<gid>/propose",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2425"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2452"
         },
         {
           "method": "GET",
           "path": "/api/health",
           "raw": "/api/health",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1356"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1378"
         },
         {
           "method": "GET",
           "path": "/api/health/agent",
           "raw": "/api/health/agent",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1536"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1563"
         },
         {
           "method": "GET",
           "path": "/api/history",
           "raw": "/api/history",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7544"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7594"
         },
         {
           "method": "GET",
@@ -1722,97 +1722,97 @@
           "method": "GET",
           "path": "/api/jobs",
           "raw": "/api/jobs",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4777"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4804"
         },
         {
           "method": "POST",
           "path": "/api/jobs/beat",
           "raw": "/api/jobs/beat",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4750"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4777"
         },
         {
           "method": "GET",
           "path": "/api/learning",
           "raw": "/api/learning",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4874"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4901"
         },
         {
           "method": "POST",
           "path": "/api/learning/retire",
           "raw": "/api/learning/retire",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4912"
+          "declaredIn": "sentinel-prime-premium:server/app.py:4939"
         },
         {
           "method": "GET",
           "path": "/api/live",
           "raw": "/api/live",
-          "declaredIn": "sentinel-prime-premium:server/app.py:4994"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5021"
         },
         {
           "method": "GET",
           "path": "/api/logs",
           "raw": "/api/logs",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7744"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7794"
         },
         {
           "method": "GET",
           "path": "/api/logs/:param",
           "raw": "/api/logs/<name>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7749"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7799"
         },
         {
           "method": "GET",
           "path": "/api/models",
           "raw": "/api/models",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5978"
+          "declaredIn": "sentinel-prime-premium:server/app.py:6025"
         },
         {
           "method": "GET",
           "path": "/api/models/active",
           "raw": "/api/models/active",
-          "declaredIn": "sentinel-prime-premium:server/app.py:6815"
+          "declaredIn": "sentinel-prime-premium:server/app.py:6865"
         },
         {
           "method": "POST",
           "path": "/api/models/auto",
           "raw": "/api/models/auto",
-          "declaredIn": "sentinel-prime-premium:server/app.py:6988"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7038"
         },
         {
           "method": "POST",
           "path": "/api/models/auto-route",
           "raw": "/api/models/auto-route",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7215"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7265"
         },
         {
           "method": "GET",
           "path": "/api/models/routing-rules",
           "raw": "/api/models/routing-rules",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7173"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7223"
         },
         {
           "method": "PUT",
           "path": "/api/models/routing-rules",
           "raw": "/api/models/routing-rules",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7199"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7249"
         },
         {
           "method": "POST",
           "path": "/api/models/switch",
           "raw": "/api/models/switch",
-          "declaredIn": "sentinel-prime-premium:server/app.py:6840"
+          "declaredIn": "sentinel-prime-premium:server/app.py:6890"
         },
         {
           "method": "POST",
           "path": "/api/models/warmup",
           "raw": "/api/models/warmup",
-          "declaredIn": "sentinel-prime-premium:server/app.py:6038"
+          "declaredIn": "sentinel-prime-premium:server/app.py:6085"
         },
         {
           "method": "POST",
           "path": "/api/models/warmup-all",
           "raw": "/api/models/warmup-all",
-          "declaredIn": "sentinel-prime-premium:server/app.py:6055"
+          "declaredIn": "sentinel-prime-premium:server/app.py:6102"
         },
         {
           "method": "GET",
@@ -1824,43 +1824,43 @@
           "method": "GET",
           "path": "/api/outbound",
           "raw": "/api/outbound",
-          "declaredIn": "sentinel-prime-premium:server/app.py:710"
+          "declaredIn": "sentinel-prime-premium:server/app.py:732"
         },
         {
           "method": "POST",
           "path": "/api/outbound",
           "raw": "/api/outbound",
-          "declaredIn": "sentinel-prime-premium:server/app.py:710"
+          "declaredIn": "sentinel-prime-premium:server/app.py:732"
         },
         {
           "method": "POST",
           "path": "/api/outbound-scheduler/approve-proposed",
           "raw": "/api/outbound-scheduler/approve-proposed",
-          "declaredIn": "sentinel-prime-premium:server/app.py:756"
+          "declaredIn": "sentinel-prime-premium:server/app.py:778"
         },
         {
           "method": "GET",
           "path": "/api/outbound-scheduler/status",
           "raw": "/api/outbound-scheduler/status",
-          "declaredIn": "sentinel-prime-premium:server/app.py:731"
+          "declaredIn": "sentinel-prime-premium:server/app.py:753"
         },
         {
           "method": "POST",
           "path": "/api/outbound-scheduler/tick",
           "raw": "/api/outbound-scheduler/tick",
-          "declaredIn": "sentinel-prime-premium:server/app.py:747"
+          "declaredIn": "sentinel-prime-premium:server/app.py:769"
         },
         {
           "method": "GET",
           "path": "/api/outbound/:param",
           "raw": "/api/outbound/<action>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:709"
+          "declaredIn": "sentinel-prime-premium:server/app.py:731"
         },
         {
           "method": "POST",
           "path": "/api/outbound/:param",
           "raw": "/api/outbound/<action>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:709"
+          "declaredIn": "sentinel-prime-premium:server/app.py:731"
         },
         {
           "method": "POST",
@@ -1902,7 +1902,7 @@
           "method": "GET",
           "path": "/api/proxy/a0-health",
           "raw": "/api/proxy/a0-health",
-          "declaredIn": "sentinel-prime-premium:server/app.py:5229"
+          "declaredIn": "sentinel-prime-premium:server/app.py:5256"
         },
         {
           "method": "GET",
@@ -1920,31 +1920,31 @@
           "method": "POST",
           "path": "/api/push/public-key",
           "raw": "/api/push/public-key",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7456"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7506"
         },
         {
           "method": "POST",
           "path": "/api/push/send",
           "raw": "/api/push/send",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7487"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7537"
         },
         {
           "method": "POST",
           "path": "/api/push/subscribe",
           "raw": "/api/push/subscribe",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7461"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7511"
         },
         {
           "method": "POST",
           "path": "/api/push/test",
           "raw": "/api/push/test",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7481"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7531"
         },
         {
           "method": "POST",
           "path": "/api/push/unsubscribe",
           "raw": "/api/push/unsubscribe",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7472"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7522"
         },
         {
           "method": "GET",
@@ -1998,7 +1998,7 @@
           "method": "POST",
           "path": "/api/review-count",
           "raw": "/api/review-count",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2279"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2306"
         },
         {
           "method": "POST",
@@ -2040,13 +2040,13 @@
           "method": "GET",
           "path": "/api/rules",
           "raw": "/api/rules",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2263"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2290"
         },
         {
           "method": "POST",
           "path": "/api/rules/:param/toggle",
           "raw": "/api/rules/<rule_id>/toggle",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2268"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2295"
         },
         {
           "method": "GET",
@@ -2076,49 +2076,49 @@
           "method": "GET",
           "path": "/api/selftest",
           "raw": "/api/selftest",
-          "declaredIn": "sentinel-prime-premium:server/app.py:7246"
+          "declaredIn": "sentinel-prime-premium:server/app.py:7296"
         },
         {
           "method": "POST",
           "path": "/api/sentinel/status",
           "raw": "/api/sentinel/status",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3170"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3197"
         },
         {
           "method": "POST",
           "path": "/api/sentinel/stop",
           "raw": "/api/sentinel/stop",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3178"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3205"
         },
         {
           "method": "POST",
           "path": "/api/server/restart",
           "raw": "/api/server/restart",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9641"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9691"
         },
         {
           "method": "GET",
           "path": "/api/skills",
           "raw": "/api/skills",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9163"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9213"
         },
         {
           "method": "POST",
           "path": "/api/skills",
           "raw": "/api/skills",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9168"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9218"
         },
         {
           "method": "DELETE",
           "path": "/api/skills/:param",
           "raw": "/api/skills/<sid>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:9183"
+          "declaredIn": "sentinel-prime-premium:server/app.py:9233"
         },
         {
           "method": "GET",
           "path": "/api/steam",
           "raw": "/api/steam",
-          "declaredIn": "sentinel-prime-premium:server/app.py:6772"
+          "declaredIn": "sentinel-prime-premium:server/app.py:6822"
         },
         {
           "method": "GET",
@@ -2136,25 +2136,25 @@
           "method": "GET",
           "path": "/api/synapse-viz/graph",
           "raw": "/api/synapse-viz/graph",
-          "declaredIn": "sentinel-prime-premium:server/synapse_viz_bp.py:53"
+          "declaredIn": "sentinel-prime-premium:server/synapse_viz_bp.py:61"
         },
         {
           "method": "GET",
           "path": "/api/synapse-viz/health",
           "raw": "/api/synapse-viz/health",
-          "declaredIn": "sentinel-prime-premium:server/synapse_viz_bp.py:130"
+          "declaredIn": "sentinel-prime-premium:server/synapse_viz_bp.py:138"
         },
         {
           "method": "GET",
           "path": "/api/themes",
           "raw": "/api/themes",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3226"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3253"
         },
         {
           "method": "GET",
           "path": "/api/timeline",
           "raw": "/api/timeline",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3103"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3130"
         },
         {
           "method": "GET",
@@ -2250,79 +2250,79 @@
           "method": "POST",
           "path": "/api/tts",
           "raw": "/api/tts",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1589"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1616"
         },
         {
           "method": "GET",
           "path": "/api/tts-clone/sample",
           "raw": "/api/tts-clone/sample",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1746"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1773"
         },
         {
           "method": "GET",
           "path": "/api/tts-clone/status",
           "raw": "/api/tts-clone/status",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1760"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1787"
         },
         {
           "method": "POST",
           "path": "/api/upload-file",
           "raw": "/api/upload-file",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3252"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3279"
         },
         {
           "method": "POST",
           "path": "/api/upload-image",
           "raw": "/api/upload-image",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3311"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3338"
         },
         {
           "method": "POST",
           "path": "/api/version",
           "raw": "/api/version",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2845"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2872"
         },
         {
           "method": "GET",
           "path": "/api/voice-sample",
           "raw": "/api/voice-sample",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2816"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2843"
         },
         {
           "method": "GET",
           "path": "/api/webhooks",
           "raw": "/api/webhooks",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1091"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1113"
         },
         {
           "method": "POST",
           "path": "/api/webhooks",
           "raw": "/api/webhooks",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1104"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1126"
         },
         {
           "method": "DELETE",
           "path": "/api/webhooks/:param",
           "raw": "/api/webhooks/<webhook_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1156"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1178"
         },
         {
           "method": "GET",
           "path": "/api/webhooks/:param",
           "raw": "/api/webhooks/<webhook_id>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1143"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1165"
         },
         {
           "method": "GET",
           "path": "/api/webhooks/events",
           "raw": "/api/webhooks/events",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1171"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1193"
         },
         {
           "method": "POST",
           "path": "/api/webhooks/test",
           "raw": "/api/webhooks/test",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1184"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1206"
         },
         {
           "method": "GET",
@@ -2334,55 +2334,55 @@
           "method": "GET",
           "path": "/brain/topics",
           "raw": "/brain/topics",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2959"
+          "declaredIn": "sentinel-prime-premium:server/app.py:2986"
         },
         {
           "method": "GET",
           "path": "/brain/topics/:param",
           "raw": "/brain/topics/<region>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:2978"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3005"
         },
         {
           "method": "GET",
           "path": "/css/:splat",
           "raw": "/css/<path:filename>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3214"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3241"
         },
         {
           "method": "GET",
           "path": "/data/uploads/:splat",
           "raw": "/data/uploads/<path:filename>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3330"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3357"
         },
         {
           "method": "GET",
           "path": "/health-panel",
           "raw": "/health-panel",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1443"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1465"
         },
         {
           "method": "GET",
           "path": "/js/:splat",
           "raw": "/js/<path:filename>",
-          "declaredIn": "sentinel-prime-premium:server/app.py:3220"
+          "declaredIn": "sentinel-prime-premium:server/app.py:3247"
         },
         {
           "method": "GET",
           "path": "/js/v17-boot.js",
           "raw": "/js/v17-boot.js",
-          "declaredIn": "sentinel-prime-premium:server/app.py:809"
+          "declaredIn": "sentinel-prime-premium:server/app.py:831"
         },
         {
           "method": "GET",
           "path": "/tv",
           "raw": "/tv",
-          "declaredIn": "sentinel-prime-premium:server/app.py:1450"
+          "declaredIn": "sentinel-prime-premium:server/app.py:1472"
         }
       ],
       "mounts": [
         {
           "path": "/public",
-          "declaredIn": "sentinel-prime-premium:server/app.py:420 (flask default static_url_path from static_folder)"
+          "declaredIn": "sentinel-prime-premium:server/app.py:427 (flask default static_url_path from static_folder)"
         }
       ],
       "proxies": []
@@ -2507,109 +2507,109 @@
           "method": "GET",
           "path": "/brain/answer",
           "raw": "/brain/answer",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:106"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:107"
         },
         {
           "method": "POST",
           "path": "/brain/classifier/clear-cache",
           "raw": "/brain/classifier/clear-cache",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:298"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:314"
         },
         {
           "method": "GET",
           "path": "/brain/classifier/stats",
           "raw": "/brain/classifier/stats",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:293"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:309"
         },
         {
           "method": "POST",
           "path": "/brain/consolidate",
           "raw": "/brain/consolidate",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:288"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:304"
         },
         {
           "method": "POST",
           "path": "/brain/curiosity/answer",
           "raw": "/brain/curiosity/answer",
-          "declaredIn": "neuralis:code/neuralis/pipelines.py:323"
+          "declaredIn": "neuralis:code/neuralis/pipelines.py:324"
         },
         {
           "method": "POST",
           "path": "/brain/curiosity/fill",
           "raw": "/brain/curiosity/fill",
-          "declaredIn": "neuralis:code/neuralis/pipelines.py:374"
+          "declaredIn": "neuralis:code/neuralis/pipelines.py:375"
         },
         {
           "method": "POST",
           "path": "/brain/curiosity/fill-all",
           "raw": "/brain/curiosity/fill-all",
-          "declaredIn": "neuralis:code/neuralis/pipelines.py:472"
+          "declaredIn": "neuralis:code/neuralis/pipelines.py:473"
         },
         {
           "method": "GET",
           "path": "/brain/curiosity/gaps",
           "raw": "/brain/curiosity/gaps",
-          "declaredIn": "neuralis:code/neuralis/pipelines.py:277"
+          "declaredIn": "neuralis:code/neuralis/pipelines.py:278"
         },
         {
           "method": "POST",
           "path": "/brain/curiosity/track",
           "raw": "/brain/curiosity/track",
-          "declaredIn": "neuralis:code/neuralis/pipelines.py:310"
+          "declaredIn": "neuralis:code/neuralis/pipelines.py:311"
         },
         {
           "method": "GET",
           "path": "/brain/diagnostics",
           "raw": "/brain/diagnostics",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:390"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:406"
         },
         {
           "method": "POST",
           "path": "/brain/distill",
           "raw": "/brain/distill",
-          "declaredIn": "neuralis:code/neuralis/cognition.py:231"
+          "declaredIn": "neuralis:code/neuralis/cognition.py:253"
         },
         {
           "method": "POST",
           "path": "/brain/dream",
           "raw": "/brain/dream",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:273"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:289"
         },
         {
           "method": "POST",
           "path": "/brain/embeddings/backfill",
           "raw": "/brain/embeddings/backfill",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:337"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:353"
         },
         {
           "method": "POST",
           "path": "/brain/embeddings/purge-orphans",
           "raw": "/brain/embeddings/purge-orphans",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:316"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:332"
         },
         {
           "method": "GET",
           "path": "/brain/embeddings/status",
           "raw": "/brain/embeddings/status",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:304"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:320"
         },
         {
           "method": "POST",
           "path": "/brain/episodes/build",
           "raw": "/brain/episodes/build",
-          "declaredIn": "neuralis:code/neuralis/cognition.py:571"
+          "declaredIn": "neuralis:code/neuralis/cognition.py:593"
         },
         {
           "method": "POST",
           "path": "/brain/ingest/git",
           "raw": "/brain/ingest/git",
-          "declaredIn": "neuralis:code/neuralis/pipelines.py:252"
+          "declaredIn": "neuralis:code/neuralis/pipelines.py:253"
         },
         {
           "method": "POST",
           "path": "/brain/ingest/session",
           "raw": "/brain/ingest/session",
-          "declaredIn": "neuralis:code/neuralis/pipelines.py:231"
+          "declaredIn": "neuralis:code/neuralis/pipelines.py:232"
         },
         {
           "method": "GET",
@@ -2621,67 +2621,67 @@
           "method": "GET",
           "path": "/brain/metrics",
           "raw": "/brain/metrics",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:704"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:720"
         },
         {
           "method": "GET",
           "path": "/brain/opinions",
           "raw": "/brain/opinions",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:472"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:488"
         },
         {
           "method": "POST",
           "path": "/brain/outcome",
           "raw": "/brain/outcome",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:53"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:54"
         },
         {
           "method": "GET",
           "path": "/brain/predict",
           "raw": "/brain/predict",
-          "declaredIn": "neuralis:code/neuralis/cognition.py:467"
+          "declaredIn": "neuralis:code/neuralis/cognition.py:489"
         },
         {
           "method": "GET",
           "path": "/brain/predict/stats",
           "raw": "/brain/predict/stats",
-          "declaredIn": "neuralis:code/neuralis/cognition.py:524"
+          "declaredIn": "neuralis:code/neuralis/cognition.py:546"
         },
         {
           "method": "GET",
           "path": "/brain/preload",
           "raw": "/brain/preload",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:418"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:434"
         },
         {
           "method": "GET",
           "path": "/brain/quality",
           "raw": "/brain/quality",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:601"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:617"
         },
         {
           "method": "POST",
           "path": "/brain/quality/prune",
           "raw": "/brain/quality/prune",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:620"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:636"
         },
         {
           "method": "POST",
           "path": "/brain/quality/snapshot",
           "raw": "/brain/quality/snapshot",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:656"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:672"
         },
         {
           "method": "GET",
           "path": "/brain/quality/trend",
           "raw": "/brain/quality/trend",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:670"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:686"
         },
         {
           "method": "POST",
           "path": "/brain/quality/update",
           "raw": "/brain/quality/update",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:610"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:626"
         },
         {
           "method": "GET",
@@ -2699,115 +2699,115 @@
           "method": "GET",
           "path": "/brain/recall-log/recent",
           "raw": "/brain/recall-log/recent",
-          "declaredIn": "neuralis:code/neuralis/cognition.py:326"
+          "declaredIn": "neuralis:code/neuralis/cognition.py:348"
         },
         {
           "method": "POST",
           "path": "/brain/recall/useful",
           "raw": "/brain/recall/useful",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:162"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:178"
         },
         {
           "method": "GET",
           "path": "/brain/report",
           "raw": "/brain/report",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:497"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:513"
         },
         {
           "method": "GET",
           "path": "/brain/schedule",
           "raw": "/brain/schedule",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:463"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:479"
         },
         {
           "method": "POST",
           "path": "/brain/self-heal/auto-repair",
           "raw": "/brain/self-heal/auto-repair",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:370"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:386"
         },
         {
           "method": "POST",
           "path": "/brain/self-heal/decay-noise",
           "raw": "/brain/self-heal/decay-noise",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:384"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:400"
         },
         {
           "method": "GET",
           "path": "/brain/self-heal/diagnose",
           "raw": "/brain/self-heal/diagnose",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:363"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:379"
         },
         {
           "method": "POST",
           "path": "/brain/self-heal/rescue-orphans",
           "raw": "/brain/self-heal/rescue-orphans",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:378"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:394"
         },
         {
           "method": "GET",
           "path": "/brain/source-quality",
           "raw": "/brain/source-quality",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:349"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:365"
         },
         {
           "method": "GET",
           "path": "/brain/stats",
           "raw": "/brain/stats",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:214"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:230"
         },
         {
           "method": "POST",
           "path": "/brain/synapses/reap",
           "raw": "/brain/synapses/reap",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:630"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:646"
         },
         {
           "method": "POST",
           "path": "/brain/synthesize/chain",
           "raw": "/brain/synthesize/chain",
-          "declaredIn": "neuralis:code/neuralis/synthesis.py:123"
+          "declaredIn": "neuralis:code/neuralis/synthesis.py:129"
         },
         {
           "method": "POST",
           "path": "/brain/synthesize/compress",
           "raw": "/brain/synthesize/compress",
-          "declaredIn": "neuralis:code/neuralis/synthesis.py:257"
+          "declaredIn": "neuralis:code/neuralis/synthesis.py:263"
         },
         {
           "method": "GET",
           "path": "/brain/synthesize/status",
           "raw": "/brain/synthesize/status",
-          "declaredIn": "neuralis:code/neuralis/synthesis.py:420"
+          "declaredIn": "neuralis:code/neuralis/synthesis.py:442"
         },
         {
           "method": "GET",
           "path": "/brain/timeline",
           "raw": "/brain/timeline",
-          "declaredIn": "neuralis:code/neuralis/cognition.py:640"
+          "declaredIn": "neuralis:code/neuralis/cognition.py:662"
         },
         {
           "method": "GET",
           "path": "/brain/topics",
           "raw": "/brain/topics",
-          "declaredIn": "neuralis:code/neuralis/topics.py:175"
+          "declaredIn": "neuralis:code/neuralis/topics.py:212"
         },
         {
           "method": "POST",
           "path": "/brain/transitions/rebuild",
           "raw": "/brain/transitions/rebuild",
-          "declaredIn": "neuralis:code/neuralis/cognition.py:366"
+          "declaredIn": "neuralis:code/neuralis/cognition.py:388"
         },
         {
           "method": "GET",
           "path": "/brain/usage",
           "raw": "/brain/usage",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:580"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:596"
         },
         {
           "method": "GET",
           "path": "/brain/write-stats",
           "raw": "/brain/write-stats",
-          "declaredIn": "neuralis:code/neuralis/routes_brain.py:694"
+          "declaredIn": "neuralis:code/neuralis/routes_brain.py:710"
         },
         {
           "method": "GET",
@@ -2897,7 +2897,7 @@
           "method": "GET",
           "path": "/curiosity/gaps",
           "raw": "/curiosity/gaps",
-          "declaredIn": "neuralis:code/neuralis/pipelines.py:292"
+          "declaredIn": "neuralis:code/neuralis/pipelines.py:293"
         },
         {
           "method": "GET",
@@ -3143,7 +3143,7 @@
           "method": "GET",
           "path": "/recall",
           "raw": "/recall",
-          "declaredIn": "neuralis:code/neuralis/routes_recall.py:57"
+          "declaredIn": "neuralis:code/neuralis/routes_recall.py:66"
         },
         {
           "method": "GET",

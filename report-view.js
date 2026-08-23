@@ -23,34 +23,12 @@
   }
 })();
 
-function escapeHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  })[c]);
-}
+// escapeHtml lives in lib/report-sanitize.js (loaded by report-view.html
+// before this file) — one copy for both report pages.
 
-// (audit) The report body is built from LLM/page-derived text (untrusted) and
-// rendered via marked into innerHTML. The extension CSP blocks inline script,
-// but injected elements that auto-load external resources (e.g. <img src>) can
-// still exfiltrate data under a permissive img-src, and injected markup can spoof
-// the report. Strip code-executing / resource-loading elements and dangerous
-// attributes before insertion.
-function sanitizeReportHtml(dirty) {
-  if (!dirty) return '';
-  const doc = new DOMParser().parseFromString(String(dirty), 'text/html');
-  doc.querySelectorAll('script,iframe,object,embed,form,link,base,meta,svg,math,img,source,video,audio,track,input,button,textarea,style').forEach((el) => el.remove());
-  const URL_ATTR = /^(href|src|srcset|action|formaction|xlink:href|background|poster)$/i;
-  const BAD_PROTO = /^\s*(javascript|data|vbscript)\s*:/i;
-  doc.querySelectorAll('*').forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith('on')) { el.removeAttribute(attr.name); continue; }
-      if (name === 'style') { el.removeAttribute(attr.name); continue; }
-      if (URL_ATTR.test(name) && BAD_PROTO.test(attr.value)) el.removeAttribute(attr.name);
-    }
-  });
-  return doc.body.innerHTML;
-}
+// sanitizeReportHtml lives in lib/report-sanitize.js (loaded by
+// report-view.html before this file). One copy for both report pages —
+// duplicated security functions drift.
 
 let __currentReport = null;
 

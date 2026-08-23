@@ -590,11 +590,11 @@ function _renderSkillStatsModal(skills) {
       const deltaStr = delta === 0 ? '' : (delta > 0 ? ` (+${delta})` : ` (${delta})`);
       const deltaColor = delta > 0 ? '#9ece6a' : delta < 0 ? '#f44' : 'var(--text-tertiary)';
       tr.innerHTML = `<td style="padding:6px 4px;"><strong>${escapeHtml(s.id)}</strong><div style="font-size:10px; color:var(--text-tertiary); margin-top:1px;">${escapeHtml(s.description || '')}</div></td>
-        <td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${stats.fires}</td>
-        <td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${stats.successes} / ${stats.failures}</td>
+        <td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${Number(stats.fires) || 0}</td>
+        <td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${Number(stats.successes) || 0} / ${Number(stats.failures) || 0}</td>
         <td style="padding:6px 4px; text-align:right; color:${rateColor}; font-variant-numeric:tabular-nums;">${rateStr}</td>
-        <td style="padding:6px 4px; text-align:right; color:var(--text-tertiary); font-variant-numeric:tabular-nums;">${s.priority || 0}</td>
-        <td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${s.effectivePriority || 0}<span style="color:${deltaColor};">${deltaStr}</span></td>`;
+        <td style="padding:6px 4px; text-align:right; color:var(--text-tertiary); font-variant-numeric:tabular-nums;">${Number(s.priority) || 0}</td>
+        <td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${Number(s.effectivePriority) || 0}<span style="color:${deltaColor};">${deltaStr}</span></td>`;
       tbody.appendChild(tr);
     }
     table.appendChild(tbody);
@@ -806,8 +806,8 @@ function _renderLearnedPatterns(patterns) {
     const steps = Array.isArray(p.steps) ? p.steps.length : '?';
     const safeGoal = escapeHtml(p.goal || '(no goal)');
     return `<div style="display:flex; align-items:center; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border-color);">
-      <span title="${safeGoal}" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:8px;">${i + 1}. ${safeGoal} <span style="color:var(--text-tertiary,#666);">(${steps} steps, ${date})</span></span>
-      <button data-idx="${i}" class="delete-pattern-btn" style="font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid var(--error-color,#ef4444); background:transparent; color:var(--error-color,#ef4444); cursor:pointer; flex-shrink:0;">✕</button>
+      <span title="${safeGoal}" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:8px;">${Number(i) + 1}. ${safeGoal} <span style="color:var(--text-tertiary,#666);">(${steps} steps, ${date})</span></span>
+      <button data-idx="${Number(i)}" class="delete-pattern-btn" style="font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid var(--error-color,#ef4444); background:transparent; color:var(--error-color,#ef4444); cursor:pointer; flex-shrink:0;">✕</button>
     </div>`;
   }).join('');
   list.querySelectorAll('.delete-pattern-btn').forEach(btn => {
@@ -1748,8 +1748,8 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
           <div style="font-size:12px; font-weight:600;">${sanitizeHtml(p.name || id)}</div>
           <div style="font-size:11px; color:var(--text-secondary);">${sanitizeHtml(p.version || '?')} by ${sanitizeHtml(p.author || '?')}</div>
         </div>
-        <button class="form-btn-sm plugin-toggle" data-id="${id}" style="font-size:10px; ${p.active ? 'background:var(--success-color, #4caf50);' : 'background:var(--bg-tertiary);'}">${p.active ? 'ON' : 'OFF'}</button>
-        <button class="form-btn-sm plugin-uninstall" data-id="${id}" style="font-size:10px; color:var(--error-color, #f44336);">Remove</button>
+        <button class="form-btn-sm plugin-toggle" data-id="${sanitizeHtml(id)}" style="font-size:10px; ${p.active ? 'background:var(--success-color, #4caf50);' : 'background:var(--bg-tertiary);'}">${p.active ? 'ON' : 'OFF'}</button>
+        <button class="form-btn-sm plugin-uninstall" data-id="${sanitizeHtml(id)}" style="font-size:10px; color:var(--error-color, #f44336);">Remove</button>
       </div>
     `).join('');
 
