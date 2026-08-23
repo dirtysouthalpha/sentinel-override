@@ -46,22 +46,6 @@
   }
 })();
 
-// (audit) The report body is built from untrusted LLM/page-derived text and
-// rendered via marked into innerHTML. Strip code-executing / resource-loading
-// elements and dangerous attributes before insertion (see report-view.js).
-function sanitizeReportHtml(dirty) {
-  if (!dirty) return '';
-  const doc = new DOMParser().parseFromString(String(dirty), 'text/html');
-  doc.querySelectorAll('script,iframe,object,embed,form,link,base,meta,svg,math,img,source,video,audio,track,input,button,textarea,style').forEach((el) => el.remove());
-  const URL_ATTR = /^(href|src|srcset|action|formaction|xlink:href|background|poster)$/i;
-  const BAD_PROTO = /^\s*(javascript|data|vbscript)\s*:/i;
-  doc.querySelectorAll('*').forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith('on')) { el.removeAttribute(attr.name); continue; }
-      if (name === 'style') { el.removeAttribute(attr.name); continue; }
-      if (URL_ATTR.test(name) && BAD_PROTO.test(attr.value)) el.removeAttribute(attr.name);
-    }
-  });
-  return doc.body.innerHTML;
-}
+// sanitizeReportHtml lives in lib/report-sanitize.js (loaded by
+// report-print.html before this file). One copy for both report pages —
+// duplicated security functions drift.

@@ -157,4 +157,15 @@ export default [
       },
     },
   },
+  // The report pages load lib/report-sanitize.js (and lib/marked.min.js) via
+  // <script src> before their page script, so these are shared page globals.
+  {
+    files: ['report-view.js', 'report-print.js'],
+    languageOptions: {
+      globals: {
+        sanitizeReportHtml: 'readonly',
+        marked: 'readonly',
+      },
+    },
+  },
 ];
