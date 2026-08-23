@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased] - 2026-08-23 upgrade day: dashboard fixes + mechanical XSS gate
+
+### Added
+- **`scripts/check-html-injection.cjs`** — AST-based gate (via `@babel/parser`) that fails `npm run test:web` if any `web/` HTML sink (`innerHTML`/`outerHTML`/`insertAdjacentHTML`/`document.write`, inline or standalone script) receives an expression it cannot prove inert: literals, `escHtml()`/`escAttr()` calls, `Math`/`Number` results, safe compositions, never-reassigned consts with safe initializers, `map(fn).join()` with safe returns. Every XSS this project shipped was an unescaped interpolation into `innerHTML`; the rule is now mechanical instead of disciplinary. 8 jest tests prove both directions. 16 sinks currently checked, 0 unsafe.
+- **`lib/report-sanitize.js`** — the ONE copy of `sanitizeReportHtml`, previously hand-duplicated in `report-view.js` and `report-print.js` (drift between two copies of a security function is a one-page-only XSS waiting to fire). Loaded by both report pages before their page script; 8 jest tests pin strip behavior plus drift guards against private forks and wrong load order.
+
+### Fixed
+- **Prime dashboard: Escape now cancels inline conversation rename.** The input saved on blur, and Escape triggered a re-render that removed the focused input — firing blur and PATCHing the value the user asked to discard.
+- **Prime dashboard: conversation rail keyboard support.** Group headers declared `role="button"`/`tabindex="0"` but only handled click (Enter/Space now toggle, including the dynamic pinned group); the pinned group's saved collapse state was dropped every reload (created after `loadGroupState()` ran); the conversation context menu (`role="menu"`) closes on Escape.
+- **`report-print.js`: raw error text concatenated into `innerHTML`** on the failure path (report-view escaped the same message). Now built through the DOM with `textContent`.
+
+### Changed
+- `contract/server-routes.json` re-extracted after upgrade-day commits landed in neuralis and sentinel-prime-premium (540 routes / 3 servers; `routes:check` current, contract holds 57/57).
+- `dashboard.js`: render-local `goal` const renamed `goalCell` (cross-scope name collision with the user-input `goal`).
+
 ## [Unreleased] - runAgentLoop state machine (#45)
 
 ### Added
