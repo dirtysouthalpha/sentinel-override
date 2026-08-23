@@ -164,6 +164,7 @@ export default [
     languageOptions: {
       globals: {
         sanitizeReportHtml: 'readonly',
+        escapeHtml: 'readonly',
         marked: 'readonly',
       },
     },

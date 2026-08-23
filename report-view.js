@@ -23,11 +23,8 @@
   }
 })();
 
-function escapeHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  })[c]);
-}
+// escapeHtml lives in lib/report-sanitize.js (loaded by report-view.html
+// before this file) — one copy for both report pages.
 
 // sanitizeReportHtml lives in lib/report-sanitize.js (loaded by
 // report-view.html before this file). One copy for both report pages —

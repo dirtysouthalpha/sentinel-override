@@ -28,7 +28,7 @@ class BrowserlikeDOMParser extends DOMParser {
 }
 globalThis.DOMParser = BrowserlikeDOMParser;
 await import('../lib/report-sanitize.js');
-const { sanitizeReportHtml } = globalThis.ReportSanitize;
+const { sanitizeReportHtml, escapeHtml } = globalThis.ReportSanitize;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(HERE, '..');
@@ -79,11 +79,20 @@ describe('sanitizeReportHtml', () => {
     expect(out).toContain('class="src-chip"');
   });
 
+  // ── shared escaper ────────────────────────────────────────────────────────
+  test('escapeHtml escapes all five significant characters', () => {
+    expect(escapeHtml('<b a="x" c=\'y\'>&'))
+      .toBe('&lt;b a=&quot;x&quot; c=&#39;y&#39;&gt;&amp;');
+    expect(escapeHtml(null)).toBe('');
+    expect(escapeHtml(undefined)).toBe('');
+  });
+
   // ── drift guards ──────────────────────────────────────────────────────────
-  test('neither report page defines a private sanitizer fork', () => {
+  test('neither report page defines a private sanitizer or escaper fork', () => {
     for (const file of ['report-view.js', 'report-print.js']) {
       const src = fs.readFileSync(path.join(REPO_ROOT, file), 'utf8');
       expect(src).not.toMatch(/function\s+sanitizeReportHtml/);
+      expect(src).not.toMatch(/function\s+escapeHtml/);
     }
   });
 

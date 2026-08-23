@@ -16,10 +16,11 @@
     if (goalEl) goalEl.textContent = data.goal || '';
     if (tsEl) tsEl.textContent = data.timestamp ? new Date(data.timestamp).toLocaleString() : '';
 
-    // Render markdown -> HTML
+    // Render markdown -> HTML. The fallback matches report-view.js: the full
+    // escapeHtml from lib/report-sanitize.js, not the old <-only replace.
     const html = window.marked && window.marked.parse
       ? window.marked.parse(data.fullReport)
-      : data.fullReport.replace(/</g, '&lt;');
+      : escapeHtml(data.fullReport).replace(/\n/g, '<br>');
 
     // Decorate [src:key] / [unverified] markers as small inline chips
     // for paper-friendly auditability.
