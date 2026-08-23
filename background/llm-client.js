@@ -57,11 +57,24 @@ const TEXT_ONLY_RE = /-text-only$/i;
 const CLAUDE_OPUS_SONNET_RE = /\bclaude-(opus|sonnet|haiku|3|4|5)\b/i;
 const GPT_4_RE = /\bgpt-(4o|4\.1|4-vision|5|o\d)\b/i;
 const GEMINI_RE = /\bgemini\b/i;
-const QWEN_VL_RE = /\bqwen[\w.-]*-vl\b/i;
+// Self-hosted VL builds do not follow one naming convention. The old
+// /\bqwen[\w.-]*-vl\b/ required a dash before "vl", so `qwen2.5vl:7b` (the
+// default ollama tag) reported NOT vision-capable, and `vl-7b-dspark` matched
+// neither /-vl-/ nor /-vl$/. Both are vision models that were being told, in
+// their own system prompt, that they could not see.
+const QWEN_VL_RE = /\bqwen[\w.]*-?vl\b/i;
 const LLAVA_RE = /\bllava\b/i;
 const VISION_RE = /vision/i;
 const VL_DASH_RE = /-vl-/i;
 const VL_END_RE = /-vl$/i;
+// `vl-7b-dspark`, `vl-7b`, `vl_3b` — a leading "vl" segment.
+const VL_START_RE = /^vl[-_.]/i;
+// `qwen2.5vl:7b`, `internvl2-8b`, `minicpm-v-2.6`, `pixtral-12b`, `moondream2`.
+const VL_TAGGED_RE = /\bvl[:\-_.]?\d/i;
+const INTERNVL_RE = /internvl/i;
+const MINICPM_V_RE = /\bminicpm-?v\b/i;
+const PIXTRAL_RE = /\bpixtral\b/i;
+const MOONDREAM_RE = /moondream/i;
 const PALOALTO_TEXT_RE = /palo alto|pan-os|panorama/;
 const SENTINELONE_URL_RE = /sentinelone\.net|\.sentinelone\.com|s1\.com/;
 const SENTINELONE_TEXT_RE = /sentinelone|singularity/;
@@ -992,7 +1005,13 @@ export function supportsVision(model, providerHint) {
     LLAVA_RE,
     VISION_RE,
     VL_DASH_RE,
-    VL_END_RE
+    VL_END_RE,
+    VL_START_RE,
+    VL_TAGGED_RE,
+    INTERNVL_RE,
+    MINICPM_V_RE,
+    PIXTRAL_RE,
+    MOONDREAM_RE
   ];
   return visionPatterns.some(re => re.test(m));
 }
@@ -1677,7 +1696,17 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   // (3.51) Send vision content when we have an image and the provider supports it.
   // If the endpoint rejects the vision request with 400, we fall back to text-only
   // (see the 400-retry block below) so non-vision model variants don't silently fail.
-  const _useVision = _isVisionCall;
+  // Once THIS run has had an image payload rejected with a 400, stop attaching
+  // the screenshot. Without this the optimistic probe below repeats on every
+  // single step: against a text-only model behind an OpenAI-compatible endpoint
+  // a live run showed a 400 (≈57KB of base64 uploaded for nothing) followed by a
+  // text-only retry on step after step — two requests, two rate-limiter slots
+  // and two apiCallCount increments per step, for the whole run. It also made
+  // the request contradict the prompt, which already tells the model
+  // `visionCapable:false` once visionDegraded is set. One probe per run is
+  // enough, and probing (rather than trusting supportsVision()) is deliberate:
+  // the model-name matcher has false negatives for self-hosted VL builds.
+  const _useVision = _isVisionCall && !(agentState && agentState.visionDegraded);
   const userContent = (_useVision)
     ? provider.buildVisionContent(prompt, base64Image)
     : prompt;

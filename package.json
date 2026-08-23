@@ -15,7 +15,8 @@
     "routes:manifest": "node scripts/generate-route-manifest.cjs",
     "routes:check": "node scripts/generate-route-manifest.cjs --check",
     "check": "npm run lint && npm run test:web && npm run routes:check && npm run test:contract && npm test && npm run build",
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "test:live": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js --config jest.live.config.js --runInBand"
   },
   "devDependencies": {
     "@babel/parser": "^7.29.3",

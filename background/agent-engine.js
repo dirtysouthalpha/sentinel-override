@@ -640,6 +640,13 @@ async function _restoreTenantMemory(tenant) {
 }
 let history = [];               // (3.15.1) Per-run action history. MUST be module-level so the trimHistory()/_guardedPersistHistory() helpers at module scope can access it. Cleared in-place at start of each runAgentLoop via history.length = 0 (preserves the array reference for any captured closures).
 let _lastAiCallMs = null;       // (3.21.0) Duration of the most recent LLM call in ms; consumed by the slow-llm-call recovery skill.
+// Sticky for the whole run: set once the endpoint has rejected an image payload
+// with a 400 (llm-client sets agentState.visionDegraded on that path). agentState
+// is REBUILT from scratch every iteration, so without this module-level mirror the
+// flag died at the end of the step that set it and every subsequent step re-sent
+// the screenshot, ate another 400, and paid for a second fallback call — observed
+// live as a 400/200 pair on every single step against a text-only model.
+let _visionDegraded = false;
 let consecutiveFailures = 0;    // Self-healing: tracks failures for strategy shift
 let currentStrategies = [];     // Self-healing: remembers tried approaches
 let agentPlan = null;           // Planning phase: numbered list of steps
@@ -1093,6 +1100,7 @@ export function resetAgentState() {
   _clickAtStreakSawPageChange = false;
   _lastNoActionProse = '';
   _noActionProseRepeats = 0;
+  _visionDegraded = false;
   consecutiveFailures = 0;
   sharedState.pageStagnation = 0;
   currentStrategies = [];
@@ -3189,7 +3197,7 @@ async function runAgentLoop(goal, workingTabId) {
           }).catch(() => {});
         } catch (_) { /* non-fatal: _ */ }
       };
-      const agentState = { apiCallCount, agentMemory, onStreamChunk: _onStreamChunk, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: getZoomRegion(), zoomAnnotation: _zoomAnnotation };
+      const agentState = { apiCallCount, agentMemory, onStreamChunk: _onStreamChunk, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: getZoomRegion(), zoomAnnotation: _zoomAnnotation, visionDegraded: _visionDegraded };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -3638,6 +3646,11 @@ async function runAgentLoop(goal, workingTabId) {
           // agentState.apiCallCount before the fetch, so if the call throws the
           // module-level var must still be updated or the final log shows 0.
           apiCallCount = agentState.apiCallCount;
+          // Carry the vision-degraded verdict forward. callLLM sets it on the
+          // per-step agentState when the endpoint 400s an image payload; the
+          // next iteration builds a brand-new agentState, so it has to be
+          // mirrored into run scope here or the run keeps re-probing.
+          if (agentState.visionDegraded) _visionDegraded = true;
           // (3.16.0) Mark the consult-ai activity as done or failed.
           if (_aiCallError) {
             activityFail(stepCount, 'consult-ai', `AI call failed: ${getErrorMessage(_aiCallError || 'unknown')}`, null);
