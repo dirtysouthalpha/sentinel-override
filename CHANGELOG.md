@@ -9,6 +9,8 @@
 ### Added (2)
 - **HTML-injection gate now covers the whole repo.** `check-html-injection.cjs` extended from `web/` to `popup-modules/`, `content/`, and the root popup/report pages — 157 sinks proven safe, 0 exceptions. The prover grew sound compositional rules (safe-write `let`s, literal lookup tables, `.map/.filter/.join` pipelines, numeric/date formatters, escape aliases, IIFEs) and its failures now name the exact unproven interpolation. 45 initially-unproven sinks were triaged: most were hardened with `escapeHtml()`/`Number()` wraps so safety is locally evident; `setResponseHTML(rawHtml)` in quick-assist was replaced with a DOM-built `setResponseError(message)`.
 
+- **`npm run routes:sync`** — one-command heal for route-manifest drift: regenerates `contract/server-routes.json` and commits it if changed (never pushes). `routes:check` now says when a stale table is metadata-only drift (source lines moved, route set unchanged) instead of printing a bare FAIL.
+
 ### Fixed (2)
 - **quick-assist markdown double-escape**: `renderMarkdown` escaped its input via `escapeHtml` and then re-escaped `&<>` a second time, so `<` in AI responses displayed as the literal text `&lt;`.
 - **Typing-banner double-escape** (`content/index.js`): the preview string was escaped at build AND at use; special characters in typed text displayed as entity text.
