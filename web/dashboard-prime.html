@@ -3709,7 +3709,12 @@ function inlineRenameConv(div, id, currentTitle) {
   titleEl.appendChild(inp);
   inp.focus();
   inp.setSelectionRange(0, inp.value.length);
+  // Escape must actually cancel. The blur listener below fires when the input
+  // leaves the DOM — including the re-render loadConvs() triggers — so without
+  // this flag, Escape ended up SAVING the typed value via blur→save().
+  let cancelled = false;
   const save = async () => {
+    if (cancelled) return;
     const t = inp.value.trim();
     if (t && t !== oldText) {
       try {
@@ -3728,7 +3733,7 @@ function inlineRenameConv(div, id, currentTitle) {
   };
   inp.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
-    if (e.key === 'Escape') { e.preventDefault(); loadConvs(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelled = true; inp.blur(); loadConvs(); }
   });
   inp.addEventListener('blur', save);
 }
