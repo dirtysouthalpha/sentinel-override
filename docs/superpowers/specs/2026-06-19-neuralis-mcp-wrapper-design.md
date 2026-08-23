@@ -3,7 +3,7 @@
 **Date:** 2026-06-19
 **Status:** Approved
 **Sub-project:** A of 3 (Neuralis ↔ Sentinel Override integration)
-**Code home:** the Neuralis repo — `/home/brandongoolsby/neuralis/scripts/neuralis-mcp-server.py` (NOT this repo)
+**Code home:** the Neuralis repo — `$HOME/neuralis/scripts/neuralis-mcp-server.py` (NOT this repo)
 
 ---
 
@@ -37,7 +37,7 @@ Registered in ZCode's MCP config as:
 mcp_servers:
   neuralis:
     command: "python3"
-    args: ["/home/brandongoolsby/neuralis/scripts/neuralis-mcp-server.py"]
+    args: ["$HOME/neuralis/scripts/neuralis-mcp-server.py"]
 ```
 
 ## Transport — MCP over stdio
