@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased] - egress audit: every user-data path through the choke point
+
+### Fixed
+- **Masking covered one door out of ten.** The scrubber was a choke point inside `callLLM`; nine other outbound paths in `background/` never flowed through it, every one reachable in production while the Settings panel promised masking. All 15 files in `background/` that perform network egress are now audited and classified.
+  - **`quick-assist-handler.js` was a SECOND full LLM path** — its prompt is page context plus the technician's selected text, sent straight to the configured provider, entirely unguarded. The Settings promise was false here in exactly the way the `shouldScrub` host rule was false before it was fixed.
+  - **`collaboration.js` uploaded user-written automation goals to GitHub.** Templates carry `goal`, free text that in MSP use routinely names the client, their portal hostname, ticket numbers and contacts. It went to a third party verbatim. Now scrubbed, fail closed. On the specific question: it **cannot** create public gists — `public: false` is hard-coded, single occurrence, no caller-controlled path (now pinned by a test). But `public: false` is a *secret* gist, not a private one: readable by anyone with the URL, unencrypted, in whichever account owns the token — so it was never a substitute for masking.
+  - Also routed: `report-generator.js` (report prompt from history + memory), `llm-planning.js` (plan prompt), `adaptive-prompts.js` (goal rewriter), `agent-engine.js` (the parallel TEXT provider alongside vision), `federation.js` (sub-goal to a **remote peer machine**), `brain-client.js` (recall context, which also lands in the server's access log — skips recall on scrub failure), `uap-bridge.js` (event payloads narrating agent actions — drops the event on scrub failure).
+
+### Added
+- **`scrubForEgress()` / `tryScrubForEgress()`** in `background/egress-scrub.js` — the shared door. Same destination policy as the LLM path, fail-closed by default, with a non-throwing variant for non-critical paths that should drop rather than crash.
+- **`background/egress-manifest.js`** — all 15 egress files classified with what each carries and how it is gated, or why it is exempt.
+- **`tests/egress-coverage.test.js`** — fails if any `fetch(` / WebSocket `send(` / `sendBeacon(` appears in `background/` that the manifest does not account for; requires every "scrubbed" entry to actually reference a gate and every exemption to state a reason. **Verified it actually fails**: a probe file with a bare `fetch()` to `evil.example` turned the suite red, and removing it turned it green again.
+
+### Justified exemptions (not wrapped reflexively)
+- `plugin-registry.js` — two GETs with no request body (registry index, plugin manifest). Nothing outbound.
+- `provider-registry.js` — GET `/models`. No body.
+- `ws-bridge.js` — control frames plus a heartbeat carrying the active tab's url and title. That **is** user data, but `BRIDGE_URL` is the hard-coded literal `ws://localhost:8001` with no configuration path, so it cannot leave the machine. A test pins that it stays a single hard-coded assignment; if it ever becomes configurable the exemption is void.
+- `brain-producer.js` — already has a stricter, **verified-wired** gate: `_scrubPii` plus a client-entity denylist that *drops* a candidate outright if it still contains a client identifier. Deliberately not double-wrapped.
+- `agent-engine.js` DoH lookup — sends only a hostname the user is already visiting, to a public resolver, for tenant detection. No page content.
+
+### Notes
+- The egress detector strips **comments only**. An earlier version also stripped string literals, desynced on a regex containing a quote, and silently swallowed `llm-client.js`, `agent-engine.js`, `adaptive-prompts.js` and `collaboration.js` — reporting them as having no egress at all. In a test whose job is to catch a new unguarded door, a false negative is the dangerous direction; over-detection merely forces a manifest entry.
+
 ## [Unreleased] - audited upgrades: live-verified masking, token budget, consent
 
 ### Fixed
