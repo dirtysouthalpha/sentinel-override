@@ -903,6 +903,46 @@ export function resolveProvider(endpoint) {
 }
 
 /**
+ * Resolve the provider DEFINITION to use for an active-provider config.
+ *
+ * The latent trap this closes: callLLM and callLLMSimple called
+ * `resolveProvider(endpoint)`, which only ever distinguishes Anthropic and
+ * Z.AI and maps everything else — including every self-hosted provider — to
+ * PROVIDERS.openai. So selecting "Ollama (Local)" in settings still used
+ * OpenAI's buildHeaders and OpenAI's strict parseResponse; the lenient
+ * parseResponse and optional-auth headers those definitions carry had never
+ * run once. It works today only because those servers happen to be
+ * OpenAI-compatible; the first local provider that isn't would fail with a
+ * confusing parse error rather than an obvious one.
+ *
+ * Precedence is deliberate:
+ *   1. An endpoint that unambiguously identifies a NON-OpenAI wire format
+ *      (api.anthropic.com, z.ai) wins outright — the request shape has to match
+ *      the server actually on the other end, whatever the operator selected.
+ *   2. Otherwise the operator's chosen provider id wins, when we have a
+ *      definition for it.
+ *   3. Otherwise fall back to endpoint sniffing, as before.
+ *
+ * @param {object} providerConfig - Result of getActiveProvider().
+ * @returns {object} A provider definition with builders and parsers.
+ */
+export function resolveProviderForConfig(providerConfig) {
+  const cfg = providerConfig || {};
+  const endpoint = cfg.endpoint || '';
+
+  // (1) Wire format is dictated by the server, not the dropdown.
+  if (/api\.anthropic\.com/.test(endpoint)) return PROVIDERS.anthropic;
+  if (/api\.z\.ai|z\.ai/.test(endpoint)) return PROVIDERS.zai;
+
+  // (2) Honour the operator's selection when we have a definition for it.
+  const byId = cfg.id && PROVIDERS[cfg.id];
+  if (byId) return byId.id ? byId : { ...byId, id: cfg.id };
+
+  // (3) Legacy behaviour.
+  return resolveProvider(endpoint);
+}
+
+/**
  * Synchronous replacement for the legacy isAnthropicEndpoint function.
  * Returns 'anthropic' or 'openai'.
  *

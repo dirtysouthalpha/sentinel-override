@@ -143,24 +143,48 @@ function embeddedInToken(text, index, length) {
   return /[A-Za-z0-9_]/.test(before) || /[A-Za-z0-9_]/.test(after);
 }
 
+const LOCAL_HOST_RE = /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[?::1\]?|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+|[\w-]+\.local|host\.docker\.internal)$/;
+
+// Model families that are hosted by a third party no matter what address the
+// request is addressed to. A local HOST is not evidence of a local MODEL.
+const CLOUD_MODEL_RE = /\b(gpt-|o[134]-|chatgpt|claude-|anthropic|gemini|palm-|glm-|zai|longcat|deepseek|grok-|command-r|sonar|kimi|moonshot|ernie|doubao|qwen-(max|plus|turbo|long))\b/i;
+
+// A proxy path that names a provider is a strong signal too: /u/zai/, /openai/v1,
+// /anthropic/v1 are all this fleet's own egress-proxy conventions.
+const CLOUD_PATH_RE = /\/(zai|z-ai|openai|anthropic|claude|gemini|google|openrouter|groq|mistral|together|fireworks|deepseek|perplexity)(\/|$)/i;
+
 /**
  * Should traffic to this endpoint be scrubbed?
  *
- * A self-hosted model on the operator's own machine is not third-party egress,
- * so CLOUD mode leaves it raw. Anything reachable off-box is scrubbed.
+ * CLOUD mode exempts a model genuinely running on the operator's own hardware.
+ * It must NOT exempt a cloud model that merely happens to be addressed through
+ * a local egress proxy — which is exactly how this product's own author routes
+ * every cloud request (127.0.0.1:8901 → z.ai, 127.0.0.1:8798 → Anthropic).
+ * A host-only rule silently disabled masking on that setup while the settings
+ * UI claimed "Cloud providers only (recommended)". Found by checking the real
+ * fleet endpoints before trusting the unit tests.
+ *
+ * So: exempt only when the host is local AND nothing about the model or the
+ * path says the bytes are leaving the machine.
  *
  * @param {string} endpoint
  * @param {string} [mode=SCRUB_MODE.CLOUD]
+ * @param {string} [model] - Active model id; a cloud family defeats the local exemption.
  * @returns {boolean}
  */
-export function shouldScrub(endpoint, mode = SCRUB_MODE.CLOUD) {
+export function shouldScrub(endpoint, mode = SCRUB_MODE.CLOUD, model = '') {
   if (mode === SCRUB_MODE.OFF) return false;
   if (mode === SCRUB_MODE.ALWAYS) return true;
   if (!endpoint) return true; // unknown destination — fail safe, scrub
-  let host;
-  try { host = new URL(endpoint).hostname.toLowerCase(); } catch { return true; }
-  const LOCAL = /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[?::1\]?|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+|[\w-]+\.local|host\.docker\.internal)$/;
-  return !LOCAL.test(host);
+
+  let url;
+  try { url = new URL(endpoint); } catch { return true; }
+
+  if (!LOCAL_HOST_RE.test(url.hostname.toLowerCase())) return true; // off-box
+  if (CLOUD_PATH_RE.test(url.pathname)) return true;                // proxy to a provider
+  if (model && CLOUD_MODEL_RE.test(String(model))) return true;     // cloud model, local address
+
+  return false;
 }
 
 /**

@@ -218,6 +218,9 @@ const CONTENT_SCRIPT_FILES = [
   // Must precede index.js: index.js reads window.__sentinelUtils.execjs at
   // top level and fails execute_js closed if it is missing.
   'content/execute-js-sandbox.js',
+  // Must precede index.js: the type handler fails credential typing CLOSED
+  // when this module is missing.
+  'content/credential-policy.js',
   'content/index.js'
 ];
 

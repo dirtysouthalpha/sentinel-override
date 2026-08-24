@@ -288,17 +288,38 @@ describe('destination policy', () => {
     }
   });
 
-  test('local and tailnet endpoints are exempt in the default mode', () => {
+  test('a genuinely self-hosted model on a local host is exempt', () => {
     for (const url of [
       'http://localhost:11434/v1/chat/completions',
-      'http://127.0.0.1:8800/v1/chat/completions',
       'http://192.168.1.50:9090/v1',
       'http://10.0.0.9:8080/v1',
       'http://100.70.240.55:9090/v1',
       'http://nuke.local:8083/v1',
     ]) {
-      expect(shouldScrub(url, SCRUB_MODE.CLOUD)).toBe(false);
+      expect(shouldScrub(url, SCRUB_MODE.CLOUD, 'llama3.2')).toBe(false);
+      expect(shouldScrub(url, SCRUB_MODE.CLOUD, 'qwen2.5vl:7b')).toBe(false);
     }
+  });
+
+  // The hole this closes: this product's own author routes EVERY cloud request
+  // through a local egress proxy (127.0.0.1:8901 → z.ai, :8798 → Anthropic,
+  // :8800 → LongCat). A host-only rule classified all of that as "local, not
+  // third-party egress" and skipped masking entirely, while the settings UI
+  // said "Cloud providers only (recommended)". A local HOST is not evidence of
+  // a local MODEL.
+  test('a CLOUD model behind a LOCAL proxy is still scrubbed', () => {
+    expect(shouldScrub('http://127.0.0.1:8901/u/zai/v1/chat/completions', SCRUB_MODE.CLOUD, 'glm-4.6v')).toBe(true);
+    expect(shouldScrub('http://127.0.0.1:8798/v1/messages', SCRUB_MODE.CLOUD, 'claude-sonnet-4')).toBe(true);
+    expect(shouldScrub('http://127.0.0.1:8800/v1/chat/completions', SCRUB_MODE.CLOUD, 'LongCat-2.0-nonthink')).toBe(true);
+    expect(shouldScrub('http://localhost:9999/v1', SCRUB_MODE.CLOUD, 'gpt-4o')).toBe(true);
+    expect(shouldScrub('http://localhost:9999/v1', SCRUB_MODE.CLOUD, 'deepseek-chat')).toBe(true);
+  });
+
+  test('a provider name in a local proxy PATH is enough on its own', () => {
+    // Even when the model id is unknown/renamed by the proxy.
+    expect(shouldScrub('http://127.0.0.1:8901/u/zai/v1/chat/completions', SCRUB_MODE.CLOUD, 'house-model')).toBe(true);
+    expect(shouldScrub('http://127.0.0.1:9000/anthropic/v1/messages', SCRUB_MODE.CLOUD, '')).toBe(true);
+    expect(shouldScrub('http://127.0.0.1:9000/openai/v1/chat', SCRUB_MODE.CLOUD, '')).toBe(true);
   });
 
   test('ALWAYS scrubs local too', () => {
@@ -392,16 +413,24 @@ describe('WIRE TEST: planted secrets never reach the request body', () => {
     expect(wire).toContain('2026-08-23 20:47 UTC');
   });
 
-  test('a LOCAL endpoint is not scrubbed in the default mode', async () => {
-    await run('http://127.0.0.1:8800/v1/chat/completions', 'LongCat-2.0-nonthink', 'custom');
+  test('a genuinely self-hosted model is not scrubbed in the default mode', async () => {
+    await run('http://127.0.0.1:11434/v1/chat/completions', 'llama3.2', 'ollama');
     const wire = bodies.join('\n');
     expect(wire).toContain(PLANTED_EMAIL);
     expect(wire).not.toMatch(/\[\[EMAIL-\d+\]\]/);
   });
 
-  test('egressScrubMode=always scrubs the local endpoint too', async () => {
+  test('a cloud model behind a local proxy IS scrubbed in the default mode', async () => {
+    await run('http://127.0.0.1:8901/u/zai/v1/chat/completions', 'glm-4.6v', 'custom');
+    const wire = bodies.join('\n');
+    expect(wire).not.toContain(PLANTED_EMAIL);
+    expect(wire).not.toContain(PLANTED_KEY);
+    expect(wire).toMatch(/\[\[EMAIL-\d+\]\]/);
+  });
+
+  test('egressScrubMode=always scrubs a self-hosted model too', async () => {
     storageData.egressScrubMode = SCRUB_MODE.ALWAYS;
-    await run('http://127.0.0.1:8800/v1/chat/completions', 'LongCat-2.0-nonthink', 'custom');
+    await run('http://127.0.0.1:11434/v1/chat/completions', 'llama3.2', 'ollama');
     const wire = bodies.join('\n');
     expect(wire).not.toContain(PLANTED_EMAIL);
     expect(wire).toMatch(/\[\[EMAIL-\d+\]\]/);

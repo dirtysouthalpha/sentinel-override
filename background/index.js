@@ -1,6 +1,7 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
+import { buildExecuteJsDisclosure } from './execute-js-risk.js';
 import {startAgent, stopAgent, agentRunning, isPrimaryPanelTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv, generateRunReplay, pauseAgent, resumeAgent, undoLastAction, setAgentSpeed, restoreFromCheckpoint, clearCheckpoint} from './agent-engine.js';
 import {getPoolStatus, stopAgent as stopPoolAgent, stopAllAgents} from './agent-pool.js';
 import {wrapMessageHandler, sendSilentUpdate} from './message-protocol.js';
@@ -583,6 +584,11 @@ const handleRuntimeMessage = async (request, sender) => {
         // and wait for response.
         const requestId = crypto.randomUUID();
         const codePreview = String(request.code || '').substring(0, 500);
+        // Informed consent, not a rubber stamp: approving execute_js SKIPS the
+        // runtime sandbox entirely, and the sandbox was never a security
+        // boundary anyway. Surface both facts, plus any specific construct in
+        // this code that would walk straight out of it.
+        const _disclosure = buildExecuteJsDisclosure(request.code || '');
 
         return await new Promise((resolve) => {
           let settled = false;
@@ -604,7 +610,11 @@ const handleRuntimeMessage = async (request, sender) => {
               elementText: null,
               selector: null,
               codePreview,
-              sourceUrl: request.url || ''
+              sourceUrl: request.url || '',
+              riskHeadline: _disclosure.headline,
+              riskDetail: _disclosure.detail,
+              risks: _disclosure.risks,
+              escapesSandbox: _disclosure.escapesSandbox
             },
             requestId
           }).catch((_e) => {

@@ -344,6 +344,8 @@ const { startAgent, stopAgent, resetAgentState, getLoopMachineSnapshot } =
 // could simply mean the loop quietly fell back to the text path.
 /** @type {Array<object>} */
 let wireLog = [];
+/** Raw outbound request bodies, so a masking test can assert on real bytes. */
+let outboundBodies = [];
 const _realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
   const entry = { url: String(url), model: null, hasImage: false, status: null, ms: 0, err: null, empty: null };
@@ -358,6 +360,7 @@ globalThis.fetch = async (url, init) => {
       entry.promptChars = JSON.stringify(body.messages || []).length;
     }
   } catch { /* not JSON */ }
+  outboundBodies.push(String((init && init.body) || ''));
   const t0 = Date.now();
   try {
     const res = await _realFetch(url, init);
@@ -468,6 +471,7 @@ beforeEach(() => {
   sentMessages = [];
   actionLog = [];
   wireLog = [];
+  outboundBodies = [];
   _url = START_URL;
   visionEnabled = false;
   _completionResolvers = [];
@@ -628,4 +632,95 @@ describe('LIVE: keyless local provider (ollama)', () => {
     expect(cmd).toBeTruthy();
     expect(typeof cmd.type).toBe('string');
   }, 400000);
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LIVE MASKING VERIFICATION
+//
+// The scrubber now sits in the path of EVERY cloud request, so unit and wire
+// tests are not enough — this drives a real multi-step run against a real cloud
+// model with masking engaged and proves three things end to end:
+//   (a) planted secrets never appear in the outbound body,
+//   (b) the agent still completes the task with the scrubber in the path,
+//   (c) restoration works — no [[TOKEN]] leaks into the agent's actions or the
+//       final report.
+//
+// The page below carries a planted API key and a planted client email inside
+// otherwise ordinary ticket text.
+describe('LIVE: masking end-to-end against a real cloud model', () => {
+  const PLANTED_KEY = 'sk-' + 'ant-' + 'api03-' + 'L'.repeat(30);
+  const PLANTED_EMAIL = 'billing.contact@acme-client.example';
+  const PLANTED_PHONE = '(617) 555-0142';
+
+  // Uses a fast TEXT cloud model, not the vision one: this test is about the
+  // scrub path, and glm-4.6v spends ~26s per call thinking (see the token-budget
+  // finding), which pushes a multi-step run past any sane settle window.
+  const CLOUD_ENDPOINT = process.env.SENTINEL_LIVE_CLOUD_ENDPOINT
+    || 'http://127.0.0.1:8901/u/zai/v1/chat/completions';
+  const CLOUD_MODEL = process.env.SENTINEL_LIVE_CLOUD_MODEL || 'glm-4.6';
+  let up = false;
+  beforeAll(async () => { up = VISION_KEY ? await reachable(CLOUD_ENDPOINT, CLOUD_MODEL, VISION_KEY) : false; });
+
+  test('secrets are masked, the task still completes, and values are restored', async () => {
+    if (!up) {
+      // eslint-disable-next-line no-console
+      console.warn(`[live] SKIPPING masking test — ${CLOUD_ENDPOINT} unreachable or no key`);
+      return;
+    }
+
+    // Plant secrets into the simulated pages for this test only.
+    const origQueue = SITE[START_URL].text;
+    const origDetail = SITE['https://helpdesk.test/tickets/4488'].text;
+    SITE[START_URL].text = origQueue
+      + `\nBilling contact: ${PLANTED_EMAIL}  Callback: ${PLANTED_PHONE}`;
+    SITE['https://helpdesk.test/tickets/4488'].text = origDetail
+      + `\nIntegration API key: ${PLANTED_KEY}`
+      + `\nReporter: ${PLANTED_EMAIL}`;
+
+    try {
+      storageData.egressScrubMode = 'cloud';
+      configureProvider({ endpoint: CLOUD_ENDPOINT, model: CLOUD_MODEL, apiKey: VISION_KEY });
+      await runAgent(
+        'Open the P1 ticket on the Northwind MSP queue page and report its ticket ID, '
+        + 'subject, assignee and SLA status.',
+        540000
+      );
+
+      const wire = wireLog.map(e => e.url).join('\n');
+      const bodies = outboundBodies.join('\n');
+      const summary = finishSummary();
+      const snap = getLoopMachineSnapshot();
+
+      // eslint-disable-next-line no-console
+      console.log('[live/mask] requests=' + wireLog.length
+        + ' exit=' + (snap && snap.exitReason)
+        + ' endedOn=' + _url
+        + '\n[live/mask] wire:\n' + wireSummary()
+        + '\n[live/mask] summary head: ' + summary.slice(0, 300));
+
+      // (a) Nothing planted reached the wire.
+      expect(bodies.length).toBeGreaterThan(0);
+      expect(bodies).not.toContain(PLANTED_KEY);
+      expect(bodies).not.toContain(PLANTED_EMAIL);
+      expect(bodies).not.toContain(PLANTED_PHONE);
+      // …and placeholders did, so the model still saw structure.
+      expect(bodies).toMatch(/\[\[(SECRET|EMAIL)-\d+\]\]/);
+      // Legitimate ticket detail still reached the model.
+      expect(bodies).toContain('TKT-4488');
+
+      // (b) The task still completed with the scrubber in the path.
+      expect(_url).toBe('https://helpdesk.test/tickets/4488');
+      expect(summary).toMatch(/TKT-4488/);
+      expect(String(snap.exitReason || '')).not.toMatch(/NO_LLM_CALL|NO_ACTIVE_TAB/);
+
+      // (c) No placeholder token leaked into the agent's own output or actions.
+      expect(summary).not.toMatch(/\[\[[A-Z]+-\d+\]\]/);
+      const actionText = JSON.stringify(sentMessages);
+      expect(actionText).not.toMatch(/\[\[SECRET-\d+\]\]/);
+    } finally {
+      SITE[START_URL].text = origQueue;
+      SITE['https://helpdesk.test/tickets/4488'].text = origDetail;
+    }
+  }, 600000);
 });

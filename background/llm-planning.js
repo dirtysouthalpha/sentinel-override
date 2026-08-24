@@ -1,6 +1,7 @@
 // ========== Pre-flight Planning ==========
 // Extracted from llm-client.js for modularity.
 // Generates a numbered plan from the goal before execution begins.
+import { planThinkingRetry } from './llm-thinking-budget.js';
 import { API_TIMEOUT_MS } from './constants.js';
 import { resolveProvider } from './provider-registry.js';
 import { getErrorMessage } from './error-utils.js';
@@ -170,20 +171,47 @@ export async function generatePlan(goal, settings, context = {}) {
     // compatible providers may reject or ignore it, causing 400 errors.
     // The fallback strategies in the parse block below handle non-JSON responses.
     const useJsonMode = endpoint.includes('api.openai.com');
-    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: useJsonMode }));
     const planHeaders = provider.buildHeaders(apiKey);
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: planHeaders,
-      body: planBody,
-      signal: controller.signal
-    });
+
+    // Reasoning models spend the output budget on reasoning_content before they
+    // emit any answer. 1200 tokens is a non-thinking budget: observed live,
+    // glm-4.6 burned 25.5s, returned finish_reason "length" with empty content,
+    // and this function silently fell back to a single-step plan. Retry ONCE
+    // with a bigger budget when — and only when — the response was truncated
+    // before producing anything usable.
+    let _budget = 1200;
+    let data = null;
+    let response = null;
+    for (let _attempt = 0; _attempt < 2; _attempt++) {
+      const planBody = JSON.stringify(provider.buildBody(
+        model,
+        'You are a planning assistant. Return ONLY valid JSON.',
+        planPrompt,
+        { maxTokens: _budget, temperature: 0.2, jsonMode: useJsonMode }
+      ));
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: planHeaders,
+        body: planBody,
+        signal: controller.signal
+      });
+      if (!response.ok) break;
+      data = await response.json();
+      const _verdict = planThinkingRetry(data, _attempt, _budget);
+      if (!_verdict.retry) break;
+      console.warn(`[Sentinel/plan] Thinking model truncated (${_verdict.reason}); retrying with maxTokens=${_verdict.budget}`);
+      _budget = _verdict.budget;
+      data = null;
+    }
     clearTimeout(timeout);
     if (!response.ok) {
       console.warn('Plan generation API returned', response.status, '— using goal as single-step fallback');
       return [(goal || 'Complete the task').substring(0, 300)];
     }
-    const data = await response.json();
+    if (!data) {
+      console.warn('Plan generation: no usable response after thinking-budget retry — single-step fallback');
+      return [(goal || 'Complete the task').substring(0, 300)];
+    }
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Plan API returned invalid response body');
     // Early detection of auth errors from providers that return HTTP 200 with error payloads
     if ((!data.choices || !data.choices.length) && (data.error || data.msg || (data.code && data.success === false))) {

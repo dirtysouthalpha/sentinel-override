@@ -1204,10 +1204,19 @@ describe('sleep — new edge cases', () => {
     await sleep(-1);
     expect(Date.now() - start).toBeLessThan(100);
   });
-  test('handles very large ms', () => {
-    const p = sleep(100000);
-    expect(p instanceof Promise).toBe(true);
-    p.catch(() => {}); // prevent unhandled rejection if canceled
+  test('handles very large ms', async () => {
+    // This used to schedule a real 100-second timer and never clear it, which
+    // is the single open handle `--forceExit` was hiding across the whole
+    // suite. Fake timers assert the same thing and leave nothing running.
+    jest.useFakeTimers();
+    try {
+      const p = sleep(100000);
+      expect(p instanceof Promise).toBe(true);
+      jest.advanceTimersByTime(100000);
+      await expect(p).resolves.toBeUndefined();
+    } finally {
+      jest.useRealTimers();
+    }
   });
   test('resolves with undefined', async () => {
     const result = await sleep(0);

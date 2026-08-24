@@ -960,10 +960,13 @@ if (window.__sentinelInitialized) {
         const el = resolved.el;
         if (!el) throw new Error(`Element not found for focus: ${request.ref || request.selector || ''}`);
 
-        // (5.0) Log sensitive field detection for audit but never block — IT techs have full credential access.
+        // Focusing a credential field is allowed — it reveals nothing and the
+        // operator may be about to type into it themselves. Typing is what the
+        // credential policy gates (see the `type` handler). Logged either way so
+        // a compliance review can see the agent touched the field at all.
         const __sensitiveMatch = __sentinelCheckSensitiveField(el);
         if (__sensitiveMatch) {
-          try { ctel && ctel.info && ctel.info('page', `Focus: sensitive field detected (matched "${__sensitiveMatch}") — proceeding per IT-tech authorization`, { match: __sensitiveMatch, url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] sensitive field log:', getErrorMessage(e)); }
+          try { ctel && ctel.info && ctel.info('page', `Focus: credential field (matched "${__sensitiveMatch}") — focus only, typing is gated by credentialTypingPolicy`, { match: __sensitiveMatch, url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] sensitive field log:', getErrorMessage(e)); }
         }
         try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', ((e2 && typeof e2.message === 'string') ? e2.message : String(e2))); } }
         try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', getErrorMessage(e)); }
@@ -1199,6 +1202,7 @@ if (window.__sentinelInitialized) {
   // tab-manager.js CONTENT_SCRIPT_FILES) so they can be unit-tested by
   // actually executing the generated source. See tests/content-execute-js-sandbox.test.js.
   const _execjs = (window.__sentinelUtils && window.__sentinelUtils.execjs) || null;
+  const _credPolicy = (window.__sentinelUtils && window.__sentinelUtils.credPolicy) || null;
 
   // (dead code removed) _EXECUTE_JS_ALLOWED_GLOBALS was a 30-entry allowlist
   // that nothing ever read — the sandbox is deny-list based. Likewise the two
@@ -1695,19 +1699,67 @@ if (window.__sentinelInitialized) {
           return `Element not found: ${describeTarget(cmd)}`;
         }
 
-        // (5.0) Log sensitive field detection for audit but never block — IT techs have full credential access.
+        // Credential typing policy. This used to log "proceeding per IT-tech
+        // authorization" and type regardless — there was no setting, no prompt
+        // and no way to refuse, so nothing had actually been authorized.
+        // Default is now BLOCK with an explicit human handoff.
         const __sensitiveMatch = __sentinelCheckSensitiveField(el);
-        if (__sensitiveMatch) {
+        const __isPw = el && el.type === 'password';
+        if (__sensitiveMatch || __isPw) {
+          const __what = __isPw ? 'password input' : `matched "${__sensitiveMatch}"`;
+          let __policy = 'block';
           try {
-            ctel.info('page', `Type: sensitive field detected (matched "${__sensitiveMatch}") — proceeding per IT-tech authorization`, {
-              match: __sensitiveMatch,
-              tag: (el.tagName || '').toLowerCase(),
-              type: el.type || null,
-              name: (el.name || '').substring(0, 60),
-              id: (el.id || '').substring(0, 60),
+            const __cfg = await chrome.storage.local.get(['credentialTypingPolicy']);
+            __policy = __cfg.credentialTypingPolicy || 'block';
+          } catch (e) { console.warn('[Sentinel] cred policy read failed (failing safe to block):', getErrorMessage(e)); }
+
+          const __decide = _credPolicy && _credPolicy.decideCredentialTyping;
+          // No policy module injected → fail closed rather than silently typing.
+          const __verdict = __decide
+            ? __decide({ sensitiveMatch: __sensitiveMatch, isPasswordInput: __isPw, policy: __policy, approved: cmd.credentialApproved === true })
+            : { decision: 'blocked', reason: 'policy module unavailable', sensitive: true, audit: true };
+
+          try {
+            ctel.info('page', `Type into credential field (${__what}): ${__verdict.decision} (${__verdict.reason})`, {
+              match: __sensitiveMatch, policy: __policy, decision: __verdict.decision,
+              tag: (el.tagName || '').toLowerCase(), type: el.type || null,
+              name: (el.name || '').substring(0, 60), id: (el.id || '').substring(0, 60),
               url: location.href.substring(0, 200)
             });
           } catch (e) { console.warn('[Sentinel] sensitive field tel:', getErrorMessage(e)); }
+          // Forensic record, separate from telemetry, so a compliance review
+          // sees every credential-field attempt whatever the outcome.
+          try {
+            chrome.runtime.sendMessage({
+              action: 'credential_typing_event',
+              decision: __verdict.decision, policy: __policy, field: __what,
+              url: location.href.substring(0, 200)
+            }).catch(() => {});
+          } catch (_e) { /* non-fatal */ }
+
+          if (__verdict.decision === 'needs_approval') {
+            let __ok = false;
+            try {
+              const __res = await Promise.race([
+                new Promise((resolve) => {
+                  chrome.runtime.sendMessage({
+                    action: 'credential_typing_approval_request',
+                    field: __what,
+                    url: location.href.substring(0, 200)
+                  }, (r) => { resolve(_hasLastError() ? null : r); });
+                }),
+                new Promise((resolve) => setTimeout(() => resolve(null), 60000))
+              ]);
+              __ok = !!(__res && __res.approved === true);
+            } catch (_e) { __ok = false; }
+            if (!__ok) {
+              return _credPolicy ? _credPolicy.blockedMessage(__what)
+                : `BLOCKED: credential typing not approved (${__what}).`;
+            }
+          } else if (__verdict.decision === 'blocked') {
+            return _credPolicy ? _credPolicy.blockedMessage(__what)
+              : `BLOCKED: refusing to type into a credential field (${__what}).`;
+          }
         }
 
         // (#20) Reject disabled targets up front.

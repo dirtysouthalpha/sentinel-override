@@ -522,6 +522,19 @@
               UUIDs, version numbers and IDs are deliberately left alone.
             </p>
           </div>
+          <div class="modal-field">
+            <label for="credentialTypingPolicy">Credential typing (passwords, secrets, CVV)</label>
+            <select id="credentialTypingPolicy" class="form-input">
+              <option value="block">Never — hand off to me (recommended)</option>
+              <option value="approve">Ask me each time</option>
+              <option value="allow">Allow the agent to type credentials</option>
+            </select>
+            <p class="field-hint">
+              Applies to password inputs and any field the detector recognises as
+              a secret. Every attempt is written to the run log whatever the
+              setting, so a compliance review can see it.
+            </p>
+          </div>
           <div class="toggle-row form-field">
             <div class="toggle-row-label">
               <span>Cover sensitive fields in screenshots</span>

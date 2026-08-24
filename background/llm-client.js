@@ -4,7 +4,7 @@
 
 ;
 import {getAllTabContexts, getActiveTabId, TAB_LIMIT} from './tab-context.js';
-import {resolveProvider, getActiveProvider, getModelSupportsVision, providerRequiresApiKey} from './provider-registry.js';
+import {resolveProviderForConfig, getActiveProvider, getModelSupportsVision, providerRequiresApiKey} from './provider-registry.js';
 import {getEgressScrubber, shouldScrub, SCRUB_MODE} from './egress-scrub.js';
 import {getPlatformProfile} from './platforms/index.js';
 import {getErrorMessage} from './error-utils.js';
@@ -1544,7 +1544,7 @@ export async function callLLM(trimmedElements, totalElementCount, pageContent, b
     console.error('[Sentinel/LLM] No API key configured! Provider:', providerConfig.id || endpoint || 'unknown');
     throw new Error('No API key configured. Open Settings and configure a provider.');
   }
-  const provider = resolveProvider(endpoint);
+  const provider = resolveProviderForConfig(providerConfig);
   if (!provider) throw new Error(`Unknown provider for endpoint: ${endpoint}`);
   // (9.2) Route simple steps to fast model if configured
   const _useSimple = isSimpleStep(agentState, stepCount, history) && providerConfig.fastModel;
@@ -1701,7 +1701,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   try {
     const _scrubMode = (await chrome.storage.local.get(['egressScrubMode']))
       .egressScrubMode || SCRUB_MODE.CLOUD;
-    if (shouldScrub(endpoint, _scrubMode)) {
+    if (shouldScrub(endpoint, _scrubMode, model)) {
       const _scrubber = getEgressScrubber();
       const _before = _scrubber.count();
       prompt = _scrubber.scrub(_rawPrompt);
@@ -2466,7 +2466,7 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
   if (!apiKey && providerRequiresApiKey(providerConfig.id, endpoint)) {
     throw new Error('API key not configured. Set it in extension settings.');
   }
-  const provider = resolveProvider(endpoint);
+  const provider = resolveProviderForConfig(providerConfig);
   if (!provider) throw new Error(`Unknown provider for endpoint: ${endpoint}`);
 
   const controller = new AbortController();

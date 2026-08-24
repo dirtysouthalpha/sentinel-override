@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js --forceExit",
+    "test": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js",
     "test:coverage": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js --coverage",
-    "test:quick": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js --forceExit --onlyChanged",
+    "test:quick": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js --onlyChanged",
     "test:all": "npm test && npm run build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -774,15 +774,17 @@ if (ticketFormatSelect) {
 {
   const egressSelect = document.getElementById('egressScrubMode');
   const shotToggle = document.getElementById('maskScreenshotFields');
+  const credSelect = document.getElementById('credentialTypingPolicy');
 
-  if (egressSelect || shotToggle) {
-    chrome.storage.local.get(['egressScrubMode', 'maskScreenshotFields'], (result) => {
+  if (egressSelect || shotToggle || credSelect) {
+    chrome.storage.local.get(['egressScrubMode', 'maskScreenshotFields', 'credentialTypingPolicy', 'credentialTypingPolicy'], (result) => {
       if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.warn('[Sentinel/settings] Failed to read privacy settings:', getErrorMessage(chrome.runtime.lastError));
         return;
       }
       if (egressSelect) egressSelect.value = result.egressScrubMode || 'cloud';
       if (shotToggle) shotToggle.checked = result.maskScreenshotFields !== false;
+      if (credSelect) credSelect.value = result.credentialTypingPolicy || 'block';
     });
   }
 
@@ -800,6 +802,25 @@ if (ticketFormatSelect) {
               ? 'Masking ON for every provider, including local models'
               : 'Masking ON for cloud providers; local models receive raw text',
           mode === 'off' ? 'error' : 'success'
+        );
+      } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+    });
+  }
+
+  if (credSelect) {
+    credSelect.addEventListener('change', () => {
+      const v = credSelect.value;
+      chrome.storage.local.set({ credentialTypingPolicy: v }).catch((e) => {
+        console.error('[Sentinel] Error saving credentialTypingPolicy:', window.getErrorMessage ? window.getErrorMessage(e) : String(e));
+      });
+      try {
+        showToast(
+          v === 'allow'
+            ? 'The agent may now type passwords and secrets unattended'
+            : v === 'approve'
+              ? 'You will be asked before the agent types any credential'
+              : 'Credential typing blocked — the agent will hand off to you',
+          v === 'allow' ? 'error' : 'success'
         );
       } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
     });
@@ -1709,7 +1730,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     'adaptivePromptsMode', 'adaptiveExpansionMode', 'telemetryLevel',
     'telemetryPersist', 'telemetryRedact', 'telemetrySkillAdapt',
     'quickMode', 'show_api_health_bar', 'ticketMode', 'ticketFormat',
-    'technicianInfo', 'expectedTenant', 'egressScrubMode', 'maskScreenshotFields'
+    'technicianInfo', 'expectedTenant', 'egressScrubMode', 'maskScreenshotFields', 'credentialTypingPolicy'
   ];
 
   function doExportSettings() {
