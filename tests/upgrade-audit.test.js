@@ -303,3 +303,45 @@ describe('wiring', () => {
     expect(pkg.scripts['test:quick']).not.toMatch(/--forceExit/);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Regression: the live keyless-provider test caught this, no unit test did.
+// Returning a PARTIAL local provider definition bare dropped everything it does
+// not define — including systemPromptTweak — so buildBody emitted
+// {"role":"system"} with no content field and ollama rejected the request with
+// "invalid message content type: <nil>".
+describe('partial local provider definitions are layered over OpenAI', () => {
+  let reg;
+  beforeAll(async () => {
+    globalThis.chrome = globalThis.chrome || { storage: { local: { get: async () => ({}) } } };
+    reg = await import('../background/provider-registry.js');
+  });
+
+  test.each(['ollama', 'lmstudio', 'vllm'])('%s produces a well-formed body', (id) => {
+    const p = reg.resolveProviderForConfig({ id, endpoint: 'http://localhost:1234/v1/chat/completions' });
+    const body = p.buildBody('m', p.systemPromptTweak, 'hello', { maxTokens: 50 });
+    for (const msg of body.messages) {
+      expect(typeof msg.content).toBe('string');
+      expect(Object.prototype.hasOwnProperty.call(msg, 'content')).toBe(true);
+    }
+    // Serialising must not silently drop a content key.
+    expect(JSON.stringify(body)).not.toMatch(/\{"role":"system"\}/);
+  });
+
+  test.each(['ollama', 'lmstudio', 'vllm'])('%s keeps its OWN parseResponse and headers', (id) => {
+    const p = reg.resolveProviderForConfig({ id, endpoint: 'http://localhost:1234/v1/chat/completions' });
+    expect(p.parseResponse).toBe(reg.PROVIDERS[id].parseResponse);
+    expect(p.buildHeaders('').Authorization).toBeUndefined();
+  });
+
+  test('self-contained providers are never layered', () => {
+    expect(reg.resolveProviderForConfig({ id: 'anthropic', endpoint: 'http://proxy/v1' })).toBe(reg.PROVIDERS.anthropic);
+    expect(reg.resolveProviderForConfig({ id: 'openai', endpoint: 'http://proxy/v1' })).toBe(reg.PROVIDERS.openai);
+  });
+
+  test('buildBody omits the system message entirely when there is no prompt', () => {
+    const body = reg.PROVIDERS.openai.buildBody('m', undefined, 'hi', {});
+    expect(body.messages).toHaveLength(1);
+    expect(body.messages[0].role).toBe('user');
+  });
+});

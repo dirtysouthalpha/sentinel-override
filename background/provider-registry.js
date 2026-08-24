@@ -105,10 +105,15 @@ function _makeOpenRouterFreeProvider(id, name, defaultModel) {
     }),
 
     buildBody: (model, systemPrompt, userContent, opts = {}) => {
+      // A system message whose content is undefined is not "empty", it is
+      // malformed: JSON.stringify drops the key entirely and a strict server
+      // rejects the whole request (ollama: "invalid message content type: nil").
+      // Coerce, and omit the message rather than send a broken one.
+      const _sys = typeof systemPrompt === 'string' ? systemPrompt : '';
       const body = {
         model,
         messages: [
-          { role: 'system', content: systemPrompt },
+          ...(_sys ? [{ role: 'system', content: _sys }] : []),
           { role: 'user', content: userContent }
         ],
         max_tokens: opts.maxTokens || 8000,
@@ -366,10 +371,17 @@ export const PROVIDERS = {
      * @returns {object} Request body for OpenAI Chat Completions API.
      */
     buildBody: (model, systemPrompt, userContent, opts = {}) => {
+      // A system message whose content is undefined is not "empty", it is
+      // malformed: JSON.stringify drops the key entirely and a strict server
+      // rejects the whole request (ollama: "invalid message content type: nil").
+      // Coerce, and omit the message rather than send a broken one. This
+      // builder is inherited by every OpenAI-compatible provider, including the
+      // self-hosted ones that have no systemPromptTweak of their own.
+      const _sys = typeof systemPrompt === 'string' ? systemPrompt : '';
       const body = {
         model,
         messages: [
-          { role: 'system', content: systemPrompt },
+          ...(_sys ? [{ role: 'system', content: _sys }] : []),
           { role: 'user', content: userContent }
         ],
         temperature: opts.temperature ?? 0.3,
@@ -902,6 +914,10 @@ export function resolveProvider(endpoint) {
   return PROVIDERS.openai;
 }
 
+// Providers that carry a COMPLETE wire format of their own and must never be
+// layered over the OpenAI definition.
+const SELF_CONTAINED_PROVIDERS = new Set(['anthropic', 'zai', 'openai', 'longcat']);
+
 /**
  * Resolve the provider DEFINITION to use for an active-provider config.
  *
@@ -935,8 +951,19 @@ export function resolveProviderForConfig(providerConfig) {
   if (/api\.z\.ai|z\.ai/.test(endpoint)) return PROVIDERS.zai;
 
   // (2) Honour the operator's selection when we have a definition for it.
+  //
+  // The local definitions (ollama/lmstudio/vllm) are PARTIAL by design: they
+  // override buildHeaders and parseResponse and inherit the rest from OpenAI.
+  // Returning one bare drops everything it does not define — including
+  // `systemPromptTweak`, which made buildBody emit `{"role":"system"}` with no
+  // content field at all and ollama reject the request with
+  // `invalid message content type: <nil>`. Caught by the live keyless-provider
+  // test, not by any unit test. So layer partial definitions over OpenAI.
   const byId = cfg.id && PROVIDERS[cfg.id];
-  if (byId) return byId.id ? byId : { ...byId, id: cfg.id };
+  if (byId) {
+    if (SELF_CONTAINED_PROVIDERS.has(cfg.id)) return byId;
+    return { ...PROVIDERS.openai, ...byId, id: byId.id || cfg.id };
+  }
 
   // (3) Legacy behaviour.
   return resolveProvider(endpoint);
