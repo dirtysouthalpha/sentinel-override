@@ -21,7 +21,7 @@ import {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLATFORMS_DIR = path.join(ROOT, 'background', 'platforms');
 
-const profileFiles = readdirSync(PLATFORMS_DIR).filter(f => f.endsWith('.js') && f !== 'index.js');
+const profileFiles = readdirSync(PLATFORMS_DIR).filter(f => f.endsWith('.js') && f !== 'index.js' && f !== 'schema.js'); // schema.js = validation module
 
 describe('platform registry generation', () => {
   it('is in sync with the profiles on disk', () => {

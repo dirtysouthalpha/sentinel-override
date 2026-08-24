@@ -24,7 +24,7 @@ const POPUP_LIST_PATH = path.resolve(__dirname, '..', 'popup-modules', 'platform
 function readProfiles() {
   const profiles = [];
   for (const file of fs.readdirSync(PLATFORMS_DIR).sort()) {
-    if (!file.endsWith('.js') || file === 'index.js') continue;
+    if (!file.endsWith('.js') || file === 'index.js' || file === 'schema.js') continue; // schema.js = validation module, not a profile
     const source = fs.readFileSync(path.join(PLATFORMS_DIR, file), 'utf8');
 
     const exportMatch = source.match(/^export const ([A-Za-z0-9_$]+)\s*=\s*\{/m);

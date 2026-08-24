@@ -11,6 +11,7 @@ export const networkDevice = {
   id: 'network_device',
   label: 'Network/Security Device Management (generic)',
   memoryKeyPrefix: 'netdev_',
+  catchAll: true, // registered LAST — generic fallback when no specific profile matched
 
   detect(url, goal) {
     try {

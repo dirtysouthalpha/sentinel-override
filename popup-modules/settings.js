@@ -106,6 +106,19 @@ if (providerBtns.length) {
   });
 }
 
+// ========== Single settings write path (SET-01, OVERRIDE-22) ==========
+// All managed-settings writes go through background/settings-persistence.js
+// (validation + schema versioning). Loaded lazily because popup scripts are
+// classic scripts, not ES modules.
+let _persistSettings = null;
+async function persistSettingsManaged(changes) {
+  if (!_persistSettings) {
+    const mod = await import(chrome.runtime.getURL('background/settings-persistence.js'));
+    _persistSettings = mod.persistSettings;
+  }
+  return _persistSettings(changes);
+}
+
 // ========== Settings Management ==========
 // eslint-disable-next-line no-unused-vars
 function loadSettings() {
@@ -150,18 +163,18 @@ if (quickAssistToggle) {
   });
   quickAssistToggle.addEventListener('change', () => {
     const enabled = quickAssistToggle.checked;
-    chrome.storage.local.set({ quickAssist: enabled }, () => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-        console.error('[Sentinel/settings] Failed to save quickAssist:', getErrorMessage(chrome.runtime.lastError));
+    persistSettingsManaged({ quickAssist: enabled })
+      .then(() => {
+        if (quickAssistLabel) {
+          quickAssistLabel.textContent = enabled
+            ? 'ON — Select text on any page'
+            : 'OFF — Quick Assist disabled';
+        }
+      })
+      .catch(e => {
+        console.error('[Sentinel/settings] Failed to save quickAssist:', getErrorMessage(e));
         showToast('Failed to save setting', 'error');
-        return;
-      }
-      if (quickAssistLabel) {
-        quickAssistLabel.textContent = enabled
-          ? 'ON — Select text on any page'
-          : 'OFF — Quick Assist disabled';
-      }
-    });
+      });
   });
 }
 
@@ -181,35 +194,33 @@ if (brainEnabledToggle) {
   });
   brainEnabledToggle.addEventListener('change', () => {
     const enabled = brainEnabledToggle.checked;
-    chrome.storage.local.set({ brainEnabled: enabled }, () => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-        console.error('[Sentinel/settings] Failed to save brainEnabled:', getErrorMessage(chrome.runtime.lastError));
+    persistSettingsManaged({ brainEnabled: enabled })
+      .then(() => {
+        try {
+          showToast(
+            enabled
+              ? 'Neuralis Brain ON — will recall shared knowledge at run start'
+              : 'Neuralis Brain OFF',
+            enabled ? 'success' : 'info'
+          );
+        } catch (e) { console.warn('[Sentinel] showToast unavailable:', getErrorMessage(e)); }
+      })
+      .catch(e => {
+        console.error('[Sentinel/settings] Failed to save brainEnabled:', getErrorMessage(e));
         showToast('Failed to save setting', 'error');
-        return;
-      }
-      try {
-        showToast(
-          enabled
-            ? 'Neuralis Brain ON — will recall shared knowledge at run start'
-            : 'Neuralis Brain OFF',
-          enabled ? 'success' : 'info'
-        );
-      } catch (e) { console.warn('[Sentinel] showToast unavailable:', getErrorMessage(e)); }
-    });
+      });
   });
 }
 if (brainBaseUrlInput) {
   // Persist the base URL on blur (don't fight the user on every keystroke).
   brainBaseUrlInput.addEventListener('change', () => {
     const val = (brainBaseUrlInput.value || '').trim();
-    chrome.storage.local.set({ brainBaseUrl: val || 'http://localhost:8000' }, () => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-        console.error('[Sentinel/settings] Failed to save brainBaseUrl:', getErrorMessage(chrome.runtime.lastError));
+    persistSettingsManaged({ brainBaseUrl: val || 'http://localhost:8000' })
+      .then(() => { try { showToast('Brain base URL saved', 'success'); } catch (e) { console.warn('[Sentinel] showToast unavailable:', getErrorMessage(e)); } })
+      .catch(e => {
+        console.error('[Sentinel/settings] Failed to save brainBaseUrl:', getErrorMessage(e));
         showToast('Failed to save Brain base URL', 'error');
-        return;
-      }
-      try { showToast('Brain base URL saved', 'success'); } catch (e) { console.warn('[Sentinel] showToast unavailable:', getErrorMessage(e)); }
-    });
+      });
   });
 }
 
@@ -1087,18 +1098,15 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', async () => {
     return;
   }
 
-  chrome.storage.local.set({
-    export_format: format,
-    agent_context: agentContext
-  }, () => {
-    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-      console.error('[Sentinel/settings] Failed to save preferences:', getErrorMessage(chrome.runtime.lastError));
-      showToast('Failed to save settings', 'error');
-      return;
-    }
-    if (settingsModal) settingsModal.classList.remove('show');
-    showToast(`Settings saved (${activeProviderId})`, 'success');
-  });
+  try {
+    await persistSettingsManaged({ export_format: format, agent_context: agentContext });
+  } catch (e) {
+    console.error('[Sentinel/settings] Failed to save preferences:', getErrorMessage(e));
+    showToast('Failed to save settings', 'error');
+    return;
+  }
+  if (settingsModal) settingsModal.classList.remove('show');
+  showToast(`Settings saved (${activeProviderId})`, 'success');
 });
 
 // ========== Theme Customization ==========
