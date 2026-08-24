@@ -2,6 +2,7 @@
 // Generates structured investigation reports after agent task completion.
 // Imports from llm-client.js for LLM calls and message-protocol.js for popup messaging.
 
+import { scrubForEgress } from './egress-scrub.js';
 import { sendSilentUpdate } from './message-protocol.js';
 import { getActiveProvider, resolveProvider, getTextProvider } from './provider-registry.js';
 import { getErrorMessage } from './error-utils.js';
@@ -294,9 +295,15 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       const reportSystem = systemPrompt || 'You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Return ONLY the report content with no wrapping.';
 
       const maxTokens = attempt === 1 ? 4000 : 2000;
+      // The report prompt is built from the run's history and extracted memory —
+      // i.e. the client's page content — and goes to the provider. Same door,
+      // same rule. Fails closed.
+      const _scrubbedPrompt = await scrubForEgress(prompt, {
+        endpoint, model, kind: 'report-generator'
+      });
       let requestBody, requestHeaders;
       try {
-        requestBody = JSON.stringify(provider.buildBody(model, reportSystem, prompt, { maxTokens, temperature: 0.3 }));
+        requestBody = JSON.stringify(provider.buildBody(model, reportSystem, _scrubbedPrompt, { maxTokens, temperature: 0.3 }));
         requestHeaders = provider.buildHeaders(apiKey);
       } catch (err) {
         clearTimeout(timeout);

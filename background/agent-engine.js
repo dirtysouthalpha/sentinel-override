@@ -7,7 +7,7 @@ import {callLLMWithRetry, parseVisionResponse} from './llm-client.js';
 import {getPlatformProfile} from './platforms/index.js';
 import {isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat} from './agent-ticket-format.js';
 import {auditReport} from './report-grounding.js';
-import {resetEgressScrubber} from './egress-scrub.js';
+import {resetEgressScrubber, scrubForEgress} from './egress-scrub.js';
 import {diagnoseFailure, buildDiagnosticMessage, saveDomainStrategy, getDomainStrategy, extractWinningStrategy, getDomainFromUrl} from './agent-adaptive.js';
 import {isComplexGoal, buildDecompositionPrompt, parseDecomposition, buildSubTaskGoal, createOrchestratorState} from './agent-orchestrator.js';
 import {detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop} from './agent-captcha.js';
@@ -3288,9 +3288,15 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const _tp = await getTextProvider().catch(() => null);
           if (_tp && _tp.apiKey) {
+            // Third LLM path: the parallel TEXT provider used alongside vision.
+            // It carries the same page-derived user content as the main call and
+            // must go through the same door. Fails closed.
+            const _scrubbedTextContent = await scrubForEgress(_visionUserContent, {
+              endpoint: _tp.endpoint, model: _tp.model, kind: 'parallel-text-provider'
+            });
             const _textMessages = [
               { role: 'system', content: 'You are a browser automation agent. Respond with a JSON action object.' },
-              { role: 'user', content: _visionUserContent }
+              { role: 'user', content: _scrubbedTextContent }
             ];
             const _textBody = JSON.stringify({
               model: _tp.model,

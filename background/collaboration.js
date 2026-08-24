@@ -3,6 +3,7 @@
 // format versioning for forward compatibility.
 // Layer 2 module -- imports only from template-manager.js.
 
+import { scrubForEgress } from './egress-scrub.js';
 import { listTemplates, getTemplate, loadTemplates, saveTemplates, extractParameters } from './template-manager.js';
 
 // ========== Format Version ==========
@@ -380,12 +381,32 @@ export async function shareViaGist(templateIds, githubToken) {
     if (!templates || templates.length === 0) {
       return { ok: false, error: 'No templates to share' };
     }
+    // Templates carry `goal` — free text the technician wrote, which in MSP use
+    // routinely names the client, their portal hostname, ticket numbers and
+    // contact addresses. This uploads it to GITHUB, a third party, so it is the
+    // furthest-reaching egress path in the extension and it never touched the
+    // scrubber.
+    //
+    // `public: false` below creates a SECRET gist, not a private one: anyone
+    // with the URL can read it, it is not encrypted, and it lives in whichever
+    // account owns the token. That is not a substitute for masking.
+    //
+    // Scrubbed unconditionally (endpoint is api.github.com, so the CLOUD policy
+    // scrubs it anyway — passing it explicitly makes the intent unmissable).
+    // Fails closed: a scrub error aborts the upload.
+    const scrubbedTemplates = await scrubForEgress(templates, {
+      endpoint: 'https://api.github.com/gists',
+      kind: 'github-gist'
+    });
+
     const gistData = {
       description: `Sentinel Override Templates (${templates.length} templates)`,
+      // Secret gist. NEVER set this true: see the note above — a public gist
+      // would publish client-identifying automation goals to the open web.
       public: false,
       files: {
         'sentinel-templates.json': {
-          content: JSON.stringify(templates, null, 2)
+          content: JSON.stringify(scrubbedTemplates, null, 2)
         }
       }
     };

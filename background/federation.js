@@ -12,6 +12,7 @@
  * @module background/federation
  */
 
+import { scrubForEgress } from './egress-scrub.js';
 import { getErrorMessage } from './error-utils.js';
 // (v21.5.1) Native UUID v4 — replaces bare 'uuid' module (Chrome MV3 compatible)
 const uuidv4 = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); }));
@@ -343,10 +344,16 @@ class FederationController {
     }
     // Remote peer - send via UAP/HTTP (Phase 4 will implement this fully)
     if (peer.info && peer.info.endpoint) {
+      // A REMOTE peer is another machine. The sub-goal is user-written text and
+      // can name the client, their hosts and their people; it must be masked
+      // before it leaves this browser, exactly like an LLM prompt.
+      const _peerGoal = await scrubForEgress(subGoal.description || subGoal, {
+        endpoint: peer.info.endpoint, kind: 'federation-peer'
+      });
       const response = await fetch(peer.info.endpoint + '/uap/task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal: subGoal.description || subGoal, requestId: subGoal.id })
+        body: JSON.stringify({ goal: _peerGoal, requestId: subGoal.id })
       });
       return await response.json();
     }

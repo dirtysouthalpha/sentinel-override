@@ -4,7 +4,8 @@
  * No agent loop, no tools — just a direct prompt → response call.
  */
 
-import { getActiveProvider, resolveProvider } from './provider-registry.js';
+import { getActiveProvider, resolveProviderForConfig } from './provider-registry.js';
+import { scrubForEgress } from './egress-scrub.js';
 import { API_TIMEOUT_MS } from './constants.js';
 
 /**
@@ -14,13 +15,24 @@ import { API_TIMEOUT_MS } from './constants.js';
  * @param {string} prompt - The fully constructed prompt (system instruction + page context + selected text)
  * @returns {Promise<string>} The LLM response text
  */
-export async function handleQuickAssist(prompt) {
+export async function handleQuickAssist(rawPrompt) {
   const config = await getActiveProvider();
   if (!config || !config.apiKey) {
     throw new Error('No API key configured. Open Sentinel Override settings to set up an LLM provider.');
   }
 
-  const provider = resolveProvider(config.endpoint);
+  // Quick Assist is a SECOND full LLM path: its prompt is page context plus the
+  // technician's selected text, sent straight to the configured provider. It
+  // never touched the scrubber, so every secret and every client detail the
+  // agent loop was carefully masking went out unmasked through this door — the
+  // Settings promise was false here in exactly the way the shouldScrub host
+  // rule was false before it was fixed. Fails closed: a scrub error must not
+  // fall through to sending the raw prompt.
+  const prompt = await scrubForEgress(rawPrompt, {
+    endpoint: config.endpoint, model: config.model, kind: 'quick-assist'
+  });
+
+  const provider = resolveProviderForConfig(config);
   const headers = provider.buildHeaders(config.apiKey);
 
   let body;

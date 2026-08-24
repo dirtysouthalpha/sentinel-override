@@ -21,6 +21,10 @@ jest.unstable_mockModule('../background/provider-registry.js', () => ({
   getTextProvider: jest.fn(async () => null),
   getActiveProvider: mockGetActiveProvider,
   resolveProvider: mockResolveProvider,
+  // Quick Assist now resolves by active-provider config (so a self-hosted
+  // provider's own parsers run) instead of sniffing the endpoint.
+  resolveProviderForConfig: mockResolveProvider,
+  providerRequiresApiKey: jest.fn(() => true),
 }));
 
 // Import handleQuickAssist after setting up mocks

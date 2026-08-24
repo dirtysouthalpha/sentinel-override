@@ -333,3 +333,70 @@ export function resetEgressScrubber() {
   if (_runScrubber) _runScrubber.reset();
   _runScrubber = null;
 }
+
+
+// ── The choke point every outbound path must use ────────────────────────────
+//
+// "A choke point only protects what actually flows through it." The LLM path in
+// callLLM was scrubbed; nine other outbound paths in background/ were not —
+// including a SECOND full LLM path (quick-assist-handler.js), the report
+// generator, the goal rewriter, the planner, and a GitHub Gist upload carrying
+// user-written automation goals to a third party. Masking that covers one door
+// out of ten is not masking, it is a false promise in the Settings UI.
+//
+// scrubForEgress() is that shared door. It reads the operator's policy, applies
+// the same destination rules as the LLM path, and FAILS CLOSED: if scrubbing
+// throws, the caller must not send.
+
+/**
+ * Scrub a payload bound for `endpoint`, honouring the operator's policy.
+ *
+ * @param {string|object} payload - Text or a JSON-serialisable structure.
+ * @param {object} opts
+ * @param {string} opts.endpoint - Destination URL; drives the CLOUD policy.
+ * @param {string} [opts.model] - Model id, so a cloud model behind a local proxy still scrubs.
+ * @param {string} [opts.kind] - Short label for logging (e.g. 'quick-assist').
+ * @returns {Promise<string|object>} The scrubbed payload.
+ * @throws If the policy cannot be read or scrubbing fails — callers must not send.
+ */
+export async function scrubForEgress(payload, opts = {}) {
+  const { endpoint, model = '', kind = 'egress' } = opts;
+
+  let mode = SCRUB_MODE.CLOUD;
+  try {
+    const cfg = await chrome.storage.local.get(['egressScrubMode']);
+    mode = cfg.egressScrubMode || SCRUB_MODE.CLOUD;
+  } catch (e) {
+    // Cannot read the policy → assume the strictest interpretation rather than
+    // silently downgrading to "send raw".
+    mode = SCRUB_MODE.CLOUD;
+    console.warn(`[Sentinel/scrub] policy read failed for ${kind}; defaulting to cloud mode:`, e && e.message);
+  }
+
+  if (!shouldScrub(endpoint, mode, model)) return payload;
+
+  const scrubber = getEgressScrubber();
+  const before = scrubber.count();
+  const out = typeof payload === 'string' ? scrubber.scrub(payload) : scrubber.scrubDeep(payload);
+  const added = scrubber.count() - before;
+  if (added > 0) {
+    console.warn(`[Sentinel/scrub] ${kind}: masked ${added} value(s) before egress`, JSON.stringify(scrubber.summary()));
+  }
+  return out;
+}
+
+/**
+ * Same contract, but never throws — returns `{ok, value}` so a caller on a
+ * non-critical path can decide whether to skip sending rather than crash.
+ *
+ * @param {string|object} payload
+ * @param {object} opts - As scrubForEgress.
+ * @returns {Promise<{ok: boolean, value: *, error?: string}>}
+ */
+export async function tryScrubForEgress(payload, opts = {}) {
+  try {
+    return { ok: true, value: await scrubForEgress(payload, opts) };
+  } catch (e) {
+    return { ok: false, value: null, error: (e && e.message) || String(e) };
+  }
+}

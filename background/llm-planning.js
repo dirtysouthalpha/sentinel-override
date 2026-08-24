@@ -1,6 +1,7 @@
 // ========== Pre-flight Planning ==========
 // Extracted from llm-client.js for modularity.
 // Generates a numbered plan from the goal before execution begins.
+import { scrubForEgress } from './egress-scrub.js';
 import { planThinkingRetry } from './llm-thinking-budget.js';
 import { API_TIMEOUT_MS } from './constants.js';
 import { resolveProvider } from './provider-registry.js';
@@ -161,7 +162,11 @@ export async function generatePlan(goal, settings, context = {}) {
   // Helper to normalize plan step objects/strings into consistent string array
   const _normalizeSteps = arr => arr.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
 
-  const planPrompt = _buildPlanPrompt(goal, context);
+  // The plan prompt carries the goal and page context to the provider. Same
+  // door as callLLM, same rule; fails closed.
+  const planPrompt = await scrubForEgress(_buildPlanPrompt(goal, context), {
+    endpoint, model, kind: 'plan-generation'
+  });
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);

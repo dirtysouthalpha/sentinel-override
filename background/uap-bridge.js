@@ -1,3 +1,4 @@
+import { tryScrubForEgress } from './egress-scrub.js';
 /**
  * UAP Bridge — Service-Worker-Safe HTTP Bridge to External UAP Server
  *
@@ -85,14 +86,19 @@ export function broadcast(eventType, data) {
   // Fire-and-forget: wrap in IIFE with try/catch
   (async () => {
     try {
-      await _postWithRetry('/uap/events', {
-        type: eventType,
-        data: {
-          ...data,
-          runId: _runId || undefined,
-          source: 'sentinel-extension'
-        }
-      });
+      // Event payloads narrate what the agent just did and carry page-derived
+      // fields (urls, titles, extracted values). _serverUrl is configurable, so
+      // "it's localhost" is a default, not a guarantee. Non-critical telemetry
+      // path: on a scrub fault drop the event rather than send it raw.
+      const _evt = await tryScrubForEgress(
+        { ...data, runId: _runId || undefined, source: 'sentinel-extension' },
+        { endpoint: _serverUrl, kind: 'uap-event' }
+      );
+      if (!_evt.ok) {
+        console.warn('[UAP Bridge] event scrub failed; dropping event:', _evt.error);
+        return;
+      }
+      await _postWithRetry('/uap/events', { type: eventType, data: _evt.value });
       _serverAvailable = true;
       _consecutiveFailures = 0;
     } catch (e) {

@@ -12,6 +12,7 @@
 // 'auto' rewrites silently. 'approval' broadcasts an adapted_goal_available
 // message and waits for the user to accept / reject / edit via the popup.
 
+import { scrubForEgress } from './egress-scrub.js';
 import { getActiveProvider } from './provider-registry.js';
 import { getErrorMessage } from './error-utils.js';
 import { getPlatformProfile, findMismatchHints } from './platforms/index.js';
@@ -235,12 +236,17 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
       return result;
     }
 
-    const { system, user } = buildRewriterPrompt(rawGoal, currentUrl, profile, expMode, technicianInfo, mismatchHints);
+    const { system, user: _rawUser } = buildRewriterPrompt(rawGoal, currentUrl, profile, expMode, technicianInfo, mismatchHints);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REWRITER_TIMEOUT_MS);
     let response;
     try {
+      // The rewriter sends the raw goal and the current URL to the provider.
+      // Goals routinely contain client names, portal hostnames and credentials.
+      const user = await scrubForEgress(_rawUser, {
+        endpoint: provider.endpoint, model: provider.model, kind: 'goal-rewriter'
+      });
       const isComplex = rawGoal.length > 200;
       const useThinking = isComplex && provider.supportsToolUse && provider.buildBodyTextWithThinking;
       const body = useThinking

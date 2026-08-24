@@ -1,3 +1,4 @@
+import { tryScrubForEgress } from './egress-scrub.js';
 // Sentinel Override v3 -- Neuralis Brain READ client (sub-project B)
 //
 // Thin HTTP read client for the Neuralis brain (sub-project A exposes it over
@@ -158,7 +159,16 @@ export async function recallNeurons(context, opts = {}) {
     ? opts.timeout
     : DEFAULT_TIMEOUT_MS;
 
-  const url = `${baseUrl}/recall?context=${encodeURIComponent(String(context || ''))}`;
+  // The recall context is page/goal derived and rides in the query string —
+  // which also means it lands in the brain server's access log. baseUrl is
+  // configurable, so this is not guaranteed to stay on-box. Non-critical path,
+  // so degrade rather than throw: on a scrub fault send nothing rather than raw.
+  const _ctxScrub = await tryScrubForEgress(String(context || ''), { endpoint: baseUrl, kind: 'brain-recall' });
+  if (!_ctxScrub.ok) {
+    console.warn('[Sentinel/brain] recall context scrub failed; skipping recall:', _ctxScrub.error);
+    return { ok: false, error: 'context scrub failed' };
+  }
+  const url = `${baseUrl}/recall?context=${encodeURIComponent(_ctxScrub.value)}`;
   let resp;
   try {
     resp = await fetch(url, {
