@@ -94,6 +94,10 @@ export const powerAutomate = {
     'Runs history can take 10-30s to populate after navigation; wait for status chips before asserting anything.',
     'Run-detail inputs/outputs are collapsed by default and some are marked Secure — a hidden value is expected, not a bug.',
     'Editing flows that live in a MANAGED solution warns on save; prefer editing the unmanaged layer or note the warning in ticket notes.',
+    // From Premier client-automation ticket history (#1146006/#1147432):
+    'For "inventory/backfill/monitor" client automations: RECON FIRST, READ-ONLY — build a flow inventory table (name, type Instant/Automated, On/Off, last run + status + duration) before proposing changes. "There should be more entries" complaints are usually historical backfill gaps, not broken flows.',
+    'A client complaint that conflates two asks (file inventory vs content extraction) is common on this portal — decode them separately and confirm which one the ticket is about before building.',
+    'Long-running backfill flows (10+ min) are normal for recursive OneDrive/SharePoint imports — judge by last-run status, not duration.',
   ].join(' '),
 
   rewriteInstructions: `When rewriting goals for Power Automate:

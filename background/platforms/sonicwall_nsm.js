@@ -102,6 +102,11 @@ export const sonicwallNsm = {
     'WAN GroupVPN policies created on the firewall BEFORE NSM took over management may not appear in NSM\'s per-device VPN view. Fall through to direct firewall web admin if Phase 2/7 returns empty.',
     'Per-device menus only appear AFTER drilling in. Trying to find "System > Licenses" at the NSM root is the #1 cause of agent flailing on this platform.',
     'Active VPN session counts and license seat consumption are NOT available at the NSM root — only inside the per-device console.',
+    // From Premier ticket history (2026-07/08): recurring SSL-VPN + routing faults
+    'SSL-VPN clients that reach servers by IP but not by name: check SSL-VPN Client Settings DNS Server 1/2 — empty (0.0.0.0) breaks name resolution and domain join. Set DNS1/2 to the internal DC and verify access rules allow UDP 53 VPN→LAN.',
+    'Tunnel up but return traffic missing: if server default gateway is a core switch (not the firewall), the switch needs a static route to the remote subnet via the firewall — check the switch, not just SonicWall (asymmetric-routing trap).',
+    'Encryption-domain mismatches after network changes: rebuild address objects from scratch and re-select them in the VPN policy — stale objects are the usual culprit.',
+    'SonicOS zone/sub-interface classification uses longest-prefix match — packets can arrive classified on the WRONG interface when overlapping subnets exist; verify zone binding before touching access rules.',
   ].join(' '),
 
   // Plain prose instructions appended to the rewriter LLM's system prompt.

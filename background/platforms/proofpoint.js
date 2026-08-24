@@ -88,6 +88,11 @@ export const proofpoint = {
     'Quarantine Release vs Release-and-Approve: the second safelists the sender tenant-wide — pick deliberately and say which in the ticket.',
     'Some pods still serve the older Angular tables with no aria-labels; fall back to row position + vision overlays when selectors miss.',
     'Log Search can lag real delivery by minutes — for "just happened" tickets, note the delay rather than reporting absence.',
+    // From Premier ticket history (cw-1144320 family + PP onboarding playbooks):
+    'Outbound relay lives in M365 EAC Mail flow → Connectors (NOT in the PP portal): the 3-connector set is Inbound, Locked-Down-Inbound (must stay OFF unless MX points at PP), and Outbound → PP smart host (e.g. outbound-us1.ppe-hosted.com). "554 5.7.1 relay denied" = 365 routing to PP with relay not enabled on the PP side.',
+    '"Outbound mail not filtering, goes direct from 365" = the Outbound connector\'s "Use of connector" condition needs smart-host route \x27*\x27 (all mail) or the connector smart host is wrong. After saving, a "validation failed" banner is EXPECTED until PP confirms — verify with a test send + message trace, not the banner.',
+    '"Mail sent but in neither the 365 message trace nor Smart Search": check mail flow in BOTH consoles plus PP → Reports → Mail Log (queue/deferred states) before concluding loss; onboarding half-done (MX moved but connectors stale) is the classic cause.',
+    'PP onboarding rescue order: verify MX points at PP, verify Primary Delivery Destination + Sending Server in PP, then align the three EAC connectors — in that order. Reversible MX cutovers: change priority instead of deleting records.',
   ].join(' '),
 
   rewriteInstructions: `When rewriting goals for Proofpoint:
