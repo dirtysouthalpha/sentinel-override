@@ -8,6 +8,8 @@ window.SENTINEL_PLATFORM_PROFILES = [
   { id: "sonicwall_nsm", label: "SonicWall Network Security Manager" },
   { id: "sonicwall_onbox", label: "SonicWall on-box web admin (SonicOS)" },
   { id: "m365_admin", label: "Microsoft 365 admin surfaces" },
+  { id: "power_automate", label: "Power Automate (maker portal)" },
+  { id: "proofpoint", label: "Proofpoint (People/Centralized admin)" },
   { id: "teams_admin", label: "Teams Admin Center" },
   { id: "fortigate", label: "FortiGate / FortiManager" },
   { id: "itglue", label: "IT Glue" },

@@ -109,7 +109,8 @@ describe('registry match order', () => {
     // after the generator landed; every other position is unchanged from the
     // hand-maintained list.
     expect(ids()).toEqual([
-      'sonicwall_nsm', 'sonicwall_onbox', 'm365_admin', 'teams_admin', 'fortigate',
+      'sonicwall_nsm', 'sonicwall_onbox', 'm365_admin', 'power_automate', 'proofpoint',
+      'teams_admin', 'fortigate',
       'itglue', 'aruba', 'ambio_viewlinc', 'screenconnect', 'ninjarmm',
       'connectwise_manage', 'autotask', 'datto_rmm', 'cisco', 'paloalto', 'sentinelone',
       'nvd', 'virustotal', 'huntress', 'freshservice', 'network_device',
@@ -170,6 +171,31 @@ describe('newly added profiles', () => {
         expect(typeof wh.hint).toBe('string');
       }
     }
+  });
+
+  describe('power_automate', () => {
+    it.each([
+      'https://make.powerautomate.com/environments/8c-123/cloudflows',
+      'https://us.flow.microsoft.com/manage/environments/default/flows',
+    ])('detects host %s', url => {
+      expect(getPlatformProfile(url, '').id).toBe('power_automate');
+    });
+    it('detects by goal alone', () => {
+      expect(getPlatformProfile('', 'turn off the failed cloud flow for invoice sync').id).toBe('power_automate');
+    });
+  });
+
+  describe('proofpoint', () => {
+    it.each([
+      'https://people-us.proofpoint.com/dashboard',
+      'https://app.ppe.encryption.proofpoint.com/admin',
+      'https://proofpointess.com/',
+    ])('detects host %s', url => {
+      expect(getPlatformProfile(url, '').id).toBe('proofpoint');
+    });
+    it('detects by goal alone', () => {
+      expect(getPlatformProfile('', 'release the quarantined invoice email in proofpoint').id).toBe('proofpoint');
+    });
   });
 });
 

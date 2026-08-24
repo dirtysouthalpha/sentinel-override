@@ -14,10 +14,11 @@ const WHITESPACE_NORMALIZE_RE = /\s+/g;
 const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
 const TICKET_PREFIX_RE = /^(ticket|incident)\s*#?\d*[:\-\s]+/i;
 const STEP_PREFIX_RE = /^(\d+[.)]|-|\*)\s+/;
-const ENV_M365_RE = /m365|microsoft|entra|exchange|defender|purview/i;
+const ENV_M365_RE = /m365|microsoft|entra|exchange|defender|purview|power\s*automate|power\s*apps/i;
 const ENV_FIREWALL_RE = /sonicwall|fortigate|firewall/i;
 const ENV_EDR_RE = /sentinelone|crowdstrike|defender for endpoint/i;
 const ENV_RMM_RE = /connectwise|ninjaone|kaseya|datto/i;
+const ENV_EMAIL_SEC_RE = /proofpoint|mimecast|barracuda|quarantine|smart\s*search/i;
 const TICKET_VENDOR_RE = /waiting on (the )?vendor|vendor (case|ticket)|vendor support/;
 const TICKET_CLIENT_RE = /waiting on (the )?client|awaiting client|client to respond|client (callback|reply)/;
 const TICKET_ITGLUE_RE = /(create|document|write).*(kb|knowledge base|it glue)/;
@@ -388,6 +389,7 @@ function formatItGlueKb(summary, goal, tech, options) {
   if (ENV_FIREWALL_RE.test(goal || '')) envBits.push('Firewall (vendor-specific)');
   if (ENV_EDR_RE.test(goal || '')) envBits.push('EDR platform');
   if (ENV_RMM_RE.test(goal || '')) envBits.push('RMM/PSA platform');
+  if (ENV_EMAIL_SEC_RE.test(goal || '')) envBits.push('Email security (Proofpoint/Mimecast/Barracuda)');
   if (!envBits.length) envBits.push('General — see investigation findings for specifics');
 
   const out = [

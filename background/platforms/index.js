@@ -13,6 +13,8 @@
 import { sonicwallNsm } from './sonicwall_nsm.js';
 import { sonicwallOnbox } from './sonicwall_onbox.js';
 import { m365Admin } from './m365_admin.js';
+import { powerAutomate } from './power_automate.js';
+import { proofpoint } from './proofpoint.js';
 import { teamsAdmin } from './teams_admin.js';
 import { fortigate } from './fortigate.js';
 import { itglue } from './itglue.js';
@@ -36,6 +38,8 @@ const PROFILES = [
   sonicwallNsm,          // 10
   sonicwallOnbox,        // 20
   m365Admin,             // 30
+  powerAutomate,         // 32
+  proofpoint,            // 34
   teamsAdmin,            // 40
   fortigate,             // 50
   itglue,                // 60
