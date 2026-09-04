@@ -235,3 +235,21 @@ MIT
 - [Releases](https://github.com/dirtysouthalpha/sentinel-override/releases)
 - [Issues](https://github.com/dirtysouthalpha/sentinel-override/issues)
 - [Changelog](CHANGELOG.md)
+
+---
+
+## Support this project
+
+Built and maintained by one person, in the open. If it saves you time or
+money, you can throw something in the hat — entirely optional, and it changes
+nothing about the license or what ships.
+
+<a href="https://cash.app/$vladien"><img src="docs/assets/donate-cashapp.png" alt="Cash App donation QR code for $vladien" width="170" align="left" hspace="18" vspace="6"></a>
+
+**Cash App — [$vladien](https://cash.app/$vladien)**
+
+Scan the code, or follow the link.
+
+No tiers, no paywalled features, no "pro" build.
+
+<br clear="left">
