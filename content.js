@@ -537,6 +537,14 @@
         history.forward();
         return { ok: true, result: 'Navigated forward' };
       }
+      case 'execute_js': {
+        try {
+          const result = cmd.code ? eval(cmd.code) : undefined;
+          return { ok: true, result: result != null ? String(result).substring(0, 500) : 'JS executed' };
+        } catch (e) {
+          return { ok: false, error: 'JS error: ' + (e.message || String(e)) };
+        }
+      }
       default:
         return { ok: false, error: 'Unknown command: ' + cmd.type };
     }
@@ -553,7 +561,7 @@
   function readPage() {
     const body = (document.body && document.body.innerText) || '';
     return {
-      content: 'Page Title: ' + document.title + '\nURL: ' + window.location.href + '\n\n' + body.substring(0, 12000)
+      content: 'Page Title: ' + document.title + '\nURL: ' + window.location.href + '\n\n' + body.substring(0, 4000)
     };
   }
 
@@ -594,6 +602,12 @@
     (async () => {
       try {
         switch (req.action) {
+          case 'analyze_page': {
+            const obs = observePage(req.opts || {});
+            const read = readPage();
+            const ext = req.skipExtract ? null : extractData();
+            return sendResponse({ observation: obs, pageContent: read, structuredData: ext });
+          }
           case 'observe_page':
             return sendResponse(observePage(req.opts || {}));
           case 'read_page':
@@ -605,6 +619,18 @@
           case 'clear_marks':
             clearMarks();
             return sendResponse({ ok: true });
+          case 'update_viewport': {
+            return sendResponse({
+              viewport: {
+                w: window.innerWidth,
+                h: window.innerHeight,
+                scrollX: Math.round(window.scrollX),
+                scrollY: Math.round(window.scrollY),
+                scrollHeight: document.documentElement.scrollHeight,
+                atBottom: (window.scrollY + window.innerHeight) >= (document.documentElement.scrollHeight - 4)
+              }
+            });
+          }
           case 'wait_stable': {
             await waitForReady(req.timeout || 8000);
             await waitForDomStable(req.quietMs || 500, req.timeout || 5000);

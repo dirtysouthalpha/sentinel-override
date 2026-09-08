@@ -8,6 +8,7 @@ let costLog = [];       // Audit trail of all API calls
 let isOpenRouter = false; // Tracks if current endpoint is OpenRouter
 let currentPlan = null;   // Stores the current decomposed plan
 let currentStepIndex = 0; // Tracks which step we're executing
+const injectedTabs = new Set(); // Cache content script injection per tab
 
 
 // ========== Utility: Sanitize API Key and Endpoint ==========
@@ -170,7 +171,7 @@ chrome.action.onClicked.addListener((tab) => {
 
 // Configuration for rate limiting
 const CONFIG = {
-  minDelayBetweenCalls: 2000,  // 2 seconds between API calls
+  minDelayBetweenCalls: 200,   // 200ms between API calls (retry logic handles 429s)
   maxRetries: 3,               // Retry failed requests 3 times
   retryDelay: 5000,            // 5 second initial delay
   screenshotQuality: 30,       // Lower quality = smaller file = faster
@@ -308,7 +309,7 @@ async function callLLMSimple(prompt, opts = {}) {
   }
 
   const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), 60000);  // 60 second timeout
+  const timeoutId = setTimeout(() => abortController.abort(), 30000);  // 30 second timeout
 
   let resp;
   try {
@@ -483,7 +484,7 @@ sendSilentUpdate('[Analysis] Generating analysis...');
   }
 
   const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), 60000);  // 60 second timeout
+  const timeoutId = setTimeout(() => abortController.abort(), 30000);  // 30 second timeout
 
   let response;
   try {
@@ -810,6 +811,10 @@ async function runAgentLoop(goal, workingTabId) {
   let finished = false;
   let history = [];
   let stepCount = 0;
+  let lastObservation = null;
+  let lastPageContent = null;
+  let lastObservedUrl = null;
+  let lastScrollHeight = 0;
 
   // Per-run history is in-memory only — don't carry over old runs
   await chrome.storage.local.remove(['agent_history']).catch(() => {});
@@ -842,27 +847,73 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       sendSilentUpdate(`[Step ${stepCount}] Observing page...`);
+      const phaseStart = Date.now();
       await ensureContentScript(tab);
-      await sendMessageWithRetry(tab, { action: 'wait_stable', timeout: 6000, quietMs: 400 }).catch(() => {});
+      console.log(`[Timing] ensureContentScript: ${Date.now() - phaseStart}ms`);
+
+      // Determine if we need full re-observation or can reuse cache
+      const currentUrl = tabInfo.url;
+      const lastAction = history.length > 0 ? history[history.length - 1].action : null;
+      const nonMutating = lastAction && ['scroll', 'note', 'hover'].includes(lastAction.type);
+      const samePage = lastObservedUrl === currentUrl;
 
       let observation, pageContent;
-      try {
-        observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
-        pageContent = await sendMessageWithRetry(tab, { action: 'read_page' });
-        const structuredData = await sendMessageWithRetry(tab, { action: 'extract_data' });
-        taskContext.intermediateData['structured_data'] = structuredData;
-      } catch (err) {
-        console.error('Failed to get page data:', err);
-        sendSilentUpdate(`[Step ${stepCount}] ⚠️ Error reading page: ${err.message}. Retrying...`);
-        await sleep(2000);
-        continue;
+
+      if (lastObservation && samePage && nonMutating) {
+        // Quick path: reuse cached observation, just update viewport
+        sendSilentUpdate(`[Step ${stepCount}] Quick re-observe (cached)...`);
+        try {
+          const vpUpdate = await sendMessageWithRetry(tab, { action: 'update_viewport' });
+          if (vpUpdate && vpUpdate.viewport) {
+            // Invalidate cache if scrollHeight changed (lazy-loaded content)
+            if (vpUpdate.viewport.scrollHeight !== lastScrollHeight) {
+              lastObservation = null; // force full re-observe below
+            } else {
+              observation = Object.assign({}, lastObservation, { viewport: vpUpdate.viewport });
+              pageContent = lastPageContent;
+            }
+          }
+        } catch (e) {
+          lastObservation = null; // fallback to full observe
+        }
+      }
+
+      if (!lastObservation || !observation) {
+        // Full observation with adaptive stability wait
+        const obsStart = Date.now();
+        const quickStable = await sendMessageWithRetry(tab, { action: 'wait_stable', timeout: 500, quietMs: 50 }).catch(() => false);
+        if (!quickStable) {
+          await sendMessageWithRetry(tab, { action: 'wait_stable', timeout: 4000, quietMs: 150 }).catch(() => {});
+        }
+        try {
+          const needsExtraction = /table|form|data|field|row|column|input|submit/i.test(goal);
+          const analysis = await sendMessageWithRetry(tab, { action: 'analyze_page', skipExtract: !needsExtraction });
+          if (analysis && analysis.error) {
+            throw new Error(analysis.error);
+          }
+          observation = analysis.observation;
+          pageContent = analysis.pageContent;
+          lastObservation = observation;
+          lastPageContent = pageContent;
+          lastObservedUrl = currentUrl;
+          lastScrollHeight = observation.viewport ? observation.viewport.scrollHeight : 0;
+          if (analysis.structuredData) {
+            taskContext.intermediateData['structured_data'] = analysis.structuredData;
+          }
+        } catch (err) {
+          console.error('Failed to get page data:', err);
+          sendSilentUpdate(`[Step ${stepCount}] ⚠️ Error reading page: ${err.message}. Retrying...`);
+          await sleep(1000);
+          continue;
+        }
+        console.log(`[Timing] full observation: ${Date.now() - obsStart}ms`);
       }
 
       sendSilentUpdate(`[Step ${stepCount}] Capturing screen with element labels...`);
       // Set-of-marks: draw numbered overlay so the model can ground actions visually
       await sendMessageWithRetry(tab, { action: 'draw_marks' }).catch(() => {});
-      // Allow the overlay to render before capture
-      await sleep(80);
+      // Allow the overlay to render before capture (one frame at 60fps)
+      await sleep(20);
       const screenshot_data_url = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(tabInfo.windowId, {
           format: 'jpeg',
@@ -879,10 +930,10 @@ async function runAgentLoop(goal, workingTabId) {
       await sendMessageWithRetry(tab, { action: 'clear_marks' }).catch(() => {});
       const base64Image = screenshot_data_url.split(',')[1];
 
-      await enforceRateLimit();
-
       sendSilentUpdate(`[Step ${stepCount}] Consulting AI (Call #${apiCallCount + 1})...`);
+      const llmStart = Date.now();
       const command = await callLLMWithRetry(observation, pageContent.content, base64Image, goal, history, stepCount);
+      console.log(`[Timing] LLM call: ${Date.now() - llmStart}ms → ${command.type}`);
 
       if (command.type === 'finish') {
         finished = true;
@@ -895,11 +946,12 @@ async function runAgentLoop(goal, workingTabId) {
         const noteText = command.text || command.summary || 'Internal note';
         taskContext.intermediateData['lastNote'] = noteText;
         history.push({ step: stepCount, action: command, result: 'Logged note' });
-        await sleep(300);
+        await sleep(50);
         continue;
       }
 
       sendSilentUpdate(`[Step ${stepCount}] Executing: ${describeCommand(command)}`);
+      const execStart = Date.now();
 
       let result;
       if (command.type === 'navigate') {
@@ -923,7 +975,8 @@ async function runAgentLoop(goal, workingTabId) {
       history.push({ step: stepCount, action: command, result: shortenForHistory(result) });
       // Trim history to last 8 entries to keep prompt small
       if (history.length > 8) history = history.slice(-8);
-      await sleep(800);
+      console.log(`[Timing] execution: ${Date.now() - execStart}ms | total step: ${Date.now() - phaseStart}ms`);
+      await sleep(200);
 
     } catch (err) {
       console.error('Agent loop error:', err);
@@ -934,7 +987,7 @@ async function runAgentLoop(goal, workingTabId) {
         break;
       }
 
-      await sleep(3000);
+      await sleep(1000);
     }
   }
 
@@ -946,16 +999,26 @@ async function runAgentLoop(goal, workingTabId) {
 
 // ========== Navigation + injection helpers ==========
 async function ensureContentScript(tabId) {
+  if (injectedTabs.has(tabId)) return;
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['content.js']
     });
+    injectedTabs.add(tabId);
   } catch (e) {
     // Some pages (chrome://, view-source:) reject injection — surface clearer error
     throw new Error('Cannot inject into this page: ' + e.message);
   }
 }
+
+// Clear injection cache when tabs close or navigate
+chrome.tabs.onRemoved.addListener(tabId => injectedTabs.delete(tabId));
+try {
+  chrome.webNavigation.onBeforeNavigate.addListener(
+    details => { if (details.frameId === 0) injectedTabs.delete(details.tabId); }
+  );
+} catch (e) {}
 
 function waitForTabLoad(tabId, timeoutMs = 15000) {
   return new Promise((resolve) => {
@@ -1239,7 +1302,7 @@ async function executePlan(plan, workingTabId) {
 
       history.push({ step: step.step_number, action: step, status: 'done' });
       currentStepIndex++;
-      await sleep(1000);
+      await sleep(300);
 
     } catch (err) {
       console.error('Step error:', err);
@@ -1277,7 +1340,7 @@ async function executePlan(plan, workingTabId) {
         break;
       }
       currentStepIndex++;
-      await sleep(2000);
+      await sleep(800);
     }
   }
 
@@ -1373,9 +1436,22 @@ async function callLLMWithRetry(observation, pageContent, base64Image, goal, his
   try {
     return await callLLM(observation, pageContent, base64Image, goal, history, stepCount);
   } catch (err) {
-    if (err.message.includes('429') && retryCount < CONFIG.maxRetries) {
+    // Non-retryable errors — fail immediately
+    if (err.message.includes('Insufficient balance') ||
+        err.message.includes('no resource package') ||
+        err.message.includes('invalid api key') ||
+        err.message.includes('authentication')) {
+      throw err;
+    }
+    // Retry on rate limits, timeouts, and transient network errors
+    const isRetryable = err.message.includes('429') ||
+      err.message.includes('timed out') ||
+      err.message.includes('Network error') ||
+      err.message.includes('AbortError') ||
+      err.message.includes('Failed to fetch');
+    if (isRetryable && retryCount < CONFIG.maxRetries) {
       const backoffDelay = CONFIG.retryDelay * Math.pow(2, retryCount);
-      console.log(`Rate limited. Waiting ${backoffDelay}ms before retry ${retryCount + 1}/${CONFIG.maxRetries}`);
+      console.log(`LLM error (${err.message.substring(0, 60)}). Retrying ${retryCount + 1}/${CONFIG.maxRetries} in ${backoffDelay}ms`);
       await sleep(backoffDelay);
       return callLLMWithRetry(observation, pageContent, base64Image, goal, history, stepCount, retryCount + 1);
     }
@@ -1426,7 +1502,7 @@ Viewport: ${viewport.w || 0}x${viewport.h || 0}, scrollY=${viewport.scrollY || 0
 CONTEXT: ${ctx}
 
 PAGE TEXT (truncated):
-${(pageContent || '').slice(0, 3500)}
+${(pageContent || '').slice(0, 1500)}
 
 INTERACTIVE ELEMENTS (id, role, name):
 ${elementList || '(none visible)'}
@@ -1481,7 +1557,7 @@ Return ONLY the JSON object.`;
   }
 
   const estimatedInputTokens = Math.max(100, Math.round(prompt.length / 3.5)) + 500;
-  const estimatedOutputTokens = 500;
+  const estimatedOutputTokens = 200;
 
   if (isVenice) {
     const costCheck = validateModelCost(model, estimatedInputTokens, estimatedOutputTokens);
@@ -1511,7 +1587,7 @@ Return ONLY the JSON object.`;
   }
 
   const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), 60000);  // 60 second timeout
+  const timeoutId = setTimeout(() => abortController.abort(), 30000);  // 30 second timeout
 
   let response;
   try {
@@ -1530,7 +1606,6 @@ Return ONLY the JSON object.`;
       body: JSON.stringify({
         model: model,
         messages: [
-          { role: 'system', content: 'You are a precise web automation agent. Return ONLY valid JSON. No markdown, no explanations.' },
           { role: 'user', content: [
               { type: 'text', text: prompt },
               { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
@@ -1538,7 +1613,7 @@ Return ONLY the JSON object.`;
           }
         ],
         temperature: 0.3,
-        max_tokens: 500
+        max_tokens: 200
       }),
       signal: abortController.signal
     });
