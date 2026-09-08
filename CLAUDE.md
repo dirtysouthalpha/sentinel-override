@@ -67,6 +67,11 @@ user types goal → generatePlan → parsePlan → runAgentLoop → each step ca
 
 6. **PUSH every 3-5 commits**
 
+## Quality Gate (MANDATORY)
+Gate command: `npm test`
+After every fix, run the gate. Only commit if it passes. If it fails, revert and fix.
+After 2 consecutive failures on the same issue, stop and report what you tried.
+
 ## Quality Standards
 - No dead code — every function must be called
 - No silent failures — every error must be logged and shown to user
