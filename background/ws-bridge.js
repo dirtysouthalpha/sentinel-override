@@ -20,6 +20,9 @@ const BRIDGE_URL = 'ws://localhost:8001/extension-bridge';
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const HEARTBEAT_INTERVAL_MS = 30000;
+// Dead-connection threshold: if no inbound message received within this window,
+// the socket is treated as dead and closed (onclose triggers reconnect).
+const DEAD_CONNECTION_MS = 30000;
 const MAX_MESSAGE_SIZE = 1048576;
 const VALID_MSG_TYPES = new Set(['auth', 'auth_challenge', 'task', 'query', 'cancel', 'status']);
 
@@ -30,6 +33,9 @@ let isConnecting = false;
 let enabled = true;
 let authenticated = false;
 let challengeNonce = null;
+// Timestamp of the last inbound frame from the server. Drives dead-connection
+// detection in the heartbeat callback. Updated on every onmessage and on open.
+let lastMessageAt = Date.now();
 
 // Auth token loaded from chrome.storage.local — never hardcoded.
 // Generated once on install, persisted, and read at connect time.
@@ -113,8 +119,19 @@ function connect() {
       token: authToken
     }));
 
+    // Reset liveness timestamp on fresh connection.
+    lastMessageAt = Date.now();
+
     heartbeatTimer = setInterval(() => {
       if (ws && ws.readyState === WebSocket.OPEN) {
+        // Dead-connection detection (WSB-04): if no inbound frame has arrived
+        // within DEAD_CONNECTION_MS, the link is presumed dead — close it so
+        // onclose fires and triggers reconnect rather than sending into a void.
+        if (Date.now() - lastMessageAt >= DEAD_CONNECTION_MS) {
+          console.warn('[WS-BRIDGE] Dead connection detected — no message for', DEAD_CONNECTION_MS, 'ms. Closing.');
+          ws.close();
+          return;
+        }
         sendStatus();
       }
     }, HEARTBEAT_INTERVAL_MS);
@@ -122,6 +139,9 @@ function connect() {
 
   ws.onmessage = async (event) => {
     try {
+      // Any inbound frame (even one that later fails validation) proves the
+      // link is live — refresh liveness before doing any work.
+      lastMessageAt = Date.now();
       if (typeof event.data === 'string' && event.data.length > MAX_MESSAGE_SIZE) {
         console.warn('[WS-BRIDGE] Oversized message dropped');
         return;
@@ -153,10 +173,29 @@ function connect() {
   };
 }
 
+
+// Per-type field validators (WSB-03). These enforce STRUCTURAL validity at the
+// inbound boundary — the fields a message MUST carry to be routable/safe:
+//   - auth_challenge needs a nonce (can't compute a response without it)
+//   - cancel needs a request_id (can't route its response without it)
+//   - query needs a message (an empty query is not routable)
+// task.goal is intentionally NOT enforced here: handleTask() validates it and
+// responds with a precise "No goal provided" error, which is the established
+// contract for that command. Schema = structure; handler = semantics.
+const MSG_SCHEMA = {
+  auth: () => true, // server → client; success optional (lenient for compat)
+  auth_challenge: (m) => typeof m.nonce === 'string' && m.nonce.length > 0,
+  task: () => true, // goal validated semantically by handleTask()
+  query: (m) => typeof m.message === 'string' && m.message.length > 0,
+  cancel: (m) => typeof m.request_id === 'string' && m.request_id.length > 0,
+  status: () => true,
+};
+
 function validateMessage(msg) {
-  if (!msg || typeof msg !== 'object') return false;
+  if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return false;
   if (!VALID_MSG_TYPES.has(msg.type)) return false;
-  return true;
+  const check = MSG_SCHEMA[msg.type];
+  return check ? check(msg) : false;
 }
 
 function scheduleReconnect() {
@@ -347,6 +386,10 @@ function sendStatus() {
 // Tests must set authToken before calling computeChallengeResponse.
 export { validateMessage, computeChallengeResponse };
 export function setAuthTokenForTest(token) { authToken = token; }
+// Test helper: force the liveness timestamp so the heartbeat's dead-connection
+// check can be exercised deterministically without waiting DEAD_CONNECTION_MS.
+export function setLastMessageAtForTest(ts) { lastMessageAt = ts; }
+export function getLastMessageAtForTest() { return lastMessageAt; }
 export function _resetBridgeForTest() {
   enabled = true;
   authenticated = false;
@@ -354,6 +397,7 @@ export function _resetBridgeForTest() {
   challengeNonce = null;
   authToken = null;
   reconnectDelay = RECONNECT_BASE_MS;
+  lastMessageAt = Date.now();
   ws = null;
   if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
 }

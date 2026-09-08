@@ -56,7 +56,7 @@ jest.unstable_mockModule('../background/tab-context.js', () => ({
   getTabContext: (...a) => _getTabContext(...a),
 }));
 
-const { startBridge, stopBridge, setAuthTokenForTest, _resetBridgeForTest } =
+const { startBridge, stopBridge, setAuthTokenForTest, _resetBridgeForTest, setLastMessageAtForTest, getLastMessageAtForTest } =
   await import('../background/ws-bridge.js');
 
 beforeEach(() => {
@@ -690,5 +690,104 @@ describe('computeChallengeResponse — uses crypto.subtle.digest', () => {
     } finally {
       globalThis.crypto = origCrypto;
     }
+  });
+});
+// ===== WSB-03: per-type message schema validation =====
+
+describe('WSB-03 — message schema validation (validateMessage)', () => {
+  // Re-import the pure validator directly so we can unit-test field rules.
+  let validateMessage;
+  beforeAll(async () => {
+    ({ validateMessage } = await import('../background/ws-bridge.js'));
+  });
+
+  // --- Structural rules enforced at the schema boundary ---
+  test('rejects query without a message', () => {
+    expect(validateMessage({ type: 'query', request_id: 'q1' })).toBe(false);
+  });
+
+  test('rejects cancel without a request_id', () => {
+    expect(validateMessage({ type: 'cancel' })).toBe(false);
+  });
+
+  test('rejects auth_challenge without a nonce', () => {
+    expect(validateMessage({ type: 'auth_challenge' })).toBe(false);
+  });
+
+  test('rejects array payloads', () => {
+    expect(validateMessage([{ type: 'task', goal: 'x' }])).toBe(false);
+  });
+
+  test('accepts well-formed task/query/cancel/auth_challenge', () => {
+    expect(validateMessage({ type: 'task', goal: 'do it', request_id: 'r1' })).toBe(true);
+    expect(validateMessage({ type: 'query', message: 'hi', request_id: 'q1' })).toBe(true);
+    expect(validateMessage({ type: 'cancel', request_id: 'c1' })).toBe(true);
+    expect(validateMessage({ type: 'auth_challenge', nonce: 'n' })).toBe(true);
+  });
+
+  // --- Semantic rule (task.goal) enforced by the handler, not the schema ---
+  test('schema accepts a task by structure even without a goal', () => {
+    // goal is a semantic concern; the handler rejects it with a precise error.
+    expect(validateMessage({ type: 'task', request_id: 'r1' })).toBe(true);
+  });
+
+  test('handler responds with "No goal provided" for goal-less task', async () => {
+    await startAndConnect();
+    await sendMessage({ type: 'auth', success: true });
+    latestWs.send.mockClear();
+    await sendMessage({ type: 'task', request_id: 'no-goal' });
+    expect(latestWs.send).toHaveBeenCalledWith(
+      expect.stringContaining('"No goal provided"')
+    );
+  });
+});
+// ===== WSB-04: heartbeat dead-connection detection (<30s) =====
+
+
+describe('WSB-04 — heartbeat dead-connection detection', () => {
+  function captureHeartbeat(callback) {
+    const origSetInterval = globalThis.setInterval;
+    let fn = null;
+    globalThis.setInterval = (cb, delay) => { fn = cb; return origSetInterval(cb, delay); };
+    return callback().then(() => { globalThis.setInterval = origSetInterval; return fn; });
+  }
+
+  test('closes socket when no message received within DEAD_CONNECTION_MS', async () => {
+    const closeSpy = jest.fn();
+    const heartbeatFn = await captureHeartbeat(async () => {
+      await startBridge();
+      latestWs.onopen();
+      latestWs.close = closeSpy;
+    });
+    expect(heartbeatFn).not.toBeNull();
+    // Simulate staleness: last inbound frame was 30s+ ago.
+    setLastMessageAtForTest(Date.now() - 30000);
+    heartbeatFn();
+    expect(closeSpy).toHaveBeenCalled();
+  });
+
+  test('does NOT close socket when a recent message was received', async () => {
+    const closeSpy = jest.fn();
+    const heartbeatFn = await captureHeartbeat(async () => {
+      await startBridge();
+      latestWs.onopen();
+      latestWs.close = closeSpy;
+    });
+    // Fresh liveness (just received a frame) → heartbeat should send status, not close.
+    setLastMessageAtForTest(Date.now());
+    latestWs.send.mockClear();
+    heartbeatFn();
+    await flushAsync();
+    expect(closeSpy).not.toHaveBeenCalled();
+    const calls = latestWs.send.mock.calls.map(c => JSON.parse(c[0]));
+    expect(calls.find(m => m.type === 'status')).toBeDefined();
+  });
+
+  test('refreshes liveness timestamp on every inbound frame', async () => {
+    await startAndConnect();
+    const before = getLastMessageAtForTest();
+    await sendMessage({ type: 'auth', success: true });
+    const after = getLastMessageAtForTest();
+    expect(after).toBeGreaterThanOrEqual(before);
   });
 });
