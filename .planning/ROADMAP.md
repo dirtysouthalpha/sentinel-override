@@ -1,111 +1,69 @@
-﻿# Milestone v16.0 Roadmap — Foundation Hardening + Plugin Power
+# Milestone v23.0 Roadmap — Plugin Power + Settings Integrity
 
 ## Overview
 
-**6 phases** | **24 requirements** | **6 categories**
+**3 phases** | **8 requirements** | **2 categories**
 
-Starting from Phase 1 (continued numbering from scratch since this is a new milestone cycle).
+Starting from the v22.0 Hardened Surfaces milestone (complete as of 2026-08-24).
+Phase 1 (state reconciliation + leak fix) shipped as part of TOKEN-BURN-SPRINT-2;
+Phases 2 and 3 are the remaining known work.
 
-## Phase 1: Repo Hygiene
+## Phase 1: State Reconciliation + Leak Fix (COMPLETE)
 
-**Goal:** Remove all session debris, consolidate docs, evaluate legacy code. Clean slate for development.
+**Goal:** Reconcile planning state with shipped reality, audit WSB-02..05, and fix the jest worker leak.
 
-**Requirements:** HYG-01, HYG-02, HYG-03, HYG-04, HYG-05
-
-**Success Criteria:**
-1. `git ls-files '*.md'` shows only CHANGELOG, CLAUDE, LICENSE, README, docs/, MIGRATION_GUIDE, and release notes
-2. No vendored JS in root that should be npm-managed
-3. All 8,431 existing tests still pass after cleanup
-4. `git status` is clean after commit
-
-**Notes:**
-- Safe phase — no feature changes, pure cleanup
-- Run full test suite before and after to verify zero regressions
-- Evaluate v3.0-integration/ carefully — may contain useful circuit-breaker patterns
-
-## Phase 2: Settings Persistence
-
-**Goal:** Single source of truth for all extension settings with no data loss.
-
-**Requirements:** SET-01, SET-02, SET-03, SET-04, SET-05
+**Requirements:** WSB-02, WSB-03, WSB-04, WSB-05 (audit + close-out)
 
 **Success Criteria:**
-1. Every write to settings goes through one function (persistSettings)
-2. Killing the popup mid-edit doesn't lose previously saved settings
-3. Export/import produces identical settings state on fresh install
-4. Schema migration runs automatically on extension update
+1. `npm test` exits 0 with no "worker process has failed to exit gracefully" warning
+2. WSB-02..05 each have a verdict (done/partial/missing) and pinning tests where applicable
+3. `.planning/STATE.md` and `.planning/ROADMAP.md` reflect actual shipped state
+4. `npm run check` fully green
 
 **Notes:**
-- Bug #6 (key not persisted) was fixed in v15 but the pattern needs systemic fix
-- This phase creates the foundation that Plugin System (Phase 4) depends on
-- Settings export/import is critical for backup before any future changes
+- Leak root cause: `background/skills/index.js` `_scheduleSaveStats()` 1500ms debounce timer without `.unref()` — fixed 2026-09-08
+- uap-server `setupCleanup()` interval leak (init/shutdown cycle) — fixed same day
+- WSB-02 (challenge-response) and WSB-05 (malformed-message rejection) verified already shipped; pinning tests added
+- WSB-03 finished: per-type structural schema validation at the inbound boundary
+- WSB-04 finished: dead-connection detection in the heartbeat (closes a socket silent > 30s so `onclose` → reconnect)
 
-## Phase 3: WebSocket Bridge Hardening
+## Phase 2: Plugin System (PLG-01..06)
 
-**Goal:** Production-grade secure bridge for SENTINEL PRIME orchestration.
-
-**Requirements:** WSB-01, WSB-02, WSB-03, WSB-04, WSB-05
-
-**Success Criteria:**
-1. Hardcoded token removed, auth read from configurable storage
-2. Server disconnect + reconnect completes without message loss
-3. Malformed messages rejected with error response, not crash
-4. Heartbeat detects dead connections within 30 seconds
-
-**Notes:**
-- Current ws-bridge.js has hardcoded auth token 'sentinel-prime-bridge-2025'
-- Must coordinate with SENTINEL PRIME bridge server expectations
-- Reconnection must handle Chrome service worker lifecycle (may suspend)
-
-## Phase 4: Plugin System
-
-**Goal:** Working plugin lifecycle with browse/install/manage UI.
+**Goal:** Working plugin lifecycle with install/use/disable/uninstall and conflict detection.
 
 **Requirements:** PLG-01, PLG-02, PLG-03, PLG-04, PLG-05, PLG-06
 
 **Success Criteria:**
-1. Install a plugin from a registry URL, see it appear in settings
-2. Disable a plugin, verify its actions don't fire
-3. Uninstall removes all traces (files, storage, registered handlers)
-4. Conflict between two plugins with same platform profile shows warning
+1. Plugin schema (JSON Schema) + validator; local file-based first (PLG-01)
+2. Install from local path/URL into extension storage; listed in settings UI (PLG-02)
+3. Disable → registered actions/interceptors do not fire (PLG-03)
+4. Uninstall → files, storage entries, handlers fully removed (PLG-04)
+5. Conflict detection: two plugins claiming the same platform profile → warning in settings (PLG-05)
+6. Tests for full lifecycle: install → use → disable → enable → uninstall + storage isolation (PLG-06)
 
 **Notes:**
-- Depends on Settings Persistence (Phase 2) for plugin storage
-- plugin-registry.js already has skeleton code — build on it
-- Start with local file-based plugins before remote registry
-- Plugin schema should validate against a JSON schema
+- `background/plugin-registry.js` already has skeleton code — build on it
+- **Design constraint:** no `eval()` or remote code loading. Read `background/agent-security.js` and the egress manifest first; stay inside the existing security model
+- Depends on the settings persistence write path (shipped in v22.0 SET module)
 
-## Phase 5: Platform Profile Validation
+## Phase 3: SET-03 Unsaved-Changes Indicator
 
-**Goal:** Automated confidence in all 19 MSP platform integrations.
+**Goal:** Every unsaved settings edit is visible and recoverable before it is lost.
 
-**Requirements:** PLT-01, PLT-02, PLT-03, PLT-04
+**Requirements:** SET-03
 
 **Success Criteria:**
-1. `npm test:platforms` validates all 19 profiles pass schema + smoke tests
-2. Invalid selector in a profile fails the test with actionable message
-3. Coverage report shows which profiles have integration vs smoke-only tests
-4. Runs as part of full `npm test` suite
+1. Settings edits that differ from persisted state show an indicator + Save/Discard affordance
+2. Closing the popup with unsaved changes prompts the user
+3. Uses the single `persistSettings` write path (v22.0 SET module)
+4. Tests with linkedom DOM
 
 **Notes:**
-- 19 profiles: SonicWall NSM/OnBox, FortiGate, Aruba, Cisco, M365 Admin, IT Glue, ConnectWise, NinjaRMM, Huntress, ScreenConnect, SentinelOne, Palo Alto, Datto RMM, VirusTotal, NVD, Network Device, Ambio ViewLinc
-- Focus on schema validation first (fast), then selector smoke tests
-- Can't test against real portals (auth required) but can validate structure
+- Smallest phase; touches only the popup settings surface and the v22.0 persistence module
+- Deferred from v22.0 alongside WSB-02..05
 
-## Phase 6: Error Recovery UX
+## Out of Scope (for v23.0)
 
-**Goal:** Every failure is visible, explainable, and recoverable.
-
-**Requirements:** ERR-01, ERR-02, ERR-03, ERR-04
-
-**Success Criteria:**
-1. Agent error produces a card with error code + human suggestion + retry button
-2. Retry button re-executes the exact failed step with same context
-3. After 3 consecutive failures, agent pauses and asks user for direction
-4. Error cards are collapsible for technical details
-
-**Notes:**
-- Define AgentError class that wraps all existing error paths
-- Error cards should match the existing chat message styling
-- Retry logic must preserve agent state (current step, context, plan)
-- This is the last phase because it touches agent-engine.js which is the most complex module
+- Remote plugin registry (start with local file-based plugins only)
+- Plugin sandboxing beyond the existing CSP + security model
+- WSB transport change: the bridge remains plain WebSocket over `ws://localhost:8001`
