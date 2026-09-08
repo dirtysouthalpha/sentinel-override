@@ -80,6 +80,9 @@ function _scheduleSaveStats() {
     _saveStatsTimer = null;
     try { chrome.storage.local.set({ [STATS_KEY]: _stats }); } catch (e) { console.warn('[Sentinel/skills] stats save error:', getErrorMessage(e)); }
   }, 1500);
+  // Allow the Node.js process (and Jest workers) to exit without waiting for the
+  // debounced stats write — mirrors the pattern in reasoning-trace.js.
+  if (typeof _saveStatsTimer === 'object' && _saveStatsTimer !== null && typeof _saveStatsTimer.unref === 'function') _saveStatsTimer.unref();
 }
 
 /**

@@ -314,6 +314,9 @@ export async function _waitForAdaptedGoalDecision(rewriteResult, _startTabId) {
       chrome.runtime.onMessage.removeListener(listener);
       finish({ approved: true, useOriginal: false, edited: false, reason: 'approval_timeout_default_adapted' });
     }, FIVE_MINUTES_MS);
+    // Allow the Node.js process (and Jest workers) to exit without waiting on the
+    // approval timeout — mirrors the pattern in reasoning-trace.js.
+    if (typeof timeoutId === 'object' && timeoutId !== null && typeof timeoutId.unref === 'function') timeoutId.unref();
   });
 }
 

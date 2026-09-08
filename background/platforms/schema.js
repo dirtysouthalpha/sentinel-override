@@ -21,7 +21,7 @@ const ID_RE = /^[a-z0-9]+([_-][a-z0-9]+)*$/;
 // Selector smoke charset: CSS selectors this codebase uses (incl. Playwright-ish
 // :has-text() / :text-is() pseudo-passthroughs and attribute-substring values
 // like a[href*="/vuln/detail/CVE-"] the agent runtime understands).
-const SELECTOR_RE = /^[A-Za-z0-9_\-\.\s,#:\*\[\]="'()~>+^$|/?&%!@\\]+$/;
+const SELECTOR_RE = /^[A-Za-z0-9_\-.\s,#:*[\]="'()~>+^$|/?&%!@\\]+$/;
 
 function validatePageType(pt, profileId, errors, seenPageNames) {
   if (!pt || typeof pt !== 'object') {

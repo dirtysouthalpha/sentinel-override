@@ -220,6 +220,9 @@ function _scheduleFlush() {
       _flushRunBuffer();
     }
   }, PERSIST_FLUSH_INTERVAL_MS);
+  // Allow the Node.js process (and Jest workers) to exit without waiting on the
+  // periodic flush — mirrors the pattern in reasoning-trace.js / skills.
+  if (typeof _persistFlushTimer === 'object' && _persistFlushTimer !== null && typeof _persistFlushTimer.unref === 'function') _persistFlushTimer.unref();
 }
 
 async function _flushRunBuffer() {

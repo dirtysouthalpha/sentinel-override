@@ -60,6 +60,7 @@ describe('UAP Server — coverage gaps', () => {
 
   afterEach(async () => {
     uapServer.config.enabled = false;
+    await uapServer.shutdown();
   });
 
   // ── init() when enabled = true ──────────────────────────────────────────────

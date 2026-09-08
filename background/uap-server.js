@@ -635,8 +635,9 @@ class UAPServer {
    * Setup periodic cleanup
    */
   setupCleanup() {
-    // Clean up old audit logs every hour
-    setInterval(() => {
+    // Clean up old audit logs every hour. Store the timer id so shutdown() can
+    // clear it — otherwise every init/shutdown cycle leaks an interval.
+    this._cleanupTimer = setInterval(() => {
       this._performCleanup();
     }, 3600000); // Every hour
   }
@@ -688,7 +689,14 @@ class UAPServer {
   /**
    * Shutdown server
    */
+
   async shutdown() {
+    // Stop the periodic cleanup interval — otherwise it leaks across restarts.
+    if (this._cleanupTimer) {
+      clearInterval(this._cleanupTimer);
+      this._cleanupTimer = null;
+    }
+
     // Cancel all active runs
     for (const [runId, run] of this.activeRuns.entries()) {
       if (run.status === 'running') {
@@ -700,7 +708,7 @@ class UAPServer {
     // Clear state
     this.clients.clear();
     this.activeRuns.clear();
-    
+
   }
 }
 

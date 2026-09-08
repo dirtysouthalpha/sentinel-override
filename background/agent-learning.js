@@ -229,8 +229,11 @@ export function getActionHistorySummary() {
 // Persist to storage (debounced)
 let _persistTimer = null;
 function _schedulePersist() {
-  if (_persistTimer) clearTimeout(_persistTimer);
+  clearTimeout(_persistTimer);
   _persistTimer = setTimeout(_persist, 5000) // v21.6.57: 5s debounce for learning persistence;
+  // Allow the Node.js process (and Jest workers) to exit without waiting for the
+  // debounced persist — mirrors the pattern in reasoning-trace.js / skills.
+  if (typeof _persistTimer === 'object' && _persistTimer !== null && typeof _persistTimer.unref === 'function') _persistTimer.unref();
 }
 
 async function _persist() {

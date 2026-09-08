@@ -108,6 +108,7 @@ async function requestApproval(command, stepNumber, { onPause, onResume } = {}) 
         if (onResume) onResume(); // unblock loop so it can clean up
         finish({ approved: false, skipped: false, rejected: true, reason: 'approval_hard_timeout' });
       }, 240000);
+      if (typeof hardRejectId === 'object' && hardRejectId !== null && typeof hardRejectId.unref === 'function') hardRejectId.unref();
       const origListener = listener;
       chrome.runtime.onMessage.removeListener(origListener);
       const hardTimeoutListener = (message) => {
@@ -124,6 +125,9 @@ async function requestApproval(command, stepNumber, { onPause, onResume } = {}) 
       };
       chrome.runtime.onMessage.addListener(hardTimeoutListener);
     }, ONE_MINUTE_MS);
+    // Allow the Node.js process (and Jest workers) to exit without waiting on the
+    // approval timeout — mirrors the pattern in reasoning-trace.js.
+    if (typeof timeoutId === 'object' && timeoutId !== null && typeof timeoutId.unref === 'function') timeoutId.unref();
   });
 }
 
